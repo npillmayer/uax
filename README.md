@@ -1,6 +1,6 @@
 <img alt="UAX Logo" src="http://npillmayer.github.io/UAX/img/UAX-Logo.svg" width="110" style="max-width:110">
 
-#### Unicode Text Segmentation Algorithms
+### Unicode Text Segmentation Algorithms
 
 Text processing applications need to segment text into pieces. Segments may be
 
