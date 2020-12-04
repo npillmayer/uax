@@ -1,4 +1,4 @@
-<img alt="UAX Logo" src="http://npillmayer.github.io/img/UAX-Logo.svg" width="110" style="max-width:110">
+<img alt="UAX Logo" src="http://npillmayer.github.io/UAX/img/UAX-Logo.svg" width="110" style="max-width:110">
 
 #### Unicode Text Segmentation Algorithms
 
