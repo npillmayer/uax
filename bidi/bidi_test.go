@@ -8,10 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/npillmayer/gorgo/lr/earley"
 	"github.com/npillmayer/gorgo/lr/sppf"
 	"github.com/npillmayer/gorgo/terex"
-	"github.com/npillmayer/gorgo/terex/termr"
 
 	"github.com/npillmayer/gorgo/lr/scanner"
 	"github.com/npillmayer/schuko/gtrace"
@@ -49,11 +47,14 @@ var inputs = []string{
 	//"car THECAR arabic!",
 	//"ab!",
 	//"car THE CAR in ARABIC SCRIPT!",
-	"aber (ab!)",
+	//"aber (ab!)",
 	//"12.453,45€",
 	//"sum = 12453€",
-	//"sum = $12453.00",
+	"sum = $12453.00",
 	//"hello w\u0302orld !",
+	//"(sum = $12453.00) OK?",
+	//`he said "THE VALUES ARE 123, 456, 789, OK".`,
+	//`VALUES 123, OK.`,
 }
 
 func TestSelected(t *testing.T) {
@@ -61,7 +62,7 @@ func TestSelected(t *testing.T) {
 	T().SetTraceLevel(tracing.LevelDebug)
 	gtrace.SyntaxTracer = gologadapter.New()
 	//gtrace.SyntaxTracer.SetTraceLevel(tracing.LevelDebug)
-	gtrace.SyntaxTracer.SetTraceLevel(tracing.LevelInfo)
+	gtrace.SyntaxTracer.SetTraceLevel(tracing.LevelDebug)
 	for i, input := range inputs {
 		scan := NewScanner(strings.NewReader(input), Testing(true))
 		accept, tree, err := Parse(scan)
@@ -76,8 +77,9 @@ func TestSelected(t *testing.T) {
 	}
 }
 
-func TODO_TestTermR(t *testing.T) {
-	input := "hello world"
+func TestTermR(t *testing.T) {
+	//input := "hello world"
+	input := "check (sum = $12453.00)?"
 	gtrace.CoreTracer = gologadapter.New()
 	T().SetTraceLevel(tracing.LevelDebug)
 	gtrace.SyntaxTracer = gologadapter.New()
@@ -89,23 +91,15 @@ func TODO_TestTermR(t *testing.T) {
 	}
 	if !accept {
 		t.Fatalf("Test input '%s': not recognized as a valid Bidi run", input)
-	} else {
-		T().Infof("OK, tree type is %T", tree)
-		ab := termr.NewASTBuilder(globalBidiGrammar.Grammar())
-		ab.AddTermR(newBidiTreeOp("L"))
-		env := ab.AST(tree, earleyTokenReceiver(getParser()))
-		expected := ""
-		if env == nil || env.AST.Cdr == nil {
-			t.Errorf("AST is empty")
-		} else if env.AST.ListString() != expected {
-			t.Errorf("AST should be %s, is %s", expected, env.AST.ListString())
-		}
 	}
-}
-
-func earleyTokenReceiver(parser *earley.Parser) termr.TokenRetriever {
-	return func(pos uint64) interface{} {
-		return parser.TokenAt(pos)
+	T().Infof("OK, tree type is %T", tree)
+	ast, _, err := AST(tree, earleyTokenRetriever(getParser()))
+	if err != nil {
+		t.Error(err)
+	}
+	terex.Elem(ast).Dump(tracing.LevelInfo)
+	if ast == nil {
+		t.Errorf("AST is empty")
 	}
 }
 

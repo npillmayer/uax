@@ -2,6 +2,8 @@ module github.com/npillmayer/uax
 
 go 1.14
 
+replace github.com/npillmayer/gorgo => /Users/npi/prg/go/gorgo
+
 require (
 	github.com/emirpasic/gods v1.12.0
 	github.com/jolestar/go-commons-pool v2.0.0+incompatible

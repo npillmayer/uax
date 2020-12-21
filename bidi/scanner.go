@@ -112,6 +112,7 @@ func (sc *Scanner) bidic(b []byte) (bidi.Class, int) {
 	r, sz := utf8.DecodeRune(b)
 	if sz > 0 {
 		if sc.hasMode(optionTesting) && unicode.IsUpper(r) {
+			sc.setIfStrong(bidi.R)
 			return bidi.R, sz // during testing, UPPERCASE is R2L
 		}
 		props, sz := bidi.Lookup(b)

@@ -6,6 +6,8 @@ import (
 	"github.com/npillmayer/gorgo/terex/termr"
 )
 
+// UNUSED
+
 /*
 var atomOp *sExprTermR  // for Atom -> ... productions
 var opOp *sExprTermR    // for Op -> ... productions

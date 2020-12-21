@@ -43,11 +43,11 @@ W7.
 N1.
  ✓   L  NI   L  →   L  L   L
  ✓   R  NI   R  →   R  R   R
-     R  NI  AN  →   R  R  AN
+ ✓   R  NI  AN  →   R  R  AN
      R  NI  EN  →   R  R  EN
-    AN  NI   R  →  AN  R   R
-    AN  NI  AN  →  AN  R  AN
-    AN  NI  EN  →  AN  R  EN
+    AN  NI   R  →  AN  R   R    // rewriter
+    AN  NI  AN  →  AN  R  AN    // rewriter
+    AN  NI  EN  →  AN  R  EN    // rewriter
     EN  NI   R  →  EN  R   R
     EN  NI  AN  →  EN  R  AN
     EN  NI  EN  →  EN  R  EN
