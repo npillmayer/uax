@@ -59,8 +59,8 @@ var inputs = []string{
 	//"sum = $12453.00",
 	//"hello w\u0302orld !",
 	//"(sum = $12453.00) OK?",
-	//`he said "THE VALUES ARE 123, 456, 789 OK".`,
-	`THE VALUES 123, 456 OK.`,
+	`he said "THE VALUES ARE 123, 456, 789 OK".`,
+	//`THE VALUES 123, 456 OK.`,
 	//`VALUES 123, 456, OK.`,
 }
 
