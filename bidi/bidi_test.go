@@ -22,7 +22,7 @@ import (
 func TestScanner(t *testing.T) {
 	gtrace.CoreTracer = gologadapter.New()
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
-	input := "Hell\u0302o 吾輩は World!"
+	input := "Hell\u0302o (吾輩は World!)"
 	//input := " Hello 123.0 \u0633\u0644\u0627\u0645 89" // Arabic
 	//input := "sum = $12453.00"
 	reader := strings.NewReader(input)
@@ -32,6 +32,7 @@ func TestScanner(t *testing.T) {
 		cnt++
 		tokval, token, pos, _ := sc.NextToken(scanner.AnyToken)
 		t.Logf("token '%s' at %d = %s", token, pos, ClassString(bidi.Class(tokval)))
+		sc.bd16stack.dump()
 		if tokval == scanner.EOF {
 			break
 		}
@@ -50,11 +51,11 @@ var inputs = []string{
 	//"aber (ab!)",
 	//"12.453,45€",
 	//"sum = 12453€",
-	"sum = $12453.00",
+	//"sum = $12453.00",
 	//"hello w\u0302orld !",
 	//"(sum = $12453.00) OK?",
 	//`he said "THE VALUES ARE 123, 456, 789, OK".`,
-	//`VALUES 123, OK.`,
+	`VALUES 123, 456, OK.`,
 }
 
 func TestSelected(t *testing.T) {
