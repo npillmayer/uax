@@ -15,12 +15,17 @@ import (
 	"github.com/npillmayer/schuko/gtrace"
 	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/schuko/tracing/gologadapter"
+	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 	"github.com/npillmayer/uax/ucd"
 	"golang.org/x/text/unicode/bidi"
 )
 
 func TestScanner(t *testing.T) {
-	gtrace.CoreTracer = gologadapter.New()
+	gtrace.SyntaxTracer = gotestingadapter.New()
+	gtrace.CoreTracer = gotestingadapter.New()
+	teardown := gotestingadapter.RedirectTracing(t)
+	defer teardown()
+	gtrace.SyntaxTracer.SetTraceLevel(tracing.LevelDebug)
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	input := "Hell\u0302o (吾輩は World!)"
 	//input := " Hello 123.0 \u0633\u0644\u0627\u0645 89" // Arabic
@@ -37,8 +42,8 @@ func TestScanner(t *testing.T) {
 			break
 		}
 	}
-	if cnt != 9 {
-		t.Errorf("Expected scanner to return 9 tokens, was %d", cnt)
+	if cnt != 11 {
+		t.Errorf("Expected scanner to return 11 tokens, was %d", cnt)
 	}
 }
 
@@ -54,8 +59,9 @@ var inputs = []string{
 	//"sum = $12453.00",
 	//"hello w\u0302orld !",
 	//"(sum = $12453.00) OK?",
-	//`he said "THE VALUES ARE 123, 456, 789, OK".`,
-	`VALUES 123, 456, OK.`,
+	//`he said "THE VALUES ARE 123, 456, 789 OK".`,
+	`THE VALUES 123, 456 OK.`,
+	//`VALUES 123, 456, OK.`,
 }
 
 func TestSelected(t *testing.T) {

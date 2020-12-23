@@ -75,18 +75,18 @@ func getParser() *earley.Parser {
 	b.LHS("NISeq").Epsilon()                 //
 
 	// LSpan is a run :LRI … :PDI, which may include mixed Ls and Rs
-	b.LHS("LSpan").N("LSOS").N("EOS").End()      // LSpan may be pure L
+	b.LHS("LSpan").N("LRun").N("EOS").End()      // LSpan may be pure L
 	b.LHS("LSpan").N("LSpanFrag").N("EOS").End() // LSpan must include EOS(=PDI)
 	// LSpanFrag is a fragment :LRI …, which included at least one R
 	b.LHS("LSpanFrag").N("LSpanFrag").N("NISeq").N("L").End()
 	b.LHS("LSpanFrag").N("LSpanFrag").N("NISeq").N("R").End()
-	b.LHS("LSpanFrag").N("LSOS").N("R").N("NISeq").N("L").End() // bridge R
-	b.LHS("LSpanFrag").N("LSOS").N("R").End()
-	// LSOS is a fragment :LRI …, which does not include any Rs
-	b.LHS("LSOS").N("LSOS").N("NI").End() // LSOS gobbles up Ls and NIs (no Rs)
-	b.LHS("LSOS").N("LSOS").N("L").End()
-	b.LHS("LSOS").T(bc(bidi.LRI)).N("L").End()  // LSOS starts at LRI
-	b.LHS("LSOS").T(bc(bidi.LRI)).N("NI").End() // TODO: EN, etc.
+	b.LHS("LSpanFrag").N("LRun").N("R").N("NISeq").N("L").End() // bridge R
+	b.LHS("LSpanFrag").N("LRun").N("R").End()
+	// LRun is a fragment :LRI …, which does not include any Rs
+	b.LHS("LRun").N("LRun").N("NI").End() // LRun gobbles up Ls and NIs (no Rs)
+	b.LHS("LRun").N("LRun").N("L").End()
+	b.LHS("LRun").T(bc(bidi.LRI)).N("L").End()  // LRun starts at LRI
+	b.LHS("LRun").T(bc(bidi.LRI)).N("NI").End() // TODO: EN, etc.
 	// EOS is a closing fragment [NI] :PD
 	b.LHS("EOS").N("NI").T(bc(bidi.PDI)).End() // EOS collects trailing NIs
 	b.LHS("EOS").T(bc(bidi.PDI)).End()
@@ -113,17 +113,21 @@ func getParser() *earley.Parser {
 func NewBidiGrammar() *lr.LRAnalysis {
 	b := lr.NewGrammarBuilder("UAX#9")
 
-	//b.LHS("S").T(bc(bidi.LRI)).N("R").T(bc(bidi.PDI)).End() // for testing
+	//b.LHS("S").N("LSpan").N("EOS").End() // for testing
 	//
-	b.LHS("Para").N("LRun").End() // L to R paragraph
-	// b.LHS("NI").N("LRun").End()            // explicit runs are neutral to surrounding text
-	b.LHS("LRun").N("LSOS").N("EOS").End() //
-	// //
-	b.LHS("LSOS").T(bc(bidi.LRI)).End()      // LSOS starts at LRI
-	b.LHS("LSOS").N("LSOS").N("NISeq").End() // LSOS gobbles up NIs
-	b.LHS("LSOS").N("LSOS").N("L").End()     // LSOS gobbles up Ls
-	b.LHS("LSOS").N("LSOS").N("R").End()     //
-	// //
+	b.LHS("Para").N("LSpan").N("EOS").End() // L to R paragraph with Ls and Rs top-level
+	//
+	b.LHS("NI").N("LSpan").N("EOS").End()      // explicit runs are neutral to surrounding text
+	b.LHS("LSpan").N("LSpan").N("L").End()     // further Ls and Rs are collected
+	b.LHS("LSpan").N("LRun").N("R").End()      // Rs promote LRuns to LSpans
+	b.LHS("LSpan").N("LSpan").N("R").End()     // further Ls and Rs are collected
+	b.LHS("LSpan").N("LSpan").N("NISeq").End() // LSpan gobbles up NIs
+	b.LHS("LSpan").N("LRun").End()             // L to R paragraph with just Ls top-level
+	//
+	b.LHS("LRun").T(bc(bidi.LRI)).End()      // LRun starts at LRI
+	b.LHS("LRun").N("LRun").N("NISeq").End() // LRun gobbles up NIs
+	b.LHS("LRun").N("LRun").N("L").End()     // LRun gobbles up Ls
+	//
 	b.LHS("EOS").T(bc(bidi.PDI)).End()
 	b.LHS("EOS").N("NISeq").N("EOS").End() // EOS collects trailing NIs
 	//
@@ -133,12 +137,12 @@ func NewBidiGrammar() *lr.LRAnalysis {
 	//
 	// N0. Process bracket pairs
 	// try to keep bracket information
-	b.LHS("L").N("LBrackRun").End()
-	b.LHS("LBrackRun").N("LBrackO").N("L").N("LBrackC").End()
-	b.LHS("LBrackO").T(bc(LBRACKO)).End()
-	b.LHS("LBrackO").N("LBrackO").N("NI").End()
-	b.LHS("LBrackC").N("NI").N("LBrackC").End()
-	b.LHS("LBrackC").T(bc(LBRACKC)).End()
+	// b.LHS("L").N("LBrackRun").End()
+	// b.LHS("LBrackRun").N("LBrackO").N("L").N("LBrackC").End()
+	// b.LHS("LBrackO").T(bc(LBRACKO)).End()
+	// b.LHS("LBrackO").N("LBrackO").N("NI").End()
+	// b.LHS("LBrackC").N("NI").N("LBrackC").End()
+	// b.LHS("LBrackC").T(bc(LBRACKC)).End()
 	//
 	// 3.3.4 Resolving Weak Types
 	b.LHS("R").T(bc(bidi.AL)).End() // W3: AL → R
