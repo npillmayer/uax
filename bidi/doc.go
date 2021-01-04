@@ -6,7 +6,7 @@ Attention: Work in progress, not yet functional.
 
 BSD License
 
-Copyright (c) 2017–2020, Norbert Pillmayer
+Copyright (c) 2017–2021, Norbert Pillmayer
 
 All rights reserved.
 

@@ -130,6 +130,7 @@ github.com/npillmayer/gorgo v0.0.0-20201204221716-78b66f4dacf6/go.mod h1:z9YZi9m
 github.com/npillmayer/gotype v0.0.0-20201204061902-df8e6285672b/go.mod h1:jm4sKGTCR4s92km7y8iLZTO2qtwe15lW0xaQTWItjc4=
 github.com/npillmayer/schuko v0.0.0-20201204201146-2476b260d9a6 h1:g+cjMIF1WbOv5OZ2TTKMASmk0+ke4Pf3dOo4Vbdi6HI=
 github.com/npillmayer/schuko v0.0.0-20201204201146-2476b260d9a6/go.mod h1:ZBwSZ3NU/4nLac7UPWGLw+W1fzAUj0iRViGjoS9j+Q0=
+github.com/npillmayer/schuko v0.0.0-20201204202054-953994f422ef h1:tBNZ4SHFKUZrI4UHvU/bGjh9brDHSZ01Ma6YnHjQJ6M=
 github.com/oklog/ulid v1.3.1/go.mod h1:CirwcVhetQ6Lv90oh/F+FBtV6XMibvdAFo93nm5qn4U=
 github.com/pascaldekloe/goe v0.0.0-20180627143212-57f6aae5913c/go.mod h1:lzWF7FIEvWOWxwDKqyGYQf6ZUaNfKdP144TG7ZOy1lc=
 github.com/pelletier/go-toml v1.2.0/go.mod h1:5z9KED0ma1S8pY6P1sdut58dfprrGBbd/94hg7ilaic=

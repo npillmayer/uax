@@ -1,5 +1,10 @@
 package bidi
 
+// TODO The scanner need not return the token lexeme, as it will not be processed by the
+// parser. The parser operates on intervals of BiDi class IDs.
+//
+// Input reader will in most cases be a cord reader.
+
 import (
 	"bufio"
 	"io"
@@ -24,7 +29,7 @@ type Scanner struct {
 	ahead       uint64         // position ahead of current lexeme
 	bd16stack   bracketStack   // bracket pair stack, rule BD16
 	done        bool           // at EOF?
-	mode        uint           // scanner modes, set with options
+	mode        uint           // scanner modes, set by scanner options
 }
 
 // BS16Max is the maximum stack depth for rule BS16 as defined in UAX#9.
@@ -230,20 +235,26 @@ func (sc *Scanner) setIfStrong(c bidi.Class) bidi.Class {
 	return ILLEGAL
 }
 
-// --- Bidi_Class Helpers ----------------------------------------------------
+// --- Bidi_Classes ----------------------------------------------------------
 
 // We use some additional Bidi_Classes, which reflects additional knowledge about
 // a character. Our scanner will process some Bidi rules before the parser is
 // going to see the tokens.
+//
+// Unfortunately we need additional BiDi classes to be close to the ones defined in package unicode.bidi,
+// to fit them in a compact hash trie. This creates an unwanted dependency on the maximum value of
+// BiDi classes in unicode.bidi, which as of now is `bidi.PDI`. unicode.bidi is unstable, thus making us
+// somewhat reliant on an unreliable API.
 const (
-	LEN     bidi.Class = iota + 100 // left biased european number (EN)
-	LBRACKO                         // opening bracket in L context
-	RBRACKO                         // opening bracket in R context
-	LBRACKC                         // closing bracket in L context
-	RBRACKC                         // closing bracket in R context
-	BRACKC                          // closing bracket
-	NI                              // neutral character
-	ILLEGAL bidi.Class = 999        // in-band value denoting illegal class
+	LEN     bidi.Class = bidi.PDI + 5 // left biased european number (EN)
+	LBRACKO                           // opening bracket in L context
+	RBRACKO                           // opening bracket in R context
+	LBRACKC                           // closing bracket in L context
+	RBRACKC                           // closing bracket in R context
+	BRACKC                            // closing bracket
+	NI                                // neutral character
+	MAX                               // marker to have the maximum BiDi class available for clients
+	ILLEGAL bidi.Class = 999          // in-band value denoting illegal class
 )
 
 const claszname = "LRENESETANCSBSWSONBNNSMALControlNumLRORLOLRERLEPDFLRIRLIFSIPDI----------"
