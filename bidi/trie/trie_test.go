@@ -38,6 +38,9 @@ func TestEnterZero(t *testing.T) {
 	trie, _ := NewTinyHashTrie(139, 46)
 	p1 := trie.AllocPositionForWord([]byte{0, 0})
 	t.Logf("p=%d", p1)
+	if p1 == 0 {
+		t.Errorf("no entry for [0,0]")
+	}
 }
 
 func TestIterator(t *testing.T) {

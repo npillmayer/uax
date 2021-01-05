@@ -241,9 +241,9 @@ func (ti *Iterator) Next(c int8) int {
 		return 0
 	}
 	if ti.n == 0 {
-		ti.position = pointer(c)
+		ti.position = pointer(ti.trie.correct(byte(c)))
 		ti.n++
-		return int(ti.trie.ch[c])
+		return int(ti.trie.ch[ti.position])
 	}
 	cc := ti.trie.correct(byte(c))
 	ti.position = ti.trie.advanceToChild(ti.position, cc, ti.n)

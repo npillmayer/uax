@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 
 	"github.com/npillmayer/gorgo/lr/scanner"
-	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/uax/bidi/trie"
 	"golang.org/x/text/unicode/bidi"
 )
@@ -72,11 +72,17 @@ func NewParser(sc *bidiScanner) (*Parser, error) {
 
 func (p *Parser) reduce(n int, rhs []intv) {
 	T().Debugf("REDUCE at %d: %d⇒%v", p.sp, n, rhs)
+	diff := len(rhs) - n
 	for i, iv := range rhs {
 		p.stack[p.sp+i] = iv
 	}
-	pos := max(0, len(p.stack)-n+len(rhs)) // avoid jumping left of 0
-	p.stack = p.stack[:pos]
+	//pos := max(0, len(p.stack)-n+len(rhs)) // avoid jumping left of 0
+	//pos := max(0, len(p.stack)+diff)
+	pos := max(0, p.sp+len(rhs))
+	//T().Debugf("STACK = %v", p.stack)
+	//T().Debugf("sp = %d, diff = %d, pos = %d", p.sp, diff, pos)
+	p.stack = append(p.stack[:pos], p.stack[pos-diff:]...)
+	//T().Debugf("STACK = %v", p.stack)
 	T().Debugf("sp=%d, stack-LA is now %v", p.sp, p.stack[p.sp:])
 }
 
@@ -145,14 +151,32 @@ func (p *Parser) read(n int, t int) (int, int) {
 }
 
 func (p *Parser) pass2() {
-	T().Debugf("PASS 2 not yet implemented")
+	p.sp = 0
+	for p.sp < len(p.stack) {
+		e := min(len(p.stack), p.sp+3)
+		T().Debugf("trying to match %v at %d", p.stack[p.sp:e], p.sp)
+		rule, _ := p.matchRulesLHS(p.stack[p.sp:len(p.stack)], 2)
+		if rule == nil || rule.pass < 2 {
+			p.sp++
+			continue
+		}
+		T().Debugf("applying UAX#9 rule %s", rule.name)
+		rhs, jmp := rule.action(p.stack[p.sp:len(p.stack)])
+		p.reduce(rule.lhsLen, rhs)
+		p.sp = max(0, p.sp+jmp) // avoid jumping left of 0
+	}
 }
 
 // Ordering starts the parse and returns a bidi-ordering for the input-text given
 // when creating the parser.
 func (p *Parser) Ordering() *Ordering {
+	T().Debugf("--- pass 1 ---")
 	p.pass1()
+	T().Debugf("--------------")
+	T().Debugf("STACK = %v", p.stack)
+	T().Debugf("--- pass 2 ---")
 	p.pass2()
+	T().Debugf("--------------")
 	return &Ordering{intervals: p.stack}
 }
 
@@ -237,20 +261,23 @@ func (iv intv) String() string {
 
 // --- Rules trie ------------------------------------------------------------
 
-var rules map[int]*bidiRule // TODO this is probably not the best idea
+var rules map[int]*bidiRule      // TODO this is probably not the best idea
+var rulesTrie *trie.TinyHashTrie // global dictionary for rules
+var prepareTrieOnce sync.Once    // all parsers will share a single rules dictionary
 
 func prepareRulesTrie() *trie.TinyHashTrie {
+	//prepareTrieOnce.Do(func() {
 	if rules == nil {
 		rules = make(map[int]*bidiRule)
 	}
 	trie, err := trie.NewTinyHashTrie(103, int8(MAX))
 	if err != nil {
 		T().Errorf(err.Error())
-		return nil
+		panic(err.Error())
 	}
 	var r *bidiRule
 	tracelevel := T().GetTraceLevel()
-	T().SetTraceLevel(tracing.LevelInfo)
+	//T().SetTraceLevel(tracing.LevelInfo)
 	var lhs []byte
 	// --- allocate all the rules ---
 	r, lhs = ruleW4_1()
@@ -291,13 +318,19 @@ func prepareRulesTrie() *trie.TinyHashTrie {
 	allocRule(trie, r, lhs)
 	r, lhs = ruleN1_10()
 	allocRule(trie, r, lhs)
+	r, lhs = ruleL()
+	allocRule(trie, r, lhs)
+	r, lhs = ruleR()
+	allocRule(trie, r, lhs)
 	// ------------------------------
 	trie.Freeze()
 	T().SetTraceLevel(tracelevel)
 	T().Debugf("--- freeze trie -------------")
 	T().Infof("#categories=%d", MAX)
 	trie.Stats()
-	return trie
+	rulesTrie = trie
+	//})
+	return rulesTrie
 }
 
 func allocRule(trie *trie.TinyHashTrie, rule *bidiRule, lhs []byte) {
@@ -308,6 +341,13 @@ func allocRule(trie *trie.TinyHashTrie, rule *bidiRule, lhs []byte) {
 }
 
 // ---------------------------------------------------------------------------
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
 
 func max(a, b int) int {
 	if a > b {

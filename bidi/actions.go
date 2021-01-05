@@ -102,6 +102,7 @@ func ruleW7() (*bidiRule, []byte) {
 //     order of the text positions of the opening paired brackets using the logic
 //     given below. Within this scope, bidirectional types EN and AN are treated as R.
 
+// This rule is currently not used.
 func ruleN0() (*bidiRule, []byte) {
 	lhs := makeLHS(BRACKC) // closing bracket has a matching opening bracket
 	return &bidiRule{
@@ -231,6 +232,16 @@ func ruleN1_10() (*bidiRule, []byte) {
 // NI → e
 // TODO this will not be implemented 1:1, I think.
 //      probably better and easier to include it during flatten operation
+
+func ruleL() (*bidiRule, []byte) {
+	lhs := makeLHS(bidi.L, bidi.L)
+	return makeSquashRule("L+L=L", lhs, bidi.L, 0), lhs
+}
+
+func ruleR() (*bidiRule, []byte) {
+	lhs := makeLHS(bidi.R, bidi.R)
+	return makeSquashRule("R+R=R", lhs, bidi.R, 0), lhs
+}
 
 // ---------------------------------------------------------------------------
 

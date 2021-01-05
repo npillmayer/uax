@@ -265,10 +265,10 @@ const (
 )
 
 const claszname = "LRENESETANCSBSWSONBNNSMALControlNumLRORLOLRERLEPDFLRIRLIFSIPDI----------"
-const claszadd = "LENLBRACKORBRACKOLBRACKCRBRACKCBRACKCNI<max>------"
+const claszadd = "LBRACKORBRACKOLBRACKCRBRACKCBRACKCNI<max>------"
 
 var claszindex = [...]uint8{0, 1, 2, 4, 6, 8, 10, 12, 13, 14, 16, 18, 20, 23, 25, 32, 35, 38, 41, 44, 47, 50, 53, 56, 59, 62}
-var claszaddinx = [...]uint8{0, 3, 10, 17, 24, 31, 37, 39, 44}
+var claszaddinx = [...]uint8{0, 7, 14, 21, 28, 34, 36, 41, 44}
 
 // ClassString returns a bidi class as a string.
 func ClassString(i bidi.Class) string {
