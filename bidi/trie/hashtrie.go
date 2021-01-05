@@ -20,12 +20,12 @@ type TinyHashTrie struct {
 	frozen     bool
 	headercode category
 	span       pointer // space in table without leading and trailing #catnct slots
+	alpha      pointer
 	size       int
 	catcnt     int
 	link       []pointer
 	sibling    []pointer
 	ch         []category
-	alpha      int
 }
 
 // NewTinyHashTrie creates a new trie. size should be a prime number.
@@ -41,7 +41,7 @@ func NewTinyHashTrie(size uint8, catcnt int8) (*TinyHashTrie, error) {
 		catcnt: int(catcnt) + 1, // make room for cat = 0
 	}
 	trie.headercode = category(trie.catcnt) + 1
-	trie.alpha = int(math.Round(0.61803 * float64(trie.size)))
+	trie.alpha = pointer(math.Round(0.61803 * float64(trie.size)))
 	trie.span = pointer(trie.size - 2*trie.catcnt)
 	trie.setInitialValues()
 	return trie, nil
@@ -96,9 +96,9 @@ func (trie *TinyHashTrie) advanceToChild(p pointer, c category, n int) pointer {
 }
 
 func (trie *TinyHashTrie) insertFirstbornChildAndProgress(p pointer, c category, n int) pointer {
-	var h pointer                             // trial header location
-	var x = pointer(n*trie.alpha) % trie.span // nominal position of header #n
-	h = x + pointer(trie.catcnt) + 1          // now catcnt < h ≤ (trie.size+catcnt)
+	var h pointer                               // trial header location
+	var x = pointer(n) * trie.alpha % trie.span // nominal position of header #n
+	h = x + pointer(trie.catcnt) + 1            // now catcnt < h ≤ (trie.size+catcnt)
 	if h <= pointer(trie.catcnt) || int(h) > trie.size+trie.catcnt {
 		panic("invariant not held")
 	}
@@ -144,9 +144,9 @@ func (trie *TinyHashTrie) insertChildIntoFamily(p, q pointer, c category) pointe
 func (trie *TinyHashTrie) moveFamily(p pointer, c category, n int) (pointer, pointer) {
 	T().Debugf("have to move family for c=%d", c)
 	//
-	var h pointer                             // trial header location
-	var x = pointer(n*trie.alpha) % trie.span // nominal position of header #n
-	h = x + pointer(trie.catcnt) + 1          // now catcnt < h ≤ (trie.size+catcnt)
+	var h pointer                               // trial header location
+	var x = pointer(n) * trie.alpha % trie.span // nominal position of header #n
+	h = x + pointer(trie.catcnt) + 1            // now catcnt < h ≤ (trie.size+catcnt)
 	if h <= pointer(trie.catcnt) || int(h) > trie.size+trie.catcnt {
 		panic("invariant not held")
 	}
