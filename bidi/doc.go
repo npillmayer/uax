@@ -47,3 +47,6 @@ import (
 func T() tracing.Trace {
 	return gtrace.CoreTracer
 }
+
+// UnicodeVersion is the UAX#9 version this implementation follows.
+const UnicodeVersion = "13.0.0"

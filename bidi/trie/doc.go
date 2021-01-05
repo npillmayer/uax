@@ -1,11 +1,16 @@
 /*
-Package trie implements a static trie data structure.
+Package trie implements a trie data-structure similar to the one described by
+Donald E Knuth in “Programming Perls”. (Communications of the ACM,
+Vol. 29, No. 6, June 1986,
+https://cecs.wright.edu/people/faculty/pmateti/Courses/7140/PDF/cwp-knuth-cacm-1986.pdf).
 
-Attention: Work in progress, not yet functional.
+The trie is suitable for write-once-read-many-times situations. The idea is to
+spend some effort to create a compact but efficient dictionary for categorical data.
+
 
 BSD License
 
-Copyright (c) 2017–2021, Norbert Pillmayer
+Copyright (c) 2020–2021, Norbert Pillmayer
 
 All rights reserved.
 

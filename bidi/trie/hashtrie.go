@@ -1,72 +1,92 @@
 package trie
 
-import "math"
+import (
+	"errors"
+	"math"
+	"unsafe"
+)
 
-type bidiclass int8
-type pointer int16
+//type pointer int16
+type pointer uint8
+type category int8
 
-// const size = 9973  // largest prime < 10000
-// const catcnt = 46      // maximum number of bidi character classes
-// const headercode = 47  // special code for anchor of family
-const empty = 0        // denotes empty slots of the trie
-const tolerance = 1000 // maximum number of trys to relocated a family
+const empty = 0      // denotes empty slots of the trie
+const tolerance = 60 // maximum number of trys to relocated a family
 
-type ShortHashTrie struct {
-	size       int
-	catcnt     int     //bidiclass
+// TinyHashTrie is a trie where the address range fits into an uint8 and
+// values to store have a small range. The bytes usually will represent
+// some kind of character classes (category).
+type TinyHashTrie struct {
+	frozen     bool
+	headercode category
 	span       pointer // space in table without leading and trailing #catnct slots
-	headercode bidiclass
+	size       int
+	catcnt     int
 	link       []pointer
 	sibling    []pointer
-	ch         []bidiclass
-	alpha      int //pointer
+	ch         []category
+	alpha      int
 }
 
-func NewShortHashTrie(size int16, catcnt int8) *ShortHashTrie {
-	trie := &ShortHashTrie{
-		size:   int(size),
-		catcnt: int(catcnt),
+// NewTinyHashTrie creates a new trie. size should be a prime number.
+// catcnt must not be greater than 50.
+func NewTinyHashTrie(size uint8, catcnt int8) (*TinyHashTrie, error) {
+	//func NewTinyHashTrie(size int16, catcnt int8) (*TinyHashTrie, error) {
+	if catcnt > 50 {
+		T().Errorf("number of categories to store may not exceed 50")
+		return nil, errors.New("number of categories to store may not exceed 50")
 	}
-	trie.headercode = bidiclass(trie.catcnt) + 1
+	trie := &TinyHashTrie{
+		size:   int(size),       // TODO find nearest prime
+		catcnt: int(catcnt) + 1, // make room for cat = 0
+	}
+	trie.headercode = category(trie.catcnt) + 1
 	trie.alpha = int(math.Round(0.61803 * float64(trie.size)))
 	trie.span = pointer(trie.size - 2*trie.catcnt)
 	trie.setInitialValues()
-	return trie
+	return trie, nil
 }
 
-func (trie *ShortHashTrie) setInitialValues() {
+func (trie *TinyHashTrie) setInitialValues() {
 	trie.link = make([]pointer, trie.size)
 	trie.sibling = make([]pointer, trie.size)
-	trie.ch = make([]bidiclass, trie.size)
+	trie.ch = make([]category, trie.size)
 	for i := 1; i <= int(trie.catcnt); i++ {
-		trie.ch[i] = bidiclass(i)
+		trie.ch[i] = category(i)
 		trie.sibling[i] = pointer(i) - 1
 	}
 	trie.ch[0] = trie.headercode
 	trie.sibling[0] = pointer(trie.catcnt)
 }
 
-// findPositionForWord is Knuth's find_buffer
-func (trie *ShortHashTrie) findPositionForWord(buf []byte) pointer {
+// AllocPositionForWord will allocate a position in the trie for a prefix
+// (this is Knuth's `find_buffer`)
+func (trie *TinyHashTrie) AllocPositionForWord(buf []byte) int {
 	n := 0
-	p := pointer(buf[0]) // current word position
+	p := pointer(trie.correct(buf[0])) // current word position
 	for n+1 < len(buf) {
 		n++
-		c := bidiclass(buf[n])
+		c := trie.correct(buf[n])
 		p = trie.advanceToChild(p, c, n)
-		T().Debugf("advanced to p=%d with c=%d", p, c)
+		//T().Debugf("advanced to p=%d with c=%d", p, c)
 	}
-	return p
+	return int(p)
 }
 
-func (trie *ShortHashTrie) advanceToChild(p pointer, c bidiclass, n int) pointer {
+func (trie *TinyHashTrie) advanceToChild(p pointer, c category, n int) pointer {
 	if trie.link[p] == 0 {
+		if trie.frozen {
+			return 0
+		}
 		T().Debugf("link[%d] is unassigned, inserting first child=%d", p, c)
 		return trie.insertFirstbornChildAndProgress(p, c, n)
 	}
-	T().Debugf("position link[%d] is occupied →%d", p, trie.link[p])
+	//T().Debugf("position link[%d] is occupied →%d", p, trie.link[p])
 	q := trie.link[p] + pointer(c)
 	if trie.ch[q] != c {
+		if trie.frozen {
+			return 0
+		}
 		if trie.ch[q] != empty {
 			p, q = trie.moveFamily(p, c, n)
 		}
@@ -75,27 +95,13 @@ func (trie *ShortHashTrie) advanceToChild(p pointer, c bidiclass, n int) pointer
 	return q
 }
 
-func (trie *ShortHashTrie) insertFirstbornChildAndProgress(p pointer, c bidiclass, n int) pointer {
+func (trie *TinyHashTrie) insertFirstbornChildAndProgress(p pointer, c category, n int) pointer {
 	var h pointer                             // trial header location
 	var x = pointer(n*trie.alpha) % trie.span // nominal position of header #n
-	//var lasth int // stopper for location search
-	// Get set for computing header locations
-	// if x < pointer(trie.size-2*int(trie.catcnt)-trie.alpha) {
-	// 	x += pointer(trie.alpha)
-	// } else {
-	// 	x = x + pointer(trie.alpha-trie.size+2*int(trie.catcnt))
-	// }
-	h = x + pointer(trie.catcnt) + 1 // now catcnt < h ≤ (trie.size+catcnt)
+	h = x + pointer(trie.catcnt) + 1          // now catcnt < h ≤ (trie.size+catcnt)
 	if h <= pointer(trie.catcnt) || int(h) > trie.size+trie.catcnt {
 		panic("invariant not held")
 	}
-	// we won't use a stopper
-	// if int(h) < trie.size-trie.catcnt-tolerance {
-	// 	lasth = int(h) + tolerance
-	// } else {
-	// 	lasth = int(h) + tolerance - trie.size + 2*trie.catcnt
-	// }
-	//
 	trys := 0
 	for ; trys < tolerance; trys++ {
 		// Compute the next trial header location or abort find
@@ -110,7 +116,6 @@ func (trie *ShortHashTrie) insertFirstbornChildAndProgress(p pointer, c bidiclas
 			break
 		}
 	}
-	//if int(h) == lasth {
 	if trys == tolerance {
 		T().Errorf("abort find")
 		panic("abort find")
@@ -124,7 +129,7 @@ func (trie *ShortHashTrie) insertFirstbornChildAndProgress(p pointer, c bidiclas
 }
 
 // q = link[p] + c
-func (trie *ShortHashTrie) insertChildIntoFamily(p, q pointer, c bidiclass) pointer {
+func (trie *TinyHashTrie) insertChildIntoFamily(p, q pointer, c category) pointer {
 	h := trie.link[p]
 	for trie.sibling[h] > q {
 		h = trie.sibling[h]
@@ -136,42 +141,24 @@ func (trie *ShortHashTrie) insertChildIntoFamily(p, q pointer, c bidiclass) poin
 	return q
 }
 
-func (trie *ShortHashTrie) moveFamily(p pointer, c bidiclass, n int) (pointer, pointer) {
+func (trie *TinyHashTrie) moveFamily(p pointer, c category, n int) (pointer, pointer) {
 	T().Debugf("have to move family for c=%d", c)
 	//
 	var h pointer                             // trial header location
 	var x = pointer(n*trie.alpha) % trie.span // nominal position of header #n
-	//var lasth int // stopper for location search
-	// Get set for computing header locations
-	// if x < pointer(trie.size-2*int(trie.catcnt)-trie.alpha) {
-	// 	x += pointer(trie.alpha)
-	// } else {
-	// 	x = x + pointer(trie.alpha-trie.size+2*int(trie.catcnt))
-	// }
-	h = x + pointer(trie.catcnt) + 1 // now catcnt < h ≤ (trie.size+catcnt)
+	h = x + pointer(trie.catcnt) + 1          // now catcnt < h ≤ (trie.size+catcnt)
 	if h <= pointer(trie.catcnt) || int(h) > trie.size+trie.catcnt {
 		panic("invariant not held")
 	}
-	//
-	// var h, x pointer
-	// var lasth int
-	// if int(x) < trie.size-2*trie.catcnt-trie.alpha {
-	// 	x += pointer(trie.alpha)
-	// } else {
-	// 	x = x + pointer(trie.alpha-trie.size+2*trie.catcnt)
-	// }
 	h = x + pointer(trie.catcnt) + 1
-	// if int(h) < trie.size-trie.catcnt-tolerance {
-	// 	lasth = int(h) + tolerance
-	// } else {
-	// 	lasth = int(h) + tolerance - trie.size + 2*trie.catcnt
-	// }
 	//
 	q := h + pointer(c)
 	r := trie.link[p]
 	delta := h - r
 	trys := 0
 	for ; trys < tolerance; trys++ {
+		// Compute the next trial header location
+		T().Debugf("trying to find a home for family")
 		if h < pointer(trie.size-trie.catcnt) {
 			h++
 		} else {
@@ -181,41 +168,115 @@ func (trie *ShortHashTrie) moveFamily(p pointer, c bidiclass, n int) (pointer, p
 		if trie.ch[h+pointer(c)] != empty {
 			continue
 		}
+		T().Debugf("found a potential home h=%d", h)
 		r = trie.link[p]
 		delta = h - r
 		for trie.ch[r+delta] == empty && trie.sibling[r] != trie.link[p] {
 			r = trie.sibling[r]
+			T().Debugf(".")
 		}
 		if trie.ch[r+delta] == empty {
 			break // found a slot
 		}
 	}
-	//if int(h) == lasth {
-	if trys == tolerance {
+	if trys >= tolerance {
 		T().Errorf("abort find")
 		panic("abort find")
+	}
+	q = h + pointer(c)
+	r = trie.link[p]
+	delta = h - r
+	for {
+		trie.sibling[r+delta] = trie.sibling[r] + delta
+		trie.ch[r+delta] = trie.ch[r]
+		trie.ch[r] = empty
+		trie.link[r+delta] = trie.link[r]
+		if trie.link[r] != empty {
+			trie.link[trie.link[r]] = r + delta
+		}
+		r = trie.sibling[r]
+		if trie.ch[r] == empty {
+			break
+		}
 	}
 	return p, q
 }
 
-func (trie *ShortHashTrie) Iterator() *TrieIterator {
-	iterator := &TrieIterator{
+// Freeze will make the trie read-only.
+func (trie *TinyHashTrie) Freeze() {
+	trie.frozen = true
+	trie.sibling = nil // will not be needed for lookup
+}
+
+// Iterator will return an iterator to advance over prefixes of words to find
+// in the trie.
+func (trie *TinyHashTrie) Iterator() *Iterator {
+	iterator := &Iterator{
 		trie: trie,
 		n:    0,
 	}
 	return iterator
 }
 
+func (trie *TinyHashTrie) correct(c byte) category {
+	if c == 0 { // bidi.L = 0 ⇒ unusable, set to max_cat+1
+		return category(trie.catcnt)
+	}
+	return category(c)
+}
+
 // --- Iterator --------------------------------------------------------------
 
-type TrieIterator struct {
-	trie     *ShortHashTrie
+// Iterator is a one-off iterator to find an entry in the trie.
+type Iterator struct {
+	trie     *TinyHashTrie
 	position pointer
 	n        int
 }
 
-func (ti *TrieIterator) Next(c int8) int {
-	ti.position = ti.trie.advanceToChild(ti.position, bidiclass(c), ti.n)
-	T().Debugf("advanced to p=%d with c=%d", ti.position, c)
+// Next will advance the iterator to the next prefix of a word to find.
+// if it returns 0, the prefix is not contained in the trie.
+func (ti *Iterator) Next(c int8) int {
+	if ti.trie == nil {
+		return 0
+	}
+	if ti.n == 0 {
+		ti.position = pointer(c)
+		ti.n++
+		return int(ti.trie.ch[c])
+	}
+	cc := ti.trie.correct(byte(c))
+	ti.position = ti.trie.advanceToChild(ti.position, cc, ti.n)
+	//T().Debugf("advanced to p=%d with c=%d", ti.position, c)
+	if ti.position == 0 {
+		ti.trie = nil // end of iteration
+	}
 	return int(ti.position)
+}
+
+// ---------------------------------------------------------------------------
+
+// Stats print some useful information about the trie on the Info log channel.
+func (trie *TinyHashTrie) Stats() {
+	fillch := 0
+	filllink := 0
+	for i := 0; i < trie.size; i++ {
+		if trie.ch[i] != empty {
+			fillch++
+		}
+		if trie.link[i] != empty {
+			filllink++
+		}
+	}
+	T().Infof("Trie Statistics:")
+	T().Infof("  Size of trie:   %d", trie.size)
+	T().Infof("  Category count: %d", trie.catcnt)
+	T().Infof("  Links:    %d of %d (%.1f%%)", filllink, trie.size, float32(filllink)/float32(trie.size)*100)
+	T().Infof("  Children: %d of %d (%.1f%%)", fillch, trie.size, float32(fillch)/float32(trie.size)*100)
+	var memory uint64
+	memory = uint64(unsafe.Sizeof(*trie))
+	test := pointer(1)
+	word := int(unsafe.Sizeof(test))
+	memory += uint64(trie.size * 2 * word)
+	T().Infof("  Memory:   %d bytes", memory)
 }
