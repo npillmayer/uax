@@ -6,7 +6,40 @@ import (
 	"golang.org/x/text/unicode/bidi"
 )
 
-// Attention: No LHS must be prefix of another rule's LHS, except for |LHS|=1 !
+// We create a set of bidi rules as layed out in UAX#9.
+// To understand the rules it is probably best to consult the UAX algorithm
+// description. Headers and rule names will be similar to names in UAX#9.
+//
+// Rules are struct which contain an action function. The rule's struct
+// has an left-hand-side (LHS) part that will be matched against the input text
+// (more specific: against bidi class clusters) and the rule's action will
+// substitute the LHS with an appropriate RHS.
+//
+// Invariants:
+// - The RHS must be of equal length to the LHS or shorter.
+// - No LHS must be prefix of another rule's LHS, except for |LHS|=1 .
+// - Every rule is required to either have RHS≠LHS or to return a jump offset ≠ 0,
+//   otherwise the parser will enter an infinite loop.
+//
+// All rules are hand-checked to not create circular identities and therefore
+// are guaranteed to not send the parser into an infinite loop.
+//
+type bidiRule struct {
+	name   string     // name of the rule according to UAX#9
+	lhsLen int        // number of symbols in the left hand side (LHS)
+	pass   int        // this is a 2-pass system
+	action ruleAction // action to perform on match of LHS
+}
+
+// ruleAction is an action on bidi class intervals. Input is a slice of (consecutive)
+// class intervals which have been matched. The action's task is to substitute all or some
+// of the input intervals by one or more output intervals (reduce action). The ``cursor''
+// will be positioned after the substitution by the parser, according to the second result
+// of the action, an integer. This position hint will be negative most of the time, telling
+// the parser to backtrack and try to re-apply other BiDi rules.
+type ruleAction func([]intv) ([]intv, int)
+
+// Headers and header numbers of the following comment sections correspond to UAX#9.
 
 // ---------------------------------------------------------------------------
 // 3.3.4 Resolving Weak Types

@@ -13,30 +13,21 @@ import (
 	"golang.org/x/text/unicode/bidi"
 )
 
-type bidiRule struct {
-	name   string     // name of the rule according to UAX#9
-	lhsLen int        // number of symbols in the left hand side (LHS)
-	pass   int        // this is a 2-pass system
-	action ruleAction // action to perform on match of LHS
-}
+// --- Parser / Resolver -----------------------------------------------------
 
-// ruleAction is an action on bidi class intervals. Input is a slice of (consecutive)
-// class intervals which have been matched. The action's task is to substitute all or some
-// of the input intervals by one or more output intervals (reduce action). The ``cursor''
-// will be positioned after the substitution by the parser, according to the second result
-// of the action, an integer. This position hint will be negative most of the time, telling
-// the parser to backtrack and try to re-apply other BiDi rules.
-type ruleAction func([]intv) ([]intv, int)
-
-// --- Parser ----------------------------------------------------------------
-
-// TODO Parser is probably not a good naming in this context. We should stick closer
-// to UAX#9 (and--insofar it makes sense--to objects in the unicode.bidi package).
-// UAX#9 mentions parsing as well, but we should prefer a different word.
-
-// Parse accepts character input and returns a BiDi ordering for the characters.
-// inp should be the text of a paragraph, but this is not enforced.
-func Parse(inp io.Reader, opts ...Option) *Ordering {
+// ResolveParagraph accepts character input and returns a BiDi ordering for the characters.
+// inp should be the text of a single paragraph, but this is not enforced.
+//
+// UAX#9 lists the following phases for bidi typesetting:
+//    3.3  Resolving Embedding Levels
+//    3.4  Reordering Resolved Levels
+//    3.5  Shaping
+// Resolving means identifying runs of left-to-right or right-to-left text fragements.
+//
+// The subsequent phases (3.4 and 3.5) require the text to be segmented into lines,
+// which is not handled by this package.
+//
+func ResolveParagraph(inp io.Reader, opts ...Option) *Ordering {
 	sc := newScanner(inp, opts...)
 	p, err := newParser(sc) // TODO create a global one and re-use it
 	if err != nil {
@@ -48,10 +39,10 @@ func Parse(inp io.Reader, opts ...Option) *Ordering {
 // parser is used to parse paragraphs of text and identify bidi runs.
 // clients will not instantiate one, but rather call bidi.Parse(…)
 type parser struct {
-	sc    *bidiScanner
-	stack []intv
-	sp    int // 'pointer' into the stack; start of LHS matching
-	trie  *trie.TinyHashTrie
+	sc    *bidiScanner       // parser uses a bidi-specific scanner
+	stack []intv             // we manage a stack of bidi class intervals
+	sp    int                // 'pointer' into the stack; start of LHS matching
+	trie  *trie.TinyHashTrie // dictionary of bidi rules
 }
 
 // newParser creates a Parser, which is used to parse paragraphs of text and identify
@@ -138,13 +129,19 @@ func (p *parser) read(n int, t int) (int, int) {
 	}
 	i := 0
 	for ; i < n; i++ { // read n bidi clusters
-		var pos, length uint64
+		var pos, length, r uint64
 		var strong interface{}
 		t, strong, pos, length = p.sc.NextToken(nil)
 		if t == scanner.EOF {
 			break
 		}
-		iv := intv{l: pos, r: pos + length, clz: bidi.Class(t), strong: strong.(strongDist)}
+		iv := intv{l: pos, clz: bidi.Class(t), strong: strong.(strongDist)}
+		if iv.clz == BRACKC { // closing brackets have misused length field
+			r = length
+		} else {
+			r = pos + length
+		}
+		iv.r = r
 		p.stack = append(p.stack, iv)
 	}
 	return t, i
@@ -155,6 +152,11 @@ func (p *parser) pass2() {
 	for p.sp < len(p.stack) {
 		e := min(len(p.stack), p.sp+3)
 		T().Debugf("trying to match %v at %d", p.stack[p.sp:e], p.sp)
+		if p.stack[p.sp].clz == BRACKC {
+			p.performRuleN0()
+			p.sp++
+			continue
+		}
 		rule, _ := p.matchRulesLHS(p.stack[p.sp:len(p.stack)], 2)
 		if rule == nil || rule.pass < 2 {
 			p.sp++
@@ -164,6 +166,16 @@ func (p *parser) pass2() {
 		rhs, jmp := rule.action(p.stack[p.sp:len(p.stack)])
 		p.reduce(rule.lhsLen, rhs)
 		p.sp = max(0, p.sp+jmp) // avoid jumping left of 0
+	}
+}
+
+func (p *parser) performRuleN0() {
+	T().Debugf("applying UAX#9 rule N0 (bracket pairs)")
+	obrpos := p.stack[p.sp].r // position of opening bracket
+	osp := p.findOpeningBracket(obrpos)
+	if osp >= 0 {
+		// osp is stack index of interval (of length 1) for opening bracket
+		p.stack[p.sp].r = 1 // reset the misused r field, no longer needed
 	}
 }
 
@@ -221,6 +233,21 @@ func (p *parser) matchRulesLHS(intervals []intv, minlen int) (*bidiRule, *bidiRu
 	return rule, shortrule
 }
 
+func (p *parser) findOpeningBracket(pos uint64) int {
+	o := p.sp - 1
+	for o >= 0 {
+		iv := p.stack[o]
+		if iv.l <= pos && iv.r > pos {
+			T().Debugf("found interval at position for closing bracket")
+			if iv.clz != LBRACKO && iv.clz != RBRACKO {
+				panic("interval at bracket position is not a bracket")
+			}
+			return o
+		}
+	}
+	return -1 // in-band return value: not found
+}
+
 // --- Ordering --------------------------------------------------------------
 
 // An Ordering holds the computed visual order of bidi-runs of a paragraph of text.
@@ -256,6 +283,15 @@ func (iv intv) clone() *intv {
 	}
 }
 func (iv intv) String() string {
+	if iv.clz == LBRACKO || iv.clz == RBRACKO || iv.clz == BRACKC {
+		return fmt.Sprintf("[%d.%s]", iv.l, ClassString(iv.clz))
+	}
+	if iv.l == iv.r-1 { // interval of length 1
+		return fmt.Sprintf("[%d.%s]", iv.l, ClassString(iv.clz))
+	}
+	if iv.l == iv.r { // interval of length 0
+		return fmt.Sprintf("|%d.%s|", iv.l, ClassString(iv.clz))
+	}
 	return fmt.Sprintf("[%d-%s-%d] ", iv.l, ClassString(iv.clz), iv.r)
 }
 
