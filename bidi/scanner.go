@@ -1,9 +1,7 @@
 package bidi
 
-// TODO The scanner need not return the token lexeme, as it will not be processed by the
-// parser. The parser operates on intervals of BiDi class IDs.
-//
-// Input reader will in most cases be a cord reader.
+// Notes:
+// - Input reader will in most cases be a cord reader
 
 import (
 	"bufio"
@@ -20,16 +18,17 @@ import (
 // It will read runs of text as a unit, as long as all runes therein have the
 // same Bidi_Class.
 type bidiScanner struct {
-	runeScanner *bufio.Scanner // we're using an embedded rune reader
+	done        bool           // at EOF?
 	currClz     bidi.Class     // the current Bidi_Class (of the last rune read)
+	dists       strongDist     // positions of leftwards strong types
+	runeScanner *bufio.Scanner // we're using an embedded rune reader
 	lookahead   []byte         // lookahead rune
 	buffer      []byte         // character buffer for token lexeme
-	strong      bidi.Class     // Bidi_Class of last strong character encountered
 	pos         uint64         // position in input string
 	ahead       uint64         // position ahead of current lexeme
 	bd16stack   bracketStack   // bracket pair stack, rule BD16
-	done        bool           // at EOF?
 	mode        uint           // scanner modes, set by scanner options
+	//strong      bidi.Class     // Bidi_Class of last strong character encountered
 }
 
 // BS16Max is the maximum stack depth for rule BS16 as defined in UAX#9.
@@ -57,10 +56,27 @@ func newScanner(input io.Reader, opts ...Option) *bidiScanner {
 }
 
 // NextToken reads the next run of input text with identical bidi_class,
-// returning a token for it.
+// returning a token for it. The signature of this method conforms to
+// interface `lr.Scanner`.
 //
-// The token's value will be set to the bidi_class, the token itself will be
-// set to the corresponding input string.
+// The token's value will be set to the bidi class.
+//
+// The token itself will be a dense type representing positions of strong types:
+// embedding direction, position of the last L and R cluster respectively.
+// We store this to avoid travelling backwards through the input text.
+// The scanner needs not return the token's lexeme, as it will not be processed by the
+// parser. The parser operates on intervals of bidi clusters without caring about
+// individual characters.
+//
+// The last two result values will be the position and length of the bidi cluster.
+//
+// Attention:
+// The scanner should operate on one paragraph at a time, as required by UAX#9.
+// It will manage internal counter that may overflow when scanning complete texts.
+// As opposed to the generic scanner interface, which will handle character positions
+// as uint64, the bidi scanner has certain internal limits which have to fit into
+// int16.
+//
 func (sc *bidiScanner) NextToken(expected []int) (int, interface{}, uint64, uint64) {
 	sc.prepareNewRun()
 	//T().Debugf("re-reading '%s'", string(sc.buffer))
@@ -77,7 +93,7 @@ func (sc *bidiScanner) NextToken(expected []int) (int, interface{}, uint64, uint
 			rc := sc.currClz // tmp for returning current class
 			sc.currClz = clz // change current class to class of LA
 			T().Debugf("scanned Token '%s' as :%s", string(sc.buffer), ClassString(rc))
-			return int(rc), sc.strong, sc.pos, uint64(len(sc.buffer))
+			return int(rc), sc.dists, sc.pos, uint64(len(sc.buffer))
 		}
 		sc.buffer = append(sc.buffer, b...)
 		sc.ahead += uint64(sz)
@@ -95,14 +111,14 @@ func (sc *bidiScanner) NextToken(expected []int) (int, interface{}, uint64, uint
 		//sc.ahead += uint64(sz) // include len(LA) in run's ahead
 		T().Debugf("final Token '%s' as :%s", string(sc.buffer), ClassString(sc.currClz))
 		//T().Debugf("final Token '%s' as :%s", string(sc.buffer), ClassString(sc.currClz))
-		return int(sc.currClz), sc.strong, sc.pos, uint64(len(sc.buffer))
+		return int(sc.currClz), sc.dists, sc.pos, uint64(len(sc.buffer))
 	}
 	if !sc.done {
 		sc.done = true
 		T().Debugf("final synthetic Token :%s", ClassString(bidi.PDI))
-		return int(bidi.PDI), sc.strong, sc.pos, 0
+		return int(bidi.PDI), sc.dists, sc.pos, 0
 	}
-	return scanner.EOF, sc.strong, sc.pos, 0
+	return scanner.EOF, sc.dists, sc.pos, 0
 }
 
 func (sc *bidiScanner) prepareNewRun() {
@@ -137,12 +153,14 @@ func (sc *bidiScanner) bidic(b []byte) (rune, bidi.Class, int) {
 	r, sz := utf8.DecodeRune(b)
 	if sz > 0 {
 		if sc.hasMode(optionTesting) && unicode.IsUpper(r) {
-			sc.setIfStrong(bidi.R)
+			//sc.setIfStrong(bidi.R)
+			sc.setDist(bidi.R)
 			return r, bidi.R, sz // during testing, UPPERCASE is R2L
 		}
 		props, sz := bidi.Lookup(b)
 		clz := props.Class()
-		sc.setIfStrong(clz)
+		//sc.setIfStrong(clz)
+		sc.setDist(clz)
 		switch clz { // do some pre-processing
 		case bidi.NSM: // rule W1, handle accents
 			switch sc.currClz {
@@ -159,8 +177,9 @@ func (sc *bidiScanner) bidic(b []byte) (rune, bidi.Class, int) {
 			// if sc.currClz == bidi.L {
 			// 	return r, bidi.L, sz
 			// }
-			switch sc.strong {
-			case bidi.AL:
+			//switch
+			if sc.dists.IsAL() {
+				//case bidi.AL:
 				return r, bidi.AN, sz
 				// case bidi.L:
 				// 	return r, LEN, sz
@@ -188,7 +207,7 @@ func (sc *bidiScanner) doBD16(r rune, pos uint64, defaultclass bidi.Class, doSta
 	var isbr bool
 	if isbr, sc.bd16stack = sc.bd16stack.pushIfBracket(r, pos); isbr {
 		T().Debugf("BD16 - pushed an opening bracket: %v", r)
-		switch sc.strong {
+		switch sc.dists.Context() {
 		case bidi.L:
 			return LBRACKO, true
 		case bidi.R:
@@ -207,7 +226,7 @@ func (sc *bidiScanner) checkBD16(r rune, defaultclass bidi.Class) (bidi.Class, b
 	if props.IsBracket() {
 		//T().Debugf("Bracket detected: %c", r)
 		//T().Debugf("Bracket '%c' with sc.strong = %s", r, ClassString(sc.strong))
-		switch sc.strong {
+		switch sc.dists.Context() {
 		case bidi.L:
 			if props.IsOpeningBracket() {
 				return LBRACKO, true
@@ -224,23 +243,34 @@ func (sc *bidiScanner) checkBD16(r rune, defaultclass bidi.Class) (bidi.Class, b
 	return defaultclass, false
 }
 
-func (sc *bidiScanner) setIfStrong(c bidi.Class) bidi.Class {
+func (sc *bidiScanner) setDist(c bidi.Class) {
 	switch c {
-	case bidi.R, bidi.RLI:
-		sc.strong = bidi.R
-		return bidi.R
 	case bidi.L, bidi.LRI:
-		sc.strong = bidi.L
-		return bidi.L
+		sc.dists.SetLDist(int(sc.pos))
+	case bidi.R, bidi.RLI:
+		sc.dists.SetRDist(int(sc.pos))
 	case bidi.AL:
-		sc.strong = bidi.AL
-		return bidi.AL
+		sc.dists.SetALDist(int(sc.pos))
 	}
-	return ILLEGAL
 }
 
-func (sc *bidiScanner) LastStrong() bidi.Class {
-	return sc.strong
+// func (sc *bidiScanner) setIfStrong(c bidi.Class) bidi.Class {
+// 	switch c {
+// 	case bidi.R, bidi.RLI:
+// 		sc.strong = bidi.R
+// 		return bidi.R
+// 	case bidi.L, bidi.LRI:
+// 		sc.strong = bidi.L
+// 		return bidi.L
+// 	case bidi.AL:
+// 		sc.strong = bidi.AL
+// 		return bidi.AL
+// 	}
+// 	return ILLEGAL
+// }
+
+func (sc *bidiScanner) Context() bidi.Class {
+	return sc.dists.Context()
 }
 
 // --- Bidi_Classes ----------------------------------------------------------
@@ -334,6 +364,76 @@ func (bs bracketStack) dump() {
 	for i, p := range bs {
 		T().Debugf("\t[%d] %v at %d", i, p.pair, p.pos)
 	}
+}
+
+// --- Strong types bitfield -------------------------------------------------
+
+const (
+	lpart  uint64 = iota // position of last L
+	rpart                // position of last R
+	alpart               // position of last AL
+	embed                // embedding direction
+)
+
+// strongDist is a helper type to store positions of strong types within the
+// input text. Various UAX#9 rules require to find preceding occurences of strong types
+// (L, R, sos, AL) to determine context. In order to avoid travelling the text backwards
+// we save the positions of strong types.
+//
+// This is quite a memory invest, but we try to manage it by storing 4 pieces of
+// information in one 64 bit memory word. We hold that positions of characters within
+// a paragraph of text will not overflow uint16, which is ~32KB. That should be
+// enough for all but machine generated paragraphs.
+// However, we make sure the scanner doesn't break in case of overflow, but rather
+// will muddle along reasonably well (no panic, memory fault, etc). This is not
+// a difficult task, as just taking the low bits will do just fine, except for
+// handling of bracket pairs.
+type strongDist [4]uint16
+
+// func l(l int, e bidi.Class) strongDist {
+// 	sd := strongDist{}
+// 	sd[lpart] = uint16(l)
+// 	return sd
+// }
+
+// func r(r int, e bidi.Class) strongDist {
+// 	sd := strongDist{}
+// 	sd[rpart] = uint16(r)
+// 	return sd
+// }
+
+func (sd strongDist) Pos() (int, int) {
+	return int(sd[lpart]), int(sd[rpart])
+}
+
+func (sd strongDist) Context() bidi.Class {
+	if sd[lpart] >= sd[rpart] {
+		return bidi.L
+	}
+	return bidi.R
+}
+
+func (sd strongDist) EmbeddingDir() bidi.Class {
+	return bidi.Class(sd[embed])
+}
+
+func (sd strongDist) SetLDist(d int) strongDist {
+	sd[lpart] = uint16(d)
+	return sd
+}
+
+func (sd strongDist) SetRDist(d int) strongDist {
+	sd[rpart] = uint16(d)
+	return sd
+}
+
+func (sd strongDist) SetALDist(d int) strongDist {
+	sd[alpart] = uint16(d)
+	return sd
+}
+
+func (sd strongDist) IsAL() bool {
+	return sd[alpart] > sd[lpart] && sd[alpart] > sd[rpart]
 }
 
 // --- Scanner options -------------------------------------------------------

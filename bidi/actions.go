@@ -13,6 +13,20 @@ import (
 
 // W1 – W3 are handled by the scanner.
 
+// W1. Examine each nonspacing mark (NSM) in the isolating run sequence, and change the
+//     type of the NSM to Other Neutral if the previous character is an isolate
+//     initiator or PDI, and to the type of the previous character otherwise.
+
+// W2. Search backward from each instance of a European number until the first strong type
+//     (R, L, AL, or sos) is found. If an AL is found, change the type of the
+//     European number to Arabic number.
+// AL EN     → AL AN
+// AL NI EN  → AL NI AN
+
+// W3. Change all ALs to R.
+
+// --- Actions ---
+
 // W4. A single European separator between two European numbers changes to
 //     a European number. A single common separator between two numbers of the
 //     same type changes to that type.
@@ -85,7 +99,7 @@ func ruleW7() (*bidiRule, []byte) {
 		lhsLen: len(lhs),
 		pass:   1,
 		action: func(match []intv) ([]intv, int) {
-			if match[0].strong == bidi.L {
+			if match[0].strong.Context() == bidi.L {
 				L := match[:1]
 				L[0].clz = bidi.L
 				return L, 0

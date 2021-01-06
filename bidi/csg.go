@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/npillmayer/gorgo/lr/scanner"
+	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/uax/bidi/trie"
 	"golang.org/x/text/unicode/bidi"
 )
@@ -37,28 +38,27 @@ type ruleAction func([]intv) ([]intv, int)
 // inp should be the text of a paragraph, but this is not enforced.
 func Parse(inp io.Reader, opts ...Option) *Ordering {
 	sc := newScanner(inp, opts...)
-	p, err := NewParser(sc)
+	p, err := newParser(sc) // TODO create a global one and re-use it
 	if err != nil {
 		panic(fmt.Sprintf("something went wrong creating a parser: %s", err.Error()))
 	}
 	return p.Ordering()
 }
 
-// Parser is used to parse paragraphs of text and identify bidi runs.
-// Parser is made public for cases where clients want to provide their own
-// implementation of a scanner. Usually it's much simpler to call bidi.Parse(…)
-type Parser struct {
+// parser is used to parse paragraphs of text and identify bidi runs.
+// clients will not instantiate one, but rather call bidi.Parse(…)
+type parser struct {
 	sc    *bidiScanner
 	stack []intv
 	sp    int // 'pointer' into the stack; start of LHS matching
 	trie  *trie.TinyHashTrie
 }
 
-// NewParser creates a Parser, which is used to parse paragraphs of text and identify
+// newParser creates a Parser, which is used to parse paragraphs of text and identify
 // bidi runs. Parser is made public for cases where clients want to provide their own
 // implementation of a scanner. Usually it's much simpler to call bidi.Parse(…)
-func NewParser(sc *bidiScanner) (*Parser, error) {
-	p := &Parser{
+func newParser(sc *bidiScanner) (*parser, error) {
+	p := &parser{
 		sc:    sc,
 		stack: make([]intv, 0, 64),
 		trie:  prepareRulesTrie(),
@@ -70,7 +70,7 @@ func NewParser(sc *bidiScanner) (*Parser, error) {
 	return p, nil // TODO check sc
 }
 
-func (p *Parser) reduce(n int, rhs []intv) {
+func (p *parser) reduce(n int, rhs []intv) {
 	T().Debugf("REDUCE at %d: %d⇒%v", p.sp, n, rhs)
 	diff := len(rhs) - n
 	for i, iv := range rhs {
@@ -90,7 +90,7 @@ func (p *Parser) reduce(n int, rhs []intv) {
 // cluster of characters. Then we do an immediate match for pass-1 rules, which are
 // basically the Wx-rules from section 3.3.4 “Resolving Weak Types”.
 //
-func (p *Parser) pass1() {
+func (p *parser) pass1() {
 	la := 0              // length of lookahead LA
 	t, _ := p.read(3, 0) // initially load 3 bidi clusters
 	var rule, shortrule *bidiRule
@@ -132,7 +132,7 @@ func (p *Parser) pass1() {
 
 // read reads k ≤ n bidi clusters from the scanner. If k < n, EOF has been encountered.
 // Returns k.
-func (p *Parser) read(n int, t int) (int, int) {
+func (p *parser) read(n int, t int) (int, int) {
 	if n <= 0 || t == scanner.EOF {
 		return t, 0
 	}
@@ -144,13 +144,13 @@ func (p *Parser) read(n int, t int) (int, int) {
 		if t == scanner.EOF {
 			break
 		}
-		iv := intv{l: pos, r: pos + length, clz: bidi.Class(t), strong: strong.(bidi.Class)}
+		iv := intv{l: pos, r: pos + length, clz: bidi.Class(t), strong: strong.(strongDist)}
 		p.stack = append(p.stack, iv)
 	}
 	return t, i
 }
 
-func (p *Parser) pass2() {
+func (p *parser) pass2() {
 	p.sp = 0
 	for p.sp < len(p.stack) {
 		e := min(len(p.stack), p.sp+3)
@@ -169,7 +169,7 @@ func (p *Parser) pass2() {
 
 // Ordering starts the parse and returns a bidi-ordering for the input-text given
 // when creating the parser.
-func (p *Parser) Ordering() *Ordering {
+func (p *parser) Ordering() *Ordering {
 	T().Debugf("--- pass 1 ---")
 	p.pass1()
 	T().Debugf("--------------")
@@ -187,7 +187,7 @@ func (p *Parser) Ordering() *Ordering {
 // If either of the two is shorter than minlen, it is not returned. That may
 // result in only the long rule being returned.
 //
-func (p *Parser) matchRulesLHS(intervals []intv, minlen int) (*bidiRule, *bidiRule) {
+func (p *parser) matchRulesLHS(intervals []intv, minlen int) (*bidiRule, *bidiRule) {
 	//T().Debugf("match: %v", intervals)
 	iterator := p.trie.Iterator()
 	var pointer, entry, short int
@@ -243,7 +243,7 @@ func (o *Ordering) String() string {
 type intv struct {
 	l, r   uint64     // left and right bounds, r not included
 	clz    bidi.Class // bidi character class of this interval
-	strong bidi.Class // last strong bidi character
+	strong strongDist // positions of last strong bidi characters
 	child  *intv      // some intervals may have a child worth saving
 }
 
@@ -277,7 +277,7 @@ func prepareRulesTrie() *trie.TinyHashTrie {
 	}
 	var r *bidiRule
 	tracelevel := T().GetTraceLevel()
-	//T().SetTraceLevel(tracing.LevelInfo)
+	T().SetTraceLevel(tracing.LevelInfo)
 	var lhs []byte
 	// --- allocate all the rules ---
 	r, lhs = ruleW4_1()
