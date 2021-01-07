@@ -134,7 +134,7 @@ func ruleW7() (*bidiRule, []byte) {
 		action: func(match []scrap) ([]scrap, int) {
 			if match[0].strong.Context() == bidi.L {
 				L := match[:1]
-				L[0].clz = bidi.L
+				L[0].bidiclz = bidi.L
 				return L, 0
 			}
 			return match, 1
@@ -207,7 +207,7 @@ func ruleN1_3() (*bidiRule, []byte) {
 		pass:   2,
 		action: func(match []scrap) ([]scrap, int) {
 			collapse(match[0], match[1], bidi.R)
-			match[1].clz = bidi.AN
+			match[1].bidiclz = bidi.AN
 			match[1].child = match[2].child
 			return match[:2], 1
 		},
@@ -222,7 +222,7 @@ func ruleN1_4() (*bidiRule, []byte) {
 		pass:   2,
 		action: func(match []scrap) ([]scrap, int) {
 			collapse(match[0], match[1], bidi.R)
-			match[1].clz = bidi.EN
+			match[1].bidiclz = bidi.EN
 			match[1].child = match[2].child
 			return match[:2], 1
 		},
@@ -310,7 +310,7 @@ func squash(c bidi.Class, jmp int) ruleAction {
 	return func(match []scrap) ([]scrap, int) {
 		last := match[len(match)-1]
 		match[0].r = last.r
-		match[0].clz = c
+		match[0].bidiclz = c
 		for i, iv := range match {
 			if i == 0 {
 				continue
@@ -329,7 +329,7 @@ func makeMidSwapRule(name string, lhs []byte, c bidi.Class, jmp int) *bidiRule {
 		lhsLen: len(lhs),
 		pass:   2, // all mid-swap rules are Nx rules ⇒ pass 2
 		action: func(match []scrap) ([]scrap, int) {
-			match[1].clz = c // change class of middle interval
+			match[1].bidiclz = c // change class of middle interval
 			return match, jmp
 		},
 	}
@@ -340,7 +340,7 @@ func collapse(dest, src scrap, c bidi.Class) {
 		appendChildren(dest, src)
 	}
 	dest.r = src.r
-	dest.clz = c
+	dest.bidiclz = c
 }
 
 func makeLHS(toks ...bidi.Class) []byte {

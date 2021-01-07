@@ -7,7 +7,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/npillmayer/gorgo/lr/scanner"
 	"github.com/npillmayer/uax/bidi/trie"
 	"golang.org/x/text/unicode/bidi"
 )
@@ -39,6 +38,7 @@ func ResolveParagraph(inp io.Reader, opts ...Option) *Ordering {
 // clients will not instantiate one, but rather call bidi.Parse(…)
 type parser struct {
 	sc    *bidiScanner       // parser uses a bidi-specific scanner
+	pipe  chan scrap         // communication with the scanner
 	stack []scrap            // we manage a stack of bidi class scraps
 	sp    int                // 'pointer' into the stack; start of LHS matching
 	trie  *trie.TinyHashTrie // dictionary of bidi rules
@@ -82,16 +82,16 @@ func (p *parser) reduce(n int, rhs []scrap) {
 //
 func (p *parser) pass1() {
 	la := 0              // length of lookahead LA
-	t, _ := p.read(3, 0) // initially load 3 bidi clusters
+	t, _ := p.read(3, 0) // initially load 3 scraps
 	var rule, shortrule *bidiRule
-	walk := false // if true, accept walking over 1 single cluster
+	walk := false // if true, accept walking over 1 scrap
 	for {         // scan the complete input sequence (until EOF)
 		la = len(p.stack) - p.sp
 		t, k := p.read(3-la, t) // extend LA to |LA|=3, if possible
 		la += k
 		//T().Debugf("t=%v, sp=%d, la=%d, walk=%v", t, p.sp, la, walk) //, minMatchLen)
 		if la == 0 {
-			if t != scanner.EOF { // TODO remove this
+			if t != ILLEGAL { // TODO remove this
 				panic("no LA, but not at EOF?")
 			}
 			break
@@ -120,27 +120,39 @@ func (p *parser) pass1() {
 	}
 }
 
+// nextInputScrap reads the next scrap from the scanner pipe. It returns a
+// new scrap and false if this is the EOF scrap, true otherwise.
+func (p *parser) nextInputScrap(pipe <-chan scrap) (scrap, bool) {
+	s := <-pipe
+	if s.bidiclz == ILLEGAL {
+		return s, false
+	}
+	return s, true
+}
+
 // read reads k ≤ n bidi clusters from the scanner. If k < n, EOF has been encountered.
 // Returns k.
-func (p *parser) read(n int, t int) (int, int) {
-	if n <= 0 || t == scanner.EOF {
+func (p *parser) read(n int, t bidi.Class) (bidi.Class, int) {
+	if n <= 0 || t == ILLEGAL {
 		return t, 0
 	}
 	i := 0
 	for ; i < n; i++ { // read n bidi clusters
-		var pos, length, r uint64
-		var strong interface{}
-		t, strong, pos, length = p.sc.NextToken(nil)
-		if t == scanner.EOF {
+		// var pos, length, r uint64
+		// var strong interface{}
+		// t, strong, pos, length = p.sc.NextToken(nil)
+		s, ok := p.nextInputScrap(p.pipe)
+		t = s.bidiclz
+		if t == ILLEGAL {
 			break
 		}
-		s := scrap{l: pos, clz: bidi.Class(t), strong: strong.(strongTypes)}
-		if s.clz == BRACKC { // closing brackets have misused length field
-			r = length
-		} else {
-			r = pos + length
-		}
-		s.r = r
+		// s := scrap{l: pos, bidiclz: bidi.Class(t), strong: strong.(strongTypes)}
+		// if s.bidiclz == BRACKC { // closing brackets have misused length field
+		// 	r = length
+		// } else {
+		// 	r = pos + length
+		// }
+		// s.r = r
 		p.stack = append(p.stack, s)
 	}
 	return t, i
@@ -151,7 +163,7 @@ func (p *parser) pass2() {
 	for p.sp < len(p.stack) {
 		e := min(len(p.stack), p.sp+3)
 		T().Debugf("trying to match %v at %d", p.stack[p.sp:e], p.sp)
-		if p.stack[p.sp].clz == BRACKC {
+		if p.stack[p.sp].bidiclz == BRACKC {
 			p.performRuleN0()
 			p.sp++
 			continue
@@ -183,17 +195,17 @@ func (p *parser) performRuleN0() {
 		emb := closeBr.strong.EmbeddingDir()
 		// a. Inspect the bidirectional types of the characters enclosed within the
 		//    bracket pair.
-		if uint64(cl) > openBr.l && emb == bidi.L {
+		if charpos(cl) > openBr.l && emb == bidi.L {
 			// L in brackets and embedding dir = L
 			// b. If any strong type (either L or R) matching the embedding direction
 			//    is found, set the type for both brackets in the pair to match the
 			//    embedding direction.
-		} else if uint64(cr) > openBr.l && emb == bidi.R {
+		} else if charpos(cr) > openBr.l && emb == bidi.R {
 			// R in brackets and embedding dir = R
 			// b. If any strong type (either L or R) matching the embedding direction
 			//    is found, set the type for both brackets in the pair to match the
 			//    embedding direction.
-		} else if uint64(cl) > openBr.l && emb == bidi.R {
+		} else if charpos(cl) > openBr.l && emb == bidi.R {
 			// L in brackets and embedding dir = R
 			// c. Otherwise, if there is a strong type it must be opposite the embedding
 			//    direction. Therefore, test for an established context with a preceding
@@ -207,7 +219,7 @@ func (p *parser) performRuleN0() {
 				// c.2. Otherwise set the type for both brackets in the pair to the
 				//      embedding direction.
 			}
-		} else if uint64(cr) > openBr.l && emb == bidi.L {
+		} else if charpos(cr) > openBr.l && emb == bidi.L {
 			// R in brackets and embedding dir = L
 			// c. Otherwise, if there is a strong type it must be opposite the embedding
 			//    direction. Therefore, test for an established context with a preceding
@@ -255,7 +267,7 @@ func (p *parser) matchRulesLHS(scraps []scrap, minlen int) (*bidiRule, *bidiRule
 	iterator := p.trie.Iterator()
 	var pointer, entry, short int
 	for k, s := range scraps {
-		pointer = iterator.Next(int8(s.clz))
+		pointer = iterator.Next(int8(s.bidiclz))
 		//T().Debugf(" pointer[%d]=%d", s.clz, pointer)
 		if pointer == 0 {
 			break
@@ -284,13 +296,13 @@ func (p *parser) matchRulesLHS(scraps []scrap, minlen int) (*bidiRule, *bidiRule
 	return rule, shortrule
 }
 
-func (p *parser) findOpeningBracket(pos uint64) int {
+func (p *parser) findOpeningBracket(pos charpos) int {
 	o := p.sp - 1
 	for o >= 0 {
 		s := p.stack[o]
 		if s.l <= pos && s.r > pos {
 			T().Debugf("found interval at position for closing bracket")
-			if s.clz != LBRACKO && s.clz != RBRACKO {
+			if s.bidiclz != LBRACKO && s.bidiclz != RBRACKO {
 				panic("interval at bracket position is not a bracket")
 			}
 			return o
@@ -312,7 +324,7 @@ type Ordering struct {
 func (o *Ordering) String() string {
 	var b strings.Builder
 	for _, s := range o.scraps {
-		b.WriteString(fmt.Sprintf("[%d-%s-%d] ", s.l, ClassString(s.clz), s.r))
+		b.WriteString(fmt.Sprintf("[%d-%s-%d] ", s.l, ClassString(s.bidiclz), s.r))
 	}
 	return b.String()
 }

@@ -8,32 +8,51 @@ import (
 
 // --- Scraps ----------------------------------------------------------------
 
+type charpos uint32 // position of a character within a paragraph
+
 type scrap struct {
-	l, r   uint64      // left and right bounds, r not included
-	clz    bidi.Class  // bidi character class of this interval
-	strong strongTypes // positions of last strong bidi characters
-	child  *scrap      // some scraps may have a child worth saving
+	bidiclz bidi.Class  // bidi character class of this scrap
+	l, r    charpos     // left and right bounds, r not included
+	strong  strongTypes // positions of last strong bidi characters
+	child   *scrap      // some scraps may have a child worth saving
 }
 
-func (s scrap) clone() *scrap {
-	return &scrap{
-		l:     s.l,
-		r:     s.r,
-		clz:   s.clz,
-		child: s.child,
-	}
-}
+// func (s scrap) clone() *scrap {
+// 	return &scrap{
+// 		l:     s.l,
+// 		r:     s.r,
+// 		clz:   s.bidiclz,
+// 		child: s.child,
+// 	}
+// }
+
 func (s scrap) String() string {
-	if s.clz == LBRACKO || s.clz == RBRACKO || s.clz == BRACKC {
-		return fmt.Sprintf("[%d.%s]", s.l, ClassString(s.clz))
+	if s.bidiclz == LBRACKO || s.bidiclz == RBRACKO || s.bidiclz == BRACKC {
+		return fmt.Sprintf("[%d.%s]", s.l, ClassString(s.bidiclz))
 	}
 	if s.l == s.r-1 { // interval of length 1
-		return fmt.Sprintf("[%d.%s]", s.l, ClassString(s.clz))
+		return fmt.Sprintf("[%d.%s]", s.l, ClassString(s.bidiclz))
 	}
 	if s.l == s.r { // interval of length 0
-		return fmt.Sprintf("|%d.%s|", s.l, ClassString(s.clz))
+		return fmt.Sprintf("|%d.%s|", s.l, ClassString(s.bidiclz))
 	}
-	return fmt.Sprintf("[%d-%s-%d]", s.l, ClassString(s.clz), s.r)
+	return fmt.Sprintf("[%d-%s-%d]", s.l, ClassString(s.bidiclz), s.r)
+}
+
+// clear initializes a scrap to neutral values.
+func (s *scrap) clear() {
+	s.l, s.r = 0, 0
+	s.bidiclz = ILLEGAL
+	s.strong = [4]uint16{}
+	s.child = nil
+}
+
+// len returns the length in bytes for a scrap.
+func (s scrap) len() charpos {
+	if s.bidiclz == LBRACKO || s.bidiclz == RBRACKO || s.bidiclz == BRACKC {
+		return 1
+	}
+	return s.r - s.l
 }
 
 // --- Strong types bitfield -------------------------------------------------
