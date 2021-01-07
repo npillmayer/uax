@@ -9,7 +9,7 @@ import (
 	"github.com/npillmayer/schuko/tracing"
 	"golang.org/x/text/unicode/bidi"
 
-	//"github.com/npillmayer/schuko/tracing/gologadapter"
+	"github.com/npillmayer/schuko/tracing/gologadapter"
 	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 )
 
@@ -31,6 +31,10 @@ func TestClasses(t *testing.T) {
 	if ClassString(BRACKC) != "BRACKC" {
 		t.Errorf("string for BRACKC not as expected")
 	}
+	t.Logf("MAX = %s", ClassString(MAX))
+	if ClassString(MAX) != "<max>" {
+		t.Errorf("string for MAX not as expected")
+	}
 }
 
 func TestSimple(t *testing.T) {
@@ -41,6 +45,19 @@ func TestSimple(t *testing.T) {
 	//
 	reader := strings.NewReader("Hello 123.456")
 	ordering := ResolveParagraph(reader)
+	fmt.Printf("resulting ordering = %s\n", ordering)
+	//t.Fail()
+}
+
+func TestBrackets(t *testing.T) {
+	//gtrace.CoreTracer = gotestingadapter.New()
+	gtrace.CoreTracer = gologadapter.New()
+	//teardown := gotestingadapter.RedirectTracing(t)
+	//defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	reader := strings.NewReader("hello (WORLD)")
+	ordering := ResolveParagraph(reader, Testing(true))
 	fmt.Printf("resulting ordering = %s\n", ordering)
 	//t.Fail()
 }

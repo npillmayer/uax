@@ -8,7 +8,6 @@ import (
 	"sync"
 
 	"github.com/npillmayer/gorgo/lr/scanner"
-	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/uax/bidi/trie"
 	"golang.org/x/text/unicode/bidi"
 )
@@ -40,7 +39,7 @@ func ResolveParagraph(inp io.Reader, opts ...Option) *Ordering {
 // clients will not instantiate one, but rather call bidi.Parse(…)
 type parser struct {
 	sc    *bidiScanner       // parser uses a bidi-specific scanner
-	stack []intv             // we manage a stack of bidi class intervals
+	stack []scrap            // we manage a stack of bidi class scraps
 	sp    int                // 'pointer' into the stack; start of LHS matching
 	trie  *trie.TinyHashTrie // dictionary of bidi rules
 }
@@ -51,7 +50,7 @@ type parser struct {
 func newParser(sc *bidiScanner) (*parser, error) {
 	p := &parser{
 		sc:    sc,
-		stack: make([]intv, 0, 64),
+		stack: make([]scrap, 0, 64),
 		trie:  prepareRulesTrie(),
 		sp:    0,
 	}
@@ -61,11 +60,11 @@ func newParser(sc *bidiScanner) (*parser, error) {
 	return p, nil // TODO check sc
 }
 
-func (p *parser) reduce(n int, rhs []intv) {
+func (p *parser) reduce(n int, rhs []scrap) {
 	T().Debugf("REDUCE at %d: %d⇒%v", p.sp, n, rhs)
 	diff := len(rhs) - n
-	for i, iv := range rhs {
-		p.stack[p.sp+i] = iv
+	for i, s := range rhs {
+		p.stack[p.sp+i] = s
 	}
 	//pos := max(0, len(p.stack)-n+len(rhs)) // avoid jumping left of 0
 	//pos := max(0, len(p.stack)+diff)
@@ -77,7 +76,7 @@ func (p *parser) reduce(n int, rhs []intv) {
 	T().Debugf("sp=%d, stack-LA is now %v", p.sp, p.stack[p.sp:])
 }
 
-// pass1 scans the complete input (character-)sequence, creating an intervals for each
+// pass1 scans the complete input (character-)sequence, creating an scraps for each
 // cluster of characters. Then we do an immediate match for pass-1 rules, which are
 // basically the Wx-rules from section 3.3.4 “Resolving Weak Types”.
 //
@@ -135,14 +134,14 @@ func (p *parser) read(n int, t int) (int, int) {
 		if t == scanner.EOF {
 			break
 		}
-		iv := intv{l: pos, clz: bidi.Class(t), strong: strong.(strongDist)}
-		if iv.clz == BRACKC { // closing brackets have misused length field
+		s := scrap{l: pos, clz: bidi.Class(t), strong: strong.(strongTypes)}
+		if s.clz == BRACKC { // closing brackets have misused length field
 			r = length
 		} else {
 			r = pos + length
 		}
-		iv.r = r
-		p.stack = append(p.stack, iv)
+		s.r = r
+		p.stack = append(p.stack, s)
 	}
 	return t, i
 }
@@ -170,16 +169,68 @@ func (p *parser) pass2() {
 }
 
 func (p *parser) performRuleN0() {
-	T().Debugf("applying UAX#9 rule N0 (bracket pairs)")
+	T().Debugf("applying UAX#9 rule N0 (bracket pairs) with %s", p.stack[p.sp])
 	obrpos := p.stack[p.sp].r // position of opening bracket
+	T().Debugf("position of opening bracket should be %d", obrpos)
 	osp := p.findOpeningBracket(obrpos)
 	if osp >= 0 {
 		// osp is stack index of interval (of length 1) for opening bracket
 		p.stack[p.sp].r = 1 // reset the misused r field, no longer needed
+		openBr := p.stack[osp]
+		closeBr := p.stack[p.sp]
+		//ol, or := openBr.strong.LRPos()
+		cl, cr := closeBr.strong.LRPos()
+		emb := closeBr.strong.EmbeddingDir()
+		// a. Inspect the bidirectional types of the characters enclosed within the
+		//    bracket pair.
+		if uint64(cl) > openBr.l && emb == bidi.L {
+			// L in brackets and embedding dir = L
+			// b. If any strong type (either L or R) matching the embedding direction
+			//    is found, set the type for both brackets in the pair to match the
+			//    embedding direction.
+		} else if uint64(cr) > openBr.l && emb == bidi.R {
+			// R in brackets and embedding dir = R
+			// b. If any strong type (either L or R) matching the embedding direction
+			//    is found, set the type for both brackets in the pair to match the
+			//    embedding direction.
+		} else if uint64(cl) > openBr.l && emb == bidi.R {
+			// L in brackets and embedding dir = R
+			// c. Otherwise, if there is a strong type it must be opposite the embedding
+			//    direction. Therefore, test for an established context with a preceding
+			//    strong type by checking backwards before the opening paired bracket
+			//    until the first strong type (L, R, or sos) is found.
+			if openBr.strong.Context() == bidi.L {
+				// c.1. If the preceding strong type is also opposite the embedding
+				//      direction, context is established, so set the type for both
+				//      brackets in the pair to that direction.
+			} else {
+				// c.2. Otherwise set the type for both brackets in the pair to the
+				//      embedding direction.
+			}
+		} else if uint64(cr) > openBr.l && emb == bidi.L {
+			// R in brackets and embedding dir = L
+			// c. Otherwise, if there is a strong type it must be opposite the embedding
+			//    direction. Therefore, test for an established context with a preceding
+			//    strong type by checking backwards before the opening paired bracket
+			//    until the first strong type (L, R, or sos) is found.
+			if openBr.strong.Context() == bidi.R {
+				// c.1. If the preceding strong type is also opposite the embedding
+				//      direction, context is established, so set the type for both
+				//      brackets in the pair to that direction.
+			} else {
+				// c.2. Otherwise set the type for both brackets in the pair to the
+				//      embedding direction.
+			}
+		} else {
+			// d. Otherwise, there are no strong types within the bracket pair.
+			//    Therefore, do not set the type for that bracket pair.
+		}
+	} else {
+		panic("could not find opening bracket")
 	}
 }
 
-// Ordering starts the parse and returns a bidi-ordering for the input-text given
+// Ordering starts the parse and returns a bidi-ordering for the input-text gsen
 // when creating the parser.
 func (p *parser) Ordering() *Ordering {
 	T().Debugf("--- pass 1 ---")
@@ -189,23 +240,23 @@ func (p *parser) Ordering() *Ordering {
 	T().Debugf("--- pass 2 ---")
 	p.pass2()
 	T().Debugf("--------------")
-	return &Ordering{intervals: p.stack}
+	return &Ordering{scraps: p.stack}
 }
 
-// matchRulesLHS trys to find 2 rules matching a given interval:
+// matchRulesLHS trys to find 2 rules matching a gsen interval:
 // a long one (returned as the first return value), and possibly one just matching
 // the first interval (returned as the second return value).
 //
 // If either of the two is shorter than minlen, it is not returned. That may
 // result in only the long rule being returned.
 //
-func (p *parser) matchRulesLHS(intervals []intv, minlen int) (*bidiRule, *bidiRule) {
-	//T().Debugf("match: %v", intervals)
+func (p *parser) matchRulesLHS(scraps []scrap, minlen int) (*bidiRule, *bidiRule) {
+	//T().Debugf("match: %v", scraps)
 	iterator := p.trie.Iterator()
 	var pointer, entry, short int
-	for k, iv := range intervals {
-		pointer = iterator.Next(int8(iv.clz))
-		//T().Debugf(" pointer[%d]=%d", iv.clz, pointer)
+	for k, s := range scraps {
+		pointer = iterator.Next(int8(s.clz))
+		//T().Debugf(" pointer[%d]=%d", s.clz, pointer)
 		if pointer == 0 {
 			break
 		}
@@ -236,14 +287,15 @@ func (p *parser) matchRulesLHS(intervals []intv, minlen int) (*bidiRule, *bidiRu
 func (p *parser) findOpeningBracket(pos uint64) int {
 	o := p.sp - 1
 	for o >= 0 {
-		iv := p.stack[o]
-		if iv.l <= pos && iv.r > pos {
+		s := p.stack[o]
+		if s.l <= pos && s.r > pos {
 			T().Debugf("found interval at position for closing bracket")
-			if iv.clz != LBRACKO && iv.clz != RBRACKO {
+			if s.clz != LBRACKO && s.clz != RBRACKO {
 				panic("interval at bracket position is not a bracket")
 			}
 			return o
 		}
+		o--
 	}
 	return -1 // in-band return value: not found
 }
@@ -253,46 +305,16 @@ func (p *parser) findOpeningBracket(pos uint64) int {
 // An Ordering holds the computed visual order of bidi-runs of a paragraph of text.
 type Ordering struct {
 	// TODO
-	// intervals = runs ?
-	intervals []intv
+	// scraps = runs ?
+	scraps []scrap
 }
 
 func (o *Ordering) String() string {
 	var b strings.Builder
-	for _, iv := range o.intervals {
-		b.WriteString(fmt.Sprintf("[%d-%s-%d] ", iv.l, ClassString(iv.clz), iv.r))
+	for _, s := range o.scraps {
+		b.WriteString(fmt.Sprintf("[%d-%s-%d] ", s.l, ClassString(s.clz), s.r))
 	}
 	return b.String()
-}
-
-// ---------------------------------------------------------------------------
-
-type intv struct {
-	l, r   uint64     // left and right bounds, r not included
-	clz    bidi.Class // bidi character class of this interval
-	strong strongDist // positions of last strong bidi characters
-	child  *intv      // some intervals may have a child worth saving
-}
-
-func (iv intv) clone() *intv {
-	return &intv{
-		l:     iv.l,
-		r:     iv.r,
-		clz:   iv.clz,
-		child: iv.child,
-	}
-}
-func (iv intv) String() string {
-	if iv.clz == LBRACKO || iv.clz == RBRACKO || iv.clz == BRACKC {
-		return fmt.Sprintf("[%d.%s]", iv.l, ClassString(iv.clz))
-	}
-	if iv.l == iv.r-1 { // interval of length 1
-		return fmt.Sprintf("[%d.%s]", iv.l, ClassString(iv.clz))
-	}
-	if iv.l == iv.r { // interval of length 0
-		return fmt.Sprintf("|%d.%s|", iv.l, ClassString(iv.clz))
-	}
-	return fmt.Sprintf("[%d-%s-%d] ", iv.l, ClassString(iv.clz), iv.r)
 }
 
 // --- Rules trie ------------------------------------------------------------
@@ -313,7 +335,7 @@ func prepareRulesTrie() *trie.TinyHashTrie {
 	}
 	var r *bidiRule
 	tracelevel := T().GetTraceLevel()
-	T().SetTraceLevel(tracing.LevelInfo)
+	//T().SetTraceLevel(tracing.LevelInfo)
 	var lhs []byte
 	// --- allocate all the rules ---
 	r, lhs = ruleW4_1()

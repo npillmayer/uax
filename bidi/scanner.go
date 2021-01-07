@@ -23,7 +23,7 @@ import (
 type bidiScanner struct {
 	done        bool           // at EOF?
 	currClz     bidi.Class     // the current Bidi_Class (of the last rune read)
-	dists       strongDist     // positions of leftwards strong types
+	strtyps     strongTypes    // positions of previously occured strong types
 	runeScanner *bufio.Scanner // we're using an embedded rune reader
 	lookahead   []byte         // lookahead rune
 	buffer      []byte         // character buffer for token lexeme
@@ -31,7 +31,6 @@ type bidiScanner struct {
 	ahead       uint64         // position ahead of current lexeme
 	bd16stack   bracketStack   // bracket pair stack, rule BD16
 	mode        uint           // scanner modes, set by scanner options
-	//strong      bidi.Class     // Bidi_Class of last strong character encountered
 }
 
 // BS16Max is the maximum stack depth for rule BS16 as defined in UAX#9.
@@ -56,6 +55,25 @@ func newScanner(input io.Reader, opts ...Option) *bidiScanner {
 		opt(sc)
 	}
 	return sc
+}
+
+func (sc *bidiScanner) nextRune() (rune, int, bool) {
+	ok := sc.runeScanner.Scan()
+	if !ok {
+		return 0, 0, false
+	}
+	b := sc.runeScanner.Bytes()
+	r, length := utf8.DecodeRune(b)
+	return r, length, true
+}
+
+func (sc *bidiScanner) checkBracket(r rune, clz bidi.Class) (bidi.Class, int64, bool) {
+	clz, openpos, isbr := sc.doBD16(r, sc.ahead, clz, true)
+	if isbr && openpos >= 0 {
+		// TODO
+		// put bracket pair on resulting bracket stack, ordered be pair.l
+	}
+	return clz, openpos, isbr
 }
 
 // NextToken reads the next run of input text with identical bidi_class,
@@ -83,29 +101,43 @@ func newScanner(input io.Reader, opts ...Option) *bidiScanner {
 func (sc *bidiScanner) NextToken(expected []int) (int, interface{}, uint64, uint64) {
 	sc.prepareNewRun()
 	//T().Debugf("re-reading '%s'", string(sc.buffer))
+	var isBracket bool
+	var openpos int64
 	for sc.runeScanner.Scan() {
 		b := sc.runeScanner.Bytes()
 		//T().Debugf("--------------")
 		r, clz, sz := sc.bidic(b)
 		//T().Debugf("next char '%s' has class %s", string(b), ClassString(clz))
-		var isBracket bool
-		var openpos uint64
-		clz, openpos, isBracket = sc.doBD16(r, sc.ahead, clz, true)
+		//clz, _, isBracket = sc.doBD16(r, sc.ahead, clz, false)
+		clz, isBracket := sc.checkBD16(r, clz)
 		if clz != sc.currClz || isBracket { // bidi classes get collected, but brackets dont't
 			sc.lookahead = sc.lookahead[:0]           // truncate previous LA
 			sc.lookahead = append(sc.lookahead, b...) // and replace by last read rune
 			current := sc.currClz                     // tmp for returning current class
 			sc.currClz = clz                          // change current class to class of LA
+			sc.setStrongPos(current)                  // remember if current is a strong type
 			T().Debugf("scanned Token '%s' as :%s", string(sc.buffer), ClassString(current))
 			l := uint64(len(sc.buffer)) // length of current bidi cluster
-			if isBracket && openpos != sc.ahead {
-				// We have the closing bracket to a corresponding open one.
-				// Brackets are always of length 1, so we'll misuse the length field
-				// for some other information: the position of the openending bracket
-				// if this is a closing bracket.
-				l = openpos
+			_, openpos, isBracket = sc.doBD16(r, sc.ahead, current, false)
+			T().Debugf("is bracket = %v", isBracket)
+			if isBracket {
+				if sc.currClz == BRACKC {
+					//_, openpos, _ = sc.doBD16(r, sc.ahead, clz, true)
+					T().Debugf("position of opening bracket is %d", openpos)
+					T().Debugf("sc.ahead is %d", sc.ahead)
+					if current == BRACKC {
+						// We have the closing bracket to a corresponding open one.
+						// Brackets are always of length 1, so we'll misuse the length field
+						// for some other information: the position of the openending bracket
+						// if this is a closing bracket.
+						l = uint64(openpos)
+					}
+				}
 			}
-			return int(current), sc.dists, sc.pos, l
+			if current == bidi.AL {
+				current = bidi.R // rule W3
+			}
+			return int(current), sc.strtyps, sc.pos, l
 		}
 		sc.buffer = append(sc.buffer, b...)
 		sc.ahead += uint64(sz)
@@ -118,19 +150,36 @@ func (sc *bidiScanner) NextToken(expected []int) (int, interface{}, uint64, uint
 		//T().Debugf("+ LEN=%d, POS=%d", sc.ahead, sc.pos)
 		//r, clz, sz := sc.bidic(sc.buffer) // calculate current bidi class
 		r, clz, _ := sc.bidic(sc.buffer) // re-calculate current bidi class; size already done
-		sc.currClz, _, _ = sc.doBD16(r, sc.ahead, clz, false)
+		sc.currClz, openpos, isBracket = sc.doBD16(r, sc.ahead, clz, true)
 		//sc.currClz = clz
 		//sc.ahead += uint64(sz) // include len(LA) in run's ahead
 		T().Debugf("final Token '%s' as :%s", string(sc.buffer), ClassString(sc.currClz))
 		//T().Debugf("final Token '%s' as :%s", string(sc.buffer), ClassString(sc.currClz))
-		return int(sc.currClz), sc.dists, sc.pos, uint64(len(sc.buffer))
+		l := uint64(len(sc.buffer)) // length of current bidi cluster
+		if isBracket {
+			//_, openpos, _ = sc.doBD16(r, sc.ahead, clz, true)
+			//if openpos != sc.ahead {
+			if sc.currClz == BRACKC {
+				T().Debugf("position of opening bracket is %d", openpos)
+				// We have the closing bracket to a corresponding open one.
+				// Brackets are always of length 1, so we'll misuse the length field
+				// for some other information: the position of the openending bracket
+				// if this is a closing bracket.
+				l = uint64(openpos)
+			}
+			panic("bracket")
+		}
+		if sc.currClz == bidi.AL {
+			sc.currClz = bidi.R // rule W3
+		}
+		return int(sc.currClz), sc.strtyps, sc.pos, l
 	}
 	if !sc.done {
 		sc.done = true
 		T().Debugf("final synthetic Token :%s", ClassString(bidi.PDI))
-		return int(bidi.PDI), sc.dists, sc.pos, 0
+		return int(bidi.PDI), sc.strtyps, sc.pos, 0
 	}
-	return scanner.EOF, sc.dists, sc.pos, 0
+	return scanner.EOF, sc.strtyps, sc.pos, 0
 }
 
 func (sc *bidiScanner) prepareNewRun() {
@@ -165,14 +214,12 @@ func (sc *bidiScanner) bidic(b []byte) (rune, bidi.Class, int) {
 	r, sz := utf8.DecodeRune(b)
 	if sz > 0 {
 		if sc.hasMode(optionTesting) && unicode.IsUpper(r) {
-			//sc.setIfStrong(bidi.R)
-			sc.setStrongPos(bidi.R)
+			//sc.setStrongPos(bidi.R)
 			return r, bidi.R, sz // during testing, UPPERCASE is R2L
 		}
 		props, sz := bidi.Lookup(b)
 		clz := props.Class()
-		//sc.setIfStrong(clz)
-		sc.setStrongPos(clz)
+		//sc.setStrongPos(clz)
 		switch clz { // do some pre-processing
 		case bidi.NSM: // rule W1, handle accents
 			switch sc.currClz {
@@ -190,14 +237,13 @@ func (sc *bidiScanner) bidic(b []byte) (rune, bidi.Class, int) {
 			// 	return r, bidi.L, sz
 			// }
 			//switch
-			if sc.dists.IsAL() {
+			if sc.strtyps.IsAL() {
 				//case bidi.AL:
 				return r, bidi.AN, sz
 				// case bidi.L:
 				// 	return r, LEN, sz
 			}
-		case bidi.AL: // rule W3
-			return r, bidi.R, sz
+		//case bidi.AL: // rule W3 //return r, bidi.R, sz
 		case bidi.S:
 			fallthrough
 		case bidi.WS:
@@ -213,28 +259,30 @@ func (sc *bidiScanner) bidic(b []byte) (rune, bidi.Class, int) {
 }
 
 func (sc *bidiScanner) doBD16(r rune, pos uint64, defaultclass bidi.Class, doStack bool) (
-	bidi.Class, uint64, bool) {
+	bidi.Class, int64, bool) {
 	//
 	if !doStack {
+		//T().Debugf("checking bidi class of %v", r)
 		c, isbr := sc.checkBD16(r, defaultclass)
-		return c, 0, isbr
+		return c, -1, isbr
 	}
 	var isbr bool
-	var openpos uint64
+	var openpos int64
 	if isbr, sc.bd16stack = sc.bd16stack.pushIfBracket(r, pos); isbr {
 		T().Debugf("BD16 - pushed an opening bracket: %v", r)
-		switch sc.dists.Context() {
+		switch sc.strtyps.Context() {
 		case bidi.L:
-			return LBRACKO, pos, true
+			return LBRACKO, int64(pos), true
 		case bidi.R:
-			return RBRACKO, pos, true
+			return RBRACKO, int64(pos), true
 		}
-		return LBRACKO, pos, true
+		return LBRACKO, int64(pos), true
 	} else if isbr, openpos, sc.bd16stack = sc.bd16stack.popWith(r, pos); isbr {
 		T().Debugf("BD16 - popped a closing bracket: %v", r)
+		//panic("DB16")
 		return BRACKC, openpos, true
 	}
-	return defaultclass, 0, false
+	return defaultclass, -1, false
 }
 
 func (sc *bidiScanner) checkBD16(r rune, defaultclass bidi.Class) (bidi.Class, bool) {
@@ -242,7 +290,7 @@ func (sc *bidiScanner) checkBD16(r rune, defaultclass bidi.Class) (bidi.Class, b
 	if props.IsBracket() {
 		//T().Debugf("Bracket detected: %c", r)
 		//T().Debugf("Bracket '%c' with sc.strong = %s", r, ClassString(sc.strong))
-		switch sc.dists.Context() {
+		switch sc.strtyps.Context() {
 		case bidi.L:
 			if props.IsOpeningBracket() {
 				return LBRACKO, true
@@ -262,16 +310,16 @@ func (sc *bidiScanner) checkBD16(r rune, defaultclass bidi.Class) (bidi.Class, b
 func (sc *bidiScanner) setStrongPos(c bidi.Class) {
 	switch c {
 	case bidi.L, bidi.LRI:
-		sc.dists.SetLDist(int(sc.pos))
+		sc.strtyps.SetLDist(int(sc.pos))
 	case bidi.R, bidi.RLI:
-		sc.dists.SetRDist(int(sc.pos))
+		sc.strtyps.SetRDist(int(sc.pos))
 	case bidi.AL:
-		sc.dists.SetALDist(int(sc.pos))
+		sc.strtyps.SetALDist(int(sc.pos))
 	}
 }
 
 func (sc *bidiScanner) Context() bidi.Class {
-	return sc.dists.Context()
+	return sc.strtyps.Context()
 }
 
 // --- Bidi_Classes ----------------------------------------------------------
@@ -287,19 +335,19 @@ func (sc *bidiScanner) Context() bidi.Class {
 const (
 	LBRACKO bidi.Class = bidi.PDI + 1 + iota // opening bracket in L context
 	RBRACKO                                  // opening bracket in R context
-	LBRACKC                                  // closing bracket in L context
-	RBRACKC                                  // closing bracket in R context
 	BRACKC                                   // closing bracket
 	NI                                       // neutral character
 	MAX                                      // marker to have the maximum BiDi class available for clients
 	ILLEGAL bidi.Class = 999                 // in-band value denoting illegal class
+	//LBRACKC                                  // closing bracket in L context
+	//RBRACKC                                  // closing bracket in R context
 )
 
 const claszname = "LRENESETANCSBSWSONBNNSMALControlNumLRORLOLRERLEPDFLRIRLIFSIPDI----------"
-const claszadd = "LBRACKORBRACKOLBRACKCRBRACKCBRACKCNI<max>------"
+const claszadd = "LBRACKORBRACKOBRACKCNI<max>------"
 
 var claszindex = [...]uint8{0, 1, 2, 4, 6, 8, 10, 12, 13, 14, 16, 18, 20, 23, 25, 32, 35, 38, 41, 44, 47, 50, 53, 56, 59, 62}
-var claszaddinx = [...]uint8{0, 7, 14, 21, 28, 34, 36, 41, 44}
+var claszaddinx = [...]uint8{0, 7, 14, 20, 22, 27}
 
 // ClassString returns a bidi class as a string.
 func ClassString(i bidi.Class) string {
@@ -341,104 +389,33 @@ func (bs bracketStack) push(b rune, pos uint64) (bool, bracketStack) {
 func (bs bracketStack) pushIfBracket(b rune, pos uint64) (bool, bracketStack) {
 	props, _ := bidi.LookupRune(b)
 	if props.IsBracket() && props.IsOpeningBracket() {
+		T().Errorf("pushing bracket %v, bracket stack was %v", b, bs)
 		return bs.push(b, pos)
 	}
 	return false, bs
 }
 
-func (bs bracketStack) popWith(b rune, pos uint64) (bool, uint64, bracketStack) {
+func (bs bracketStack) popWith(b rune, pos uint64) (bool, int64, bracketStack) {
+	T().Errorf("popWith: rune=%v, bracket stack is %v", b, bs)
 	if len(bs) == 0 {
-		return false, 0, bs
+		return false, -1, bs
 	}
 	i := len(bs) - 1
 	for i >= 0 { // start at TOS, possible skip unclosed opening brackets
 		if bs[i].pair.c == b {
 			openpos := bs[i].pos
 			bs = bs[:i]
-			return true, openpos, bs
+			return true, int64(openpos), bs
 		}
 		i--
 	}
-	return false, 0, bs
+	return false, -1, bs
 }
 
 func (bs bracketStack) dump() {
 	for i, p := range bs {
 		T().Debugf("\t[%d] %v at %d", i, p.pair, p.pos)
 	}
-}
-
-// --- Strong types bitfield -------------------------------------------------
-
-const ( // positions within type strongDist:
-	lpart  uint64 = iota // position of last L
-	rpart                // position of last R
-	alpart               // position of last AL
-	embed                // embedding direction
-)
-
-// strongDist is a helper type to store positions of strong types within the
-// input text. Various UAX#9 rules require to find preceding occurences of strong types
-// (L, R, sos, AL) to determine context. In order to avoid travelling the text backwards
-// we save the positions of strong types.
-//
-// This is quite a memory invest, but we try to manage it by storing 4 pieces of
-// information in one 64 bit memory word. We hold that positions of characters within a
-// paragraph of text will not overflow uint16, which is ~32.000 bytes. That should be
-// enough for all but machine generated paragraphs, even when encoding non-Western languages.
-// However, we make sure the scanner doesn't break in case of overflow, but rather
-// will muddle along reasonably well (no panic, memory fault, etc). This is not
-// a difficult task, as just taking the low bits will do just fine, except for
-// handling of bracket pairs.
-//
-// The memory layout will be like this:
-//
-//    +--------------+--------------+--------------+--------------+
-//    |  emb.dir.    |    AL pos.   |     R pos.   |    L pos.    |
-//    +--------------+--------------+--------------+--------------+
-//   64                            32                             0
-//
-type strongDist [4]uint16
-
-// Position of last L and R, respectively.
-func (sd strongDist) LRPos() (int, int) {
-	return int(sd[lpart]), int(sd[rpart])
-}
-
-// Has the last strong type been L or R?
-func (sd strongDist) Context() bidi.Class {
-	if sd[lpart] >= sd[rpart] {
-		return bidi.L
-	}
-	return bidi.R
-}
-
-// Embedding direction, as determined by the last LRI or RLI.
-func (sd strongDist) EmbeddingDir() bidi.Class {
-	return bidi.Class(sd[embed])
-}
-
-// Set position of L strong type.
-func (sd strongDist) SetLDist(d int) strongDist {
-	sd[lpart] = uint16(d)
-	return sd
-}
-
-// Set position of R strong type.
-func (sd strongDist) SetRDist(d int) strongDist {
-	sd[rpart] = uint16(d)
-	return sd
-}
-
-// Set position of AL.
-func (sd strongDist) SetALDist(d int) strongDist {
-	sd[alpart] = uint16(d)
-	return sd
-}
-
-// Has the currently last strong type been an AL?
-func (sd strongDist) IsAL() bool {
-	return sd[alpart] > sd[lpart] && sd[alpart] > sd[rpart]
 }
 
 // --- Scanner options -------------------------------------------------------

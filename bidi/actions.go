@@ -37,7 +37,7 @@ type bidiRule struct {
 // will be positioned after the substitution by the parser, according to the second result
 // of the action, an integer. This position hint will be negative most of the time, telling
 // the parser to backtrack and try to re-apply other BiDi rules.
-type ruleAction func([]intv) ([]intv, int)
+type ruleAction func([]scrap) ([]scrap, int)
 
 // Headers and header numbers of the following comment sections correspond to UAX#9.
 
@@ -131,7 +131,7 @@ func ruleW7() (*bidiRule, []byte) {
 		name:   "W7",
 		lhsLen: len(lhs),
 		pass:   1,
-		action: func(match []intv) ([]intv, int) {
+		action: func(match []scrap) ([]scrap, int) {
 			if match[0].strong.Context() == bidi.L {
 				L := match[:1]
 				L[0].clz = bidi.L
@@ -156,7 +156,7 @@ func ruleN0() (*bidiRule, []byte) {
 		name:   "N0",
 		lhsLen: len(lhs),
 		pass:   2,
-		action: func(match []intv) ([]intv, int) {
+		action: func(match []scrap) ([]scrap, int) {
 			// TODO find opening bracket by walking back intervals
 			//      until position of corresponding bracket contained.
 			//      opening bracket should sit in an interval by itself
@@ -205,7 +205,7 @@ func ruleN1_3() (*bidiRule, []byte) {
 		name:   "N1-3",
 		lhsLen: len(lhs),
 		pass:   2,
-		action: func(match []intv) ([]intv, int) {
+		action: func(match []scrap) ([]scrap, int) {
 			collapse(match[0], match[1], bidi.R)
 			match[1].clz = bidi.AN
 			match[1].child = match[2].child
@@ -220,7 +220,7 @@ func ruleN1_4() (*bidiRule, []byte) {
 		name:   "N1-4",
 		lhsLen: len(lhs),
 		pass:   2,
-		action: func(match []intv) ([]intv, int) {
+		action: func(match []scrap) ([]scrap, int) {
 			collapse(match[0], match[1], bidi.R)
 			match[1].clz = bidi.EN
 			match[1].child = match[2].child
@@ -235,7 +235,7 @@ func ruleN1_5() (*bidiRule, []byte) {
 		name:   "N1-5",
 		lhsLen: len(lhs),
 		pass:   2,
-		action: func(match []intv) ([]intv, int) {
+		action: func(match []scrap) ([]scrap, int) {
 			collapse(match[1], match[2], bidi.R)
 			return match[:2], 1
 		},
@@ -258,7 +258,7 @@ func ruleN1_8() (*bidiRule, []byte) {
 		name:   "N1-8",
 		lhsLen: len(lhs),
 		pass:   2,
-		action: func(match []intv) ([]intv, int) {
+		action: func(match []scrap) ([]scrap, int) {
 			collapse(match[1], match[2], bidi.R)
 			return match[:2], 1
 		},
@@ -307,7 +307,7 @@ func makeSquashRule(name string, lhs []byte, c bidi.Class, jmp int) *bidiRule {
 }
 
 func squash(c bidi.Class, jmp int) ruleAction {
-	return func(match []intv) ([]intv, int) {
+	return func(match []scrap) ([]scrap, int) {
 		last := match[len(match)-1]
 		match[0].r = last.r
 		match[0].clz = c
@@ -328,14 +328,14 @@ func makeMidSwapRule(name string, lhs []byte, c bidi.Class, jmp int) *bidiRule {
 		name:   name,
 		lhsLen: len(lhs),
 		pass:   2, // all mid-swap rules are Nx rules ⇒ pass 2
-		action: func(match []intv) ([]intv, int) {
+		action: func(match []scrap) ([]scrap, int) {
 			match[1].clz = c // change class of middle interval
 			return match, jmp
 		},
 	}
 }
 
-func collapse(dest, src intv, c bidi.Class) {
+func collapse(dest, src scrap, c bidi.Class) {
 	if src.child != nil {
 		appendChildren(dest, src)
 	}
@@ -351,6 +351,6 @@ func makeLHS(toks ...bidi.Class) []byte {
 	return b
 }
 
-func appendChildren(dest intv, src intv) {
+func appendChildren(dest scrap, src scrap) {
 	T().Errorf("appendChildren(…) not yet implemented")
 }
