@@ -17,24 +17,15 @@ type scrap struct {
 	child   *scrap      // some scraps may have a child worth saving
 }
 
-// func (s scrap) clone() *scrap {
-// 	return &scrap{
-// 		l:     s.l,
-// 		r:     s.r,
-// 		clz:   s.bidiclz,
-// 		child: s.child,
-// 	}
-// }
-
 func (s scrap) String() string {
-	if s.bidiclz == LBRACKO || s.bidiclz == RBRACKO || s.bidiclz == BRACKC {
+	if s.bidiclz == BRACKO || s.bidiclz == BRACKC {
 		return fmt.Sprintf("[%d.%s]", s.l, ClassString(s.bidiclz))
 	}
 	if s.l == s.r-1 { // interval of length 1
 		return fmt.Sprintf("[%d.%s]", s.l, ClassString(s.bidiclz))
 	}
 	if s.l == s.r { // interval of length 0
-		return fmt.Sprintf("|%d.%s|", s.l, ClassString(s.bidiclz))
+		return fmt.Sprintf("|%s|", ClassString(s.bidiclz))
 	}
 	return fmt.Sprintf("[%d-%s-%d]", s.l, ClassString(s.bidiclz), s.r)
 }
@@ -42,14 +33,17 @@ func (s scrap) String() string {
 // clear initializes a scrap to neutral values.
 func (s *scrap) clear() {
 	s.l, s.r = 0, 0
-	s.bidiclz = ILLEGAL
+	s.bidiclz = NULL
 	s.strong = [4]uint16{}
 	s.child = nil
 }
 
 // len returns the length in bytes for a scrap.
 func (s scrap) len() charpos {
-	if s.bidiclz == LBRACKO || s.bidiclz == RBRACKO || s.bidiclz == BRACKC {
+	if s.bidiclz == NULL {
+		return 0
+	}
+	if s.bidiclz == BRACKO || s.bidiclz == BRACKC {
 		return 1
 	}
 	return s.r - s.l
@@ -106,19 +100,19 @@ func (st strongTypes) EmbeddingDir() bidi.Class {
 }
 
 // Set position of L strong type.
-func (st strongTypes) SetLDist(d int) strongTypes {
+func (st strongTypes) SetLDist(d charpos) strongTypes {
 	st[lpart] = uint16(d)
 	return st
 }
 
 // Set position of R strong type.
-func (st strongTypes) SetRDist(d int) strongTypes {
+func (st strongTypes) SetRDist(d charpos) strongTypes {
 	st[rpart] = uint16(d)
 	return st
 }
 
 // Set position of AL.
-func (st strongTypes) SetALDist(d int) strongTypes {
+func (st strongTypes) SetALDist(d charpos) strongTypes {
 	st[alpart] = uint16(d)
 	return st
 }

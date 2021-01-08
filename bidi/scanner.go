@@ -26,7 +26,7 @@ type bidiScanner struct {
 	lookahead   scrap          // lookahead has been read but not sent to parser
 	pos         charpos        // position in input string
 	ahead       charpos        // position ahead of current scrap
-	strtyps     strongTypes    // positions of previously occured strong types
+	strongs     strongTypes    // positions of previously occured strong types
 	runeScanner *bufio.Scanner // we're using an embedded rune reader
 	bd16stack   bracketStack   // bracket pair stack, rule BD16
 	//laLen       charpos        // byte length of lookahead
@@ -57,10 +57,12 @@ func newScanner(input io.Reader, opts ...Option) *bidiScanner {
 	return sc
 }
 
+// nextRune reads the next rune from the input reader.
+// Returns the rune, its byte length, bidi class and a flag indicating
+// a valid input (false for EOF).
 func (sc *bidiScanner) nextRune() (rune, int, bidi.Class, bool) {
-	ok := sc.runeScanner.Scan()
-	if !ok {
-		return 0, 0, ILLEGAL, false
+	if ok := sc.runeScanner.Scan(); !ok {
+		return 0, 0, NULL, false
 	}
 	b := sc.runeScanner.Bytes()
 	r, length := utf8.DecodeRune(b)
@@ -69,21 +71,22 @@ func (sc *bidiScanner) nextRune() (rune, int, bidi.Class, bool) {
 		panic("bidi package differs in rune interpretation from scanner package")
 	}
 	bidiclz := props.Class()
+	if props.IsBracket() {
+		if props.IsOpeningBracket() {
+			bidiclz = BRACKO
+		} else {
+			bidiclz = BRACKC
+		}
+	}
 	return r, length, bidiclz, true
 }
 
-func (sc *bidiScanner) makeScrap(r rune, pos, ahead charpos, length int) scrap {
+// makeScrap wraps the input rune into a scrap.
+func makeScrap(r rune, clz bidi.Class, pos charpos, length int) scrap {
 	s := scrap{
 		l:       pos,
 		r:       pos + charpos(length),
-		bidiclz: sc.bidic(r),
-	}
-	clz, openbrpos, isbr := sc.doBD16(r, ahead, s.bidiclz, true)
-	if isbr {
-		s.bidiclz = clz
-		if openbrpos >= 0 {
-			s.r = openbrpos // bracket scraps mis-use r for position of opening bracket
-		}
+		bidiclz: clz,
 	}
 	return s
 }
@@ -101,27 +104,42 @@ func (sc *bidiScanner) makeScrap(r rune, pos, ahead charpos, length int) scrap {
 // uint16.
 //
 func (sc *bidiScanner) Scan(pipe chan<- scrap) {
-	var pos, lapos charpos
 	var current, lookahead scrap
-	current.bidiclz = ILLEGAL
+	var pos, lapos charpos // position of current scrap and of lookahead
+	var lastAL charpos     // position of last AL in input
+	current.bidiclz = NULL
 	for {
-		r, length, bidiclz, ok := sc.read()
-		if !ok {
-			sc.post(lookahead, pipe)
-			sc.stop(pipe)
+		r, length, bidiclz, ok := sc.nextRune() // read the next input rune
+		if !ok {                                // if EOF, drain lookahead and quit
+			sc.post(lookahead, pipe) // use lookahead as current scrap and put it onto pipe
+			sc.stop(pipe)            // then send quit signal to parser
 			break
 		}
-		lookahead = makeScrap(r, sc.pos, sc.ahead, length)
-		T().Debugf("bidi scanner read lookahead = %v", lookahead)
-		if current.bidiclz == ILLEGAL || current.bidiclz != lookahead.bidiclz || isbracket(current.bidiclz) {
-			if current.bidiclz != ILLEGAL {
+
+		// a rune has successfully been read ⇒ make it the new lookahead
+		if sc.hasMode(optionTesting) && unicode.IsUpper(r) {
+			bidiclz = bidi.R // during testing, UPPERCASE is R2L
+		}
+		isAL := bidiclz == bidi.AL                     // AL will be changed by rule W3
+		bidiclz = applyRulesW1to3(r, bidiclz, current) // UAX#9 W1–3 handled by scanner
+		lookahead = makeScrap(r, bidiclz, pos, length)
+		lookahead = sc.prepareRuleBD16(r, lookahead, current)
+		T().Debugf("bidi scanner read lookahead = %v", lookahead) // finally a new lookahead
+
+		// the current scrap is finished if the lookahead cannot extend it
+		if current.bidiclz == NULL || current.bidiclz != lookahead.bidiclz || isbracket(current) {
+			if current.bidiclz != NULL { // if the current scrap is not the initial null scrap
 				sc.post(lookahead, pipe) // put current on channel
 			}
+			// proceed ahead, making lookahead the current scrap
+			inheritStrongTypes(lookahead, current, lastAL)
 			current = lookahead
-			pos = lapos
-			lapos += lookahead.len()
-		} else {
-			collapse(current, lookahead, current.bidiclz) // append LA to current
+			pos, lapos = lapos, lapos+lookahead.len()
+			if isAL {
+				lastAL = current.l
+			}
+		} else { // otherwise the current scrap grows
+			collapse(current, lookahead, current.bidiclz) // merge LA with current
 		}
 	}
 }
@@ -133,7 +151,7 @@ func (sc *bidiScanner) post(s scrap, pipe chan<- scrap) {
 
 func (sc *bidiScanner) stop(pipe chan<- scrap) {
 	T().Debugf("stopping bidi scanner, sending final scrap (stopper)")
-	s := scrap{bidiclz: ILLEGAL}
+	s := scrap{bidiclz: NULL}
 	pipe <- s
 	T().Infof("stopped bidi scanner")
 }
@@ -235,15 +253,6 @@ func (sc *bidiScanner) prepareNewRun() {
 }
 */
 
-// SetErrorHandler sets an error handler function, which receives an error
-// and may try some error repair strategy.
-//
-// Currently does nothing.
-//
-func (sc *bidiScanner) SetErrorHandler(h func(error)) {
-	// TODO
-}
-
 // --- Handling of BiDi Classes ----------------------------------------------
 
 // bidic returns the Bidi_Class for a rune. It will apply certain UAX#9 rules
@@ -251,17 +260,15 @@ func (sc *bidiScanner) SetErrorHandler(h func(error)) {
 //
 // TODO Completely implement W1 on scanner level
 //
-func (sc *bidiScanner) bidic(r rune) bidi.Class {
+func applyRulesW1to3(r rune, clz bidi.Class, current scrap) bidi.Class {
 	//r, sz := utf8.DecodeRune(b)
 	//if sz > 0 {
-	if sc.hasMode(optionTesting) && unicode.IsUpper(r) {
-		return bidi.R // during testing, UPPERCASE is R2L
-	}
 	// props, sz := bidi.Lookup(b)
 	// clz := props.Class()
+	currclz := current.bidiclz
 	switch clz { // do some pre-processing
 	case bidi.NSM: // rule W1, handle accents
-		switch sc.bidiclz {
+		switch currclz {
 		case bidi.LRI:
 			return bidi.L
 		case bidi.RLI:
@@ -270,87 +277,130 @@ func (sc *bidiScanner) bidic(r rune) bidi.Class {
 			//return r, bidi.ON, sz
 			return NI
 		}
-		return sc.bidiclz
+		return currclz
 	case bidi.EN: // rule W2
-		if sc.strtyps.IsAL() {
+		//if sc.strtyps.IsAL() {
+		if current.strong.IsAL() {
 			//case bidi.AL:
 			return bidi.AN
 			// case bidi.L:
 			// 	return r, LEN, sz
 		}
-	//case bidi.AL: // rule W3 //return r, bidi.R, sz
+	case bidi.AL: // rule W3
+		return bidi.R
 	case bidi.S, bidi.WS, bidi.ON:
 		return NI
 		//if sc.bidiclz == NI {
 		// return NI
 		//}
 	}
-	return props.Class()
+	//return props.Class()
+	return clz
 }
 
-func (sc *bidiScanner) doBD16(r rune, pos charpos, defaultclass bidi.Class, doStack bool) (
-	bidi.Class, charpos, bool) {
-	//
-	if !doStack {
-		//T().Debugf("checking bidi class of %v", r)
-		c, isbr := sc.checkBD16(r, defaultclass)
-		return c, -1, isbr
+func isbracket(s scrap) bool {
+	clz := s.bidiclz
+	return clz == BRACKO || clz == BRACKC
+}
+
+func (sc *bidiScanner) prepareRuleBD16(r rune, la, current scrap) scrap {
+	if !isbracket(la) {
+		return la
 	}
-	var isbr bool
-	var openpos int64
-	if isbr, sc.bd16stack = sc.bd16stack.pushIfBracket(r, pos); isbr {
-		T().Debugf("BD16 - pushed an opening bracket: %v", r)
-		switch sc.strtyps.Context() {
-		case bidi.L:
-			return LBRACKO, int64(pos), true
-		case bidi.R:
-			return RBRACKO, int64(pos), true
+	if la.bidiclz == BRACKO {
+		var isbr bool // is LA not just a bracket, but part of a UAX#9 bracket pair?
+		isbr, sc.bd16stack = sc.bd16stack.push(r, la.l)
+		if isbr {
+			T().Debugf("pushed lookahead as bracket onto bracket stack")
 		}
-		return LBRACKO, int64(pos), true
-	} else if isbr, openpos, sc.bd16stack = sc.bd16stack.popWith(r, pos); isbr {
-		T().Debugf("BD16 - popped a closing bracket: %v", r)
-		//panic("DB16")
-		return BRACKC, openpos, true
+	} else {
+		// TODO pop bracket
 	}
-	return defaultclass, -1, false
+	// clz, openbrpos, isbr := sc.doBD16(r, pos, s.bidiclz, true)
+	// if isbr {
+	// 	s.bidiclz = clz
+	// 	if openbrpos >= 0 {
+	// 		s.r = openbrpos // bracket scraps mis-use r for position of opening bracket
+	// 	}
+	// }
+	return la
 }
 
-func (sc *bidiScanner) checkBD16(r rune, defaultclass bidi.Class) (bidi.Class, bool) {
-	props, _ := bidi.LookupRune(r)
-	if props.IsBracket() {
-		//T().Debugf("Bracket detected: %c", r)
-		//T().Debugf("Bracket '%c' with sc.strong = %s", r, ClassString(sc.strong))
-		switch sc.strtyps.Context() {
-		case bidi.L:
-			if props.IsOpeningBracket() {
-				return LBRACKO, true
-			}
-			return BRACKC, true
-		case bidi.R:
-			if props.IsOpeningBracket() {
-				return RBRACKO, true
-			}
-			return BRACKC, true
-		}
-		return LBRACKO, true
-	}
-	return defaultclass, false
-}
+// func (sc *bidiScanner) doBD16(r rune, pos charpos, defaultclass bidi.Class, doStack bool) (
+// 	bidi.Class, charpos, bool) {
+// 	//
+// 	if !doStack {
+// 		//T().Debugf("checking bidi class of %v", r)
+// 		c, isbr := sc.checkBD16(r, defaultclass)
+// 		return c, -1, isbr
+// 	}
+// 	var isbr bool
+// 	var openpos int64
+// 	if isbr, sc.bd16stack = sc.bd16stack.pushIfBracket(r, pos); isbr {
+// 		T().Debugf("BD16 - pushed an opening bracket: %v", r)
+// 		switch sc.strtyps.Context() {
+// 		case bidi.L:
+// 			return LBRACKO, int64(pos), true
+// 		case bidi.R:
+// 			return RBRACKO, int64(pos), true
+// 		}
+// 		return LBRACKO, int64(pos), true
+// 	} else if isbr, openpos, sc.bd16stack = sc.bd16stack.popWith(r, pos); isbr {
+// 		T().Debugf("BD16 - popped a closing bracket: %v", r)
+// 		//panic("DB16")
+// 		return BRACKC, openpos, true
+// 	}
+// 	return defaultclass, -1, false
+// }
 
-func (sc *bidiScanner) setStrongPos(c bidi.Class) {
-	switch c {
+// func (sc *bidiScanner) checkBD16(r rune, defaultclass bidi.Class) (bidi.Class, bool) {
+// 	props, _ := bidi.LookupRune(r)
+// 	if props.IsBracket() {
+// 		//T().Debugf("Bracket detected: %c", r)
+// 		//T().Debugf("Bracket '%c' with sc.strong = %s", r, ClassString(sc.strong))
+// 		switch sc.strtyps.Context() {
+// 		case bidi.L:
+// 			if props.IsOpeningBracket() {
+// 				return LBRACKO, true
+// 			}
+// 			return BRACKC, true
+// 		case bidi.R:
+// 			if props.IsOpeningBracket() {
+// 				return RBRACKO, true
+// 			}
+// 			return BRACKC, true
+// 		}
+// 		return LBRACKO, true
+// 	}
+// 	return defaultclass, false
+// }
+
+// isAL is true if dest has been of bidi class AL (before UAX#9 rule W3 changed it)
+func inheritStrongTypes(dest, src scrap, lastAL charpos) {
+	dest.strong = src.strong
+	switch src.bidiclz {
 	case bidi.L, bidi.LRI:
-		sc.strtyps.SetLDist(int(sc.pos))
+		dest.strong.SetLDist(src.l)
 	case bidi.R, bidi.RLI:
-		sc.strtyps.SetRDist(int(sc.pos))
-	case bidi.AL:
-		sc.strtyps.SetALDist(int(sc.pos))
+		dest.strong.SetRDist(src.l)
 	}
+	dest.strong.SetALDist(lastAL)
 }
 
-func (sc *bidiScanner) Context() bidi.Class {
-	return sc.strtyps.Context()
-}
+// func (sc *bidiScanner) setStrongPos(c bidi.Class) {
+// 	switch c {
+// 	case bidi.L, bidi.LRI:
+// 		sc.strtyps.SetLDist(int(sc.pos))
+// 	case bidi.R, bidi.RLI:
+// 		sc.strtyps.SetRDist(int(sc.pos))
+// 	case bidi.AL:
+// 		sc.strtyps.SetALDist(int(sc.pos))
+// 	}
+// }
+
+// func (sc *bidiScanner) Context() bidi.Class {
+// 	return sc.strtyps.Context()
+// }
 
 // --- Bidi_Classes ----------------------------------------------------------
 
@@ -363,30 +413,30 @@ func (sc *bidiScanner) Context() bidi.Class {
 // BiDi classes in unicode.bidi, which as of now is `bidi.PDI`. Package unicode.bidi is
 // unstable, thus making us somewhat reliant on an unreliable API.
 const (
-	LBRACKO bidi.Class = bidi.PDI + 1 + iota // opening bracket in L context
-	RBRACKO                                  // opening bracket in R context
-	BRACKC                                   // closing bracket
-	NI                                       // neutral character
-	MAX                                      // marker to have the maximum BiDi class available for clients
-	ILLEGAL bidi.Class = 999                 // in-band value denoting illegal class
+	BRACKO bidi.Class = bidi.PDI + 1 + iota // opening bracket
+	BRACKC                                  // closing bracket
+	NI                                      // neutral character
+	MAX                                     // marker to have the maximum BiDi class available for clients
+	NULL   bidi.Class = 999                 // in-band value denoting illegal class
+	//RBRACKO                                  // opening bracket in R context
 	//LBRACKC                                  // closing bracket in L context
 	//RBRACKC                                  // closing bracket in R context
 )
 
 const claszname = "LRENESETANCSBSWSONBNNSMALControlNumLRORLOLRERLEPDFLRIRLIFSIPDI----------"
-const claszadd = "LBRACKORBRACKOBRACKCNI<max>------"
+const claszadd = "BRACKOBRACKCNI<max>------"
 
 var claszindex = [...]uint8{0, 1, 2, 4, 6, 8, 10, 12, 13, 14, 16, 18, 20, 23, 25, 32, 35, 38, 41, 44, 47, 50, 53, 56, 59, 62}
-var claszaddinx = [...]uint8{0, 7, 14, 20, 22, 27}
+var claszaddinx = [...]uint8{0, 6, 12, 14, 19, 20}
 
 // ClassString returns a bidi class as a string.
 func ClassString(i bidi.Class) string {
-	if i == ILLEGAL {
+	if i == NULL {
 		return "bidi_class(none)"
 	}
 	if i > bidi.PDI {
 		if i > bidi.PDI && i <= MAX {
-			j := i - LBRACKO
+			j := i - BRACKO
 			return claszadd[claszaddinx[j]:claszaddinx[j+1]]
 		}
 		return "bidi_class(" + strconv.FormatInt(int64(i), 10) + ")"
@@ -398,16 +448,17 @@ func ClassString(i bidi.Class) string {
 
 type bracketStack []bpos
 type bpos struct {
-	pos  uint64
+	pos  charpos
 	pair bracketPair
 }
 
-func (bs bracketStack) push(b rune, pos uint64) (bool, bracketStack) {
-	if len(bs) == BS16Max { // skip in case of stack overflow, as def in UAX#9
+func (bs bracketStack) push(r rune, pos charpos) (bool, bracketStack) {
+	if len(bs) == BS16Max { // skip in case of stack overflow, as defined in UAX#9
 		return false, bs
 	}
+	// TODO put bracket list in sutable data structure (map like)
 	for _, pair := range uax9BracketPairs { // double check for UAX#9 brackets
-		if pair.o == b {
+		if pair.o == r {
 			b := bpos{pos: pos, pair: pair}
 			return true, append(bs, b)
 		}
@@ -416,17 +467,17 @@ func (bs bracketStack) push(b rune, pos uint64) (bool, bracketStack) {
 	return false, bs
 }
 
-func (bs bracketStack) pushIfBracket(b rune, pos uint64) (bool, bracketStack) {
-	props, _ := bidi.LookupRune(b)
-	if props.IsBracket() && props.IsOpeningBracket() {
-		T().Errorf("pushing bracket %v, bracket stack was %v", b, bs)
-		return bs.push(b, pos)
-	}
-	return false, bs
-}
+// func (bs bracketStack) pushIfBracket(b rune, pos uint64) (bool, bracketStack) {
+// 	props, _ := bidi.LookupRune(b)
+// 	if props.IsBracket() && props.IsOpeningBracket() {
+// 		T().Errorf("pushing bracket %v, bracket stack was %v", b, bs)
+// 		return bs.push(b, pos)
+// 	}
+// 	return false, bs
+// }
 
 func (bs bracketStack) popWith(b rune, pos uint64) (bool, int64, bracketStack) {
-	T().Errorf("popWith: rune=%v, bracket stack is %v", b, bs)
+	T().Debugf("popWith: rune=%v, bracket stack is %v", b, bs)
 	if len(bs) == 0 {
 		return false, -1, bs
 	}
@@ -454,9 +505,9 @@ func (bs bracketStack) dump() {
 type Option func(p *bidiScanner)
 
 const (
-	optionRecognizeLegacy uint = 1 << 1 // recognize LRM, RLM, ALM, LRE, RLE, LRO, RLO, PDF
-	optionOuterR2L        uint = 1 << 2 // set outer direction as RtoL
-	optionTesting         uint = 1 << 3 // test mode: recognize uppercase as class R
+	optionRecognizeLegacy uint8 = 1 << 1 // recognize LRM, RLM, ALM, LRE, RLE, LRO, RLO, PDF
+	optionOuterR2L        uint8 = 1 << 2 // set outer direction as RtoL
+	optionTesting         uint8 = 1 << 3 // test mode: recognize uppercase as class R
 )
 
 // RecognizeLegacy is not yet implemented. It was indented to make the
@@ -484,6 +535,6 @@ func Testing(b bool) Option {
 	}
 }
 
-func (sc *bidiScanner) hasMode(m uint) bool {
+func (sc *bidiScanner) hasMode(m uint8) bool {
 	return sc.mode&m > 0
 }

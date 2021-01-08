@@ -91,7 +91,7 @@ func (p *parser) pass1() {
 		la += k
 		//T().Debugf("t=%v, sp=%d, la=%d, walk=%v", t, p.sp, la, walk) //, minMatchLen)
 		if la == 0 {
-			if t != ILLEGAL { // TODO remove this
+			if t != NULL { // TODO remove this
 				panic("no LA, but not at EOF?")
 			}
 			break
@@ -124,7 +124,7 @@ func (p *parser) pass1() {
 // new scrap and false if this is the EOF scrap, true otherwise.
 func (p *parser) nextInputScrap(pipe <-chan scrap) (scrap, bool) {
 	s := <-pipe
-	if s.bidiclz == ILLEGAL {
+	if s.bidiclz == NULL {
 		return s, false
 	}
 	return s, true
@@ -133,7 +133,7 @@ func (p *parser) nextInputScrap(pipe <-chan scrap) (scrap, bool) {
 // read reads k ≤ n bidi clusters from the scanner. If k < n, EOF has been encountered.
 // Returns k.
 func (p *parser) read(n int, t bidi.Class) (bidi.Class, int) {
-	if n <= 0 || t == ILLEGAL {
+	if n <= 0 || t == NULL {
 		return t, 0
 	}
 	i := 0
@@ -142,8 +142,11 @@ func (p *parser) read(n int, t bidi.Class) (bidi.Class, int) {
 		// var strong interface{}
 		// t, strong, pos, length = p.sc.NextToken(nil)
 		s, ok := p.nextInputScrap(p.pipe)
+		if !ok {
+			// TODO set EOF
+		}
 		t = s.bidiclz
-		if t == ILLEGAL {
+		if t == NULL {
 			break
 		}
 		// s := scrap{l: pos, bidiclz: bidi.Class(t), strong: strong.(strongTypes)}
@@ -302,7 +305,7 @@ func (p *parser) findOpeningBracket(pos charpos) int {
 		s := p.stack[o]
 		if s.l <= pos && s.r > pos {
 			T().Debugf("found interval at position for closing bracket")
-			if s.bidiclz != LBRACKO && s.bidiclz != RBRACKO {
+			if s.bidiclz != BRACKO {
 				panic("interval at bracket position is not a bracket")
 			}
 			return o
