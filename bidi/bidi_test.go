@@ -54,7 +54,7 @@ func TestScannerScraps(t *testing.T) {
 	}
 	for i, inp := range inputs {
 		input := strings.NewReader(inp.str)
-		scnr := newScanner(input, Testing(true))
+		scnr := newScanner(input, TestMode(true))
 		pipe := make(chan scrap, 0)
 		go scnr.Scan(pipe)
 		n := 0
@@ -82,13 +82,13 @@ func TestScannerBrackets(t *testing.T) {
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	input := strings.NewReader("hi (YOU[])")
-	scnr := newScanner(input, Testing(true))
+	scnr := newScanner(input, TestMode(true))
 	pipe := make(chan scrap, 0)
 	go scnr.Scan(pipe)
 	for s := range pipe {
 		t.Logf("-> %s", s)
 		if s.bidiclz == BRACKC {
-			pair, found := scnr.bd16.FindBracketPairing(s, Closing)
+			pair, found := scnr.bd16.FindBracketPairing(s) //, Closing)
 			if !found {
 				t.Errorf("expected closing bracket %s to form a pairing, did not", s)
 			}
@@ -98,12 +98,13 @@ func TestScannerBrackets(t *testing.T) {
 }
 
 func TestSimple(t *testing.T) {
-	gtrace.CoreTracer = gotestingadapter.New()
-	teardown := gotestingadapter.RedirectTracing(t)
-	defer teardown()
+	//gtrace.CoreTracer = gotestingadapter.New()
+	gtrace.CoreTracer = gologadapter.New()
+	//teardown := gotestingadapter.RedirectTracing(t)
+	//defer teardown()
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
-	reader := strings.NewReader("Hello 123.456")
+	reader := strings.NewReader("hello 123.456")
 	ordering := ResolveParagraph(reader)
 	fmt.Printf("resulting ordering = %s\n", ordering)
 	//t.Fail()
@@ -117,7 +118,7 @@ func TestBrackets(t *testing.T) {
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	reader := strings.NewReader("hello (WORLD)")
-	ordering := ResolveParagraph(reader, Testing(true))
+	ordering := ResolveParagraph(reader, TestMode(true))
 	fmt.Printf("resulting ordering = %s\n", ordering)
 	//t.Fail()
 }

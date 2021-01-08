@@ -39,6 +39,7 @@ func ResolveParagraph(inp io.Reader, opts ...Option) *Ordering {
 type parser struct {
 	sc    *bidiScanner       // parser uses a bidi-specific scanner
 	pipe  chan scrap         // communication with the scanner
+	eof   bool               // end of input reached during first pass
 	stack []scrap            // we manage a stack of bidi class scraps
 	sp    int                // 'pointer' into the stack; start of LHS matching
 	trie  *trie.TinyHashTrie // dictionary of bidi rules
@@ -81,17 +82,19 @@ func (p *parser) reduce(n int, rhs []scrap) {
 // basically the Wx-rules from section 3.3.4 “Resolving Weak Types”.
 //
 func (p *parser) pass1() {
-	la := 0              // length of lookahead LA
-	t, _ := p.read(3, 0) // initially load 3 scraps
+	la := 0            // length of lookahead LA
+	_, ok := p.read(3) // initially load 3 scraps
+	p.eof = !ok
 	var rule, shortrule *bidiRule
 	walk := false // if true, accept walking over 1 scrap
 	for {         // scan the complete input sequence (until EOF)
 		la = len(p.stack) - p.sp
-		t, k := p.read(3-la, t) // extend LA to |LA|=3, if possible
+		k, ok := p.read(3 - la) // extend LA to |LA|=3, if possible
 		la += k
+		p.eof = !ok
 		//T().Debugf("t=%v, sp=%d, la=%d, walk=%v", t, p.sp, la, walk) //, minMatchLen)
 		if la == 0 {
-			if t != NULL { // TODO remove this
+			if !p.eof {
 				panic("no LA, but not at EOF?")
 			}
 			break
@@ -132,9 +135,9 @@ func (p *parser) nextInputScrap(pipe <-chan scrap) (scrap, bool) {
 
 // read reads k ≤ n bidi clusters from the scanner. If k < n, EOF has been encountered.
 // Returns k.
-func (p *parser) read(n int, t bidi.Class) (bidi.Class, int) {
-	if n <= 0 || t == NULL {
-		return t, 0
+func (p *parser) read(n int) (int, bool) {
+	if n <= 0 || p.eof {
+		return 0, false
 	}
 	i := 0
 	for ; i < n; i++ { // read n bidi clusters
@@ -143,12 +146,12 @@ func (p *parser) read(n int, t bidi.Class) (bidi.Class, int) {
 		// t, strong, pos, length = p.sc.NextToken(nil)
 		s, ok := p.nextInputScrap(p.pipe)
 		if !ok {
-			// TODO set EOF
+			p.eof = true
 		}
-		t = s.bidiclz
-		if t == NULL {
-			break
-		}
+		// t = s.bidiclz
+		// if t == NULL {
+		// 	break
+		// }
 		// s := scrap{l: pos, bidiclz: bidi.Class(t), strong: strong.(strongTypes)}
 		// if s.bidiclz == BRACKC { // closing brackets have misused length field
 		// 	r = length
@@ -158,7 +161,7 @@ func (p *parser) read(n int, t bidi.Class) (bidi.Class, int) {
 		// s.r = r
 		p.stack = append(p.stack, s)
 	}
-	return t, i
+	return i, true
 }
 
 func (p *parser) pass2() {
@@ -248,13 +251,15 @@ func (p *parser) performRuleN0() {
 // Ordering starts the parse and returns a bidi-ordering for the input-text gsen
 // when creating the parser.
 func (p *parser) Ordering() *Ordering {
+	p.pipe = make(chan scrap, 0)
+	go p.sc.Scan(p.pipe)
 	T().Debugf("--- pass 1 ---")
 	p.pass1()
 	T().Debugf("--------------")
 	T().Debugf("STACK = %v", p.stack)
-	T().Debugf("--- pass 2 ---")
-	p.pass2()
-	T().Debugf("--------------")
+	// T().Debugf("--- pass 2 ---")
+	// p.pass2()
+	// T().Debugf("--------------")
 	return &Ordering{scraps: p.stack}
 }
 

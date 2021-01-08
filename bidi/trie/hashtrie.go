@@ -40,6 +40,7 @@ func NewTinyHashTrie(size uint8, catcnt int8) (*TinyHashTrie, error) {
 		size:   int(size),       // TODO find nearest prime
 		catcnt: int(catcnt) + 1, // make room for cat = 0
 	}
+	T().Infof("hash trie size = %d for %d categories", trie.size, trie.catcnt-1)
 	trie.headercode = category(trie.catcnt) + 1
 	trie.alpha = pointer(math.Round(0.61803 * float64(trie.size)))
 	trie.span = pointer(trie.size - 2*trie.catcnt)
@@ -219,8 +220,8 @@ func (trie *TinyHashTrie) Iterator() *Iterator {
 }
 
 func (trie *TinyHashTrie) correct(c byte) category {
-	if c == 0 { // bidi.L = 0 ⇒ unusable, set to max_cat+1
-		return category(trie.catcnt)
+	if c == 0 { // bidi.L = 0 ⇒ unusable, set to max_cat
+		return category(trie.catcnt - 1)
 	}
 	return category(c)
 }

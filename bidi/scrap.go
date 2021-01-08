@@ -132,3 +132,12 @@ func (st strongTypes) SetALDist(d charpos) strongTypes {
 func (st strongTypes) IsAL() bool {
 	return st[alpart] > st[lpart] && st[alpart] > st[rpart]
 }
+
+func (st strongTypes) SetEmbedding(dir bidi.Direction) strongTypes {
+	if dir == bidi.LeftToRight {
+		st[embed] = uint16(bidi.L)
+	} else if dir == bidi.RightToLeft {
+		st[embed] = uint16(bidi.R)
+	}
+	return st
+}
