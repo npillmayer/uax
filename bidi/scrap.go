@@ -49,6 +49,17 @@ func (s scrap) len() charpos {
 	return s.r - s.l
 }
 
+func collapse(dest, src scrap, c bidi.Class) scrap {
+	//x := dest
+	if src.child != nil {
+		appendChildren(dest, src)
+	}
+	dest.r = src.r
+	dest.bidiclz = c
+	//T().Debugf("%s + %s = %s", x, src, dest)
+	return dest
+}
+
 // --- Strong types bitfield -------------------------------------------------
 
 const ( // positions within type strongTypes:

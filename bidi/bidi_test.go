@@ -37,6 +37,60 @@ func TestClasses(t *testing.T) {
 	}
 }
 
+func TestScannerScraps(t *testing.T) {
+	gtrace.CoreTracer = gotestingadapter.New()
+	teardown := gotestingadapter.RedirectTracing(t)
+	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelError)
+	//
+	inputs := []struct {
+		str string
+		cnt int
+	}{
+		{str: "hello 12.345", cnt: 5},
+		{str: "Hello (123)", cnt: 6},
+		{str: "smith (fabrikam ARABIC) HEBREW", cnt: 9},
+		{str: "AB(CD[&ef])gh", cnt: 9},
+	}
+	for i, inp := range inputs {
+		input := strings.NewReader(inp.str)
+		scnr := newScanner(input, Testing(true))
+		pipe := make(chan scrap, 0)
+		go scnr.Scan(pipe)
+		n := 0
+		scraps := "produced scraps:"
+		for s := range pipe {
+			if s.bidiclz == NULL {
+				scraps += "\n----------------"
+			} else {
+				scraps += fmt.Sprintf("\n[%d %2d] -> %s", i, n, s)
+			}
+			n++
+		}
+		if n-1 != inp.cnt {
+			t.Logf("scanner test for [%d] \"%s\"", i, inp.str)
+			t.Logf(scraps)
+			t.Errorf("ERROR: expected scanner to produce %d scraps, have %d", inp.cnt, n-1)
+		}
+	}
+}
+
+func TestScannerBrackets(t *testing.T) {
+	//gtrace.CoreTracer = gotestingadapter.New()
+	gtrace.CoreTracer = gologadapter.New()
+	//teardown := gotestingadapter.RedirectTracing(t)
+	//defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	input := strings.NewReader("hi (YOU[])")
+	scnr := newScanner(input, Testing(true))
+	pipe := make(chan scrap, 0)
+	go scnr.Scan(pipe)
+	for s := range pipe {
+		t.Logf("-> %s", s)
+	}
+}
+
 func TestSimple(t *testing.T) {
 	gtrace.CoreTracer = gotestingadapter.New()
 	teardown := gotestingadapter.RedirectTracing(t)

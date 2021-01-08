@@ -335,14 +335,6 @@ func makeMidSwapRule(name string, lhs []byte, c bidi.Class, jmp int) *bidiRule {
 	}
 }
 
-func collapse(dest, src scrap, c bidi.Class) {
-	if src.child != nil {
-		appendChildren(dest, src)
-	}
-	dest.r = src.r
-	dest.bidiclz = c
-}
-
 func makeLHS(toks ...bidi.Class) []byte {
 	b := make([]byte, len(toks))
 	for i, t := range toks {

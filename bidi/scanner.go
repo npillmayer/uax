@@ -21,21 +21,22 @@ import (
 // same Bidi_Class.
 type bidiScanner struct {
 	//done        bool           // at EOF?
-	mode        uint8          // scanner modes, set by scanner options
-	bidiclz     bidi.Class     // the current bidi class
-	lookahead   scrap          // lookahead has been read but not sent to parser
-	pos         charpos        // position in input string
-	ahead       charpos        // position ahead of current scrap
-	strongs     strongTypes    // positions of previously occured strong types
-	runeScanner *bufio.Scanner // we're using an embedded rune reader
-	bd16stack   bracketStack   // bracket pair stack, rule BD16
+	mode        uint8               // scanner modes, set by scanner options
+	bidiclz     bidi.Class          // the current bidi class
+	lookahead   scrap               // lookahead has been read but not sent to parser
+	pos         charpos             // position in input string
+	ahead       charpos             // position ahead of current scrap
+	strongs     strongTypes         // positions of previously occured strong types
+	runeScanner *bufio.Scanner      // we're using an embedded rune reader
+	bd16        *bracketPairHandler // support type for handling bracket pairings
+	// bd16stack   bracketStack        // bracket pair stack, rule BD16
 	//laLen       charpos        // byte length of lookahead
 	// lookahead   []byte         // lookahead rune
 	// buffer      []byte         // character buffer for token lexeme
 }
 
-// BS16Max is the maximum stack depth for rule BS16 as defined in UAX#9.
-const BS16Max = 63
+// BD16Max is the maximum stack depth for rule BS16 as defined in UAX#9.
+const BD16Max = 63
 
 // NewScanner creates a scanner for bidi formatting. It will read runs of text
 // as a unit, as long as all runes therein have the same Bidi_Class.
@@ -49,8 +50,9 @@ func newScanner(input io.Reader, opts ...Option) *bidiScanner {
 	sc.runeScanner.Split(bufio.ScanRunes)
 	sc.bidiclz = bidi.LRI
 	//sc.buffer = make([]byte, 0, buflen)
-	//sc.lookahead = make([]byte, 0, 32)
-	sc.bd16stack = make(bracketStack, 0, BS16Max+1)
+	//sc.lookahead = make([]byte, 0, 32s)
+	sc.bd16 = makeBracketPairHandler(BD16Max + 1)
+	//sc.bd16stack = make(bracketStack, 0, BS16Max+1)
 	for _, opt := range opts {
 		opt(sc)
 	}
@@ -78,6 +80,7 @@ func (sc *bidiScanner) nextRune() (rune, int, bidi.Class, bool) {
 			bidiclz = BRACKC
 		}
 	}
+	T().Debugf("scanner rune %#U (%s)", r, ClassString(bidiclz))
 	return r, length, bidiclz, true
 }
 
@@ -105,8 +108,8 @@ func makeScrap(r rune, clz bidi.Class, pos charpos, length int) scrap {
 //
 func (sc *bidiScanner) Scan(pipe chan<- scrap) {
 	var current, lookahead scrap
-	var pos, lapos charpos // position of current scrap and of lookahead
-	var lastAL charpos     // position of last AL in input
+	//var pos, lapos charpos // position of current scrap and of lookahead
+	var lastAL charpos // position of last AL in input
 	current.bidiclz = NULL
 	for {
 		r, length, bidiclz, ok := sc.nextRune() // read the next input rune
@@ -122,26 +125,33 @@ func (sc *bidiScanner) Scan(pipe chan<- scrap) {
 		}
 		isAL := bidiclz == bidi.AL                     // AL will be changed by rule W3
 		bidiclz = applyRulesW1to3(r, bidiclz, current) // UAX#9 W1–3 handled by scanner
-		lookahead = makeScrap(r, bidiclz, pos, length)
-		lookahead = sc.prepareRuleBD16(r, lookahead, current)
-		T().Debugf("bidi scanner read lookahead = %v", lookahead) // finally a new lookahead
+		//lookahead = makeScrap(r, bidiclz, lapos, length)
+		lookahead = makeScrap(r, bidiclz, current.r, length)
+		T().Debugf("bidi scanner lookahead = %v", lookahead) // finally a new lookahead
 
 		// the current scrap is finished if the lookahead cannot extend it
 		if current.bidiclz == NULL || current.bidiclz != lookahead.bidiclz || isbracket(current) {
 			if current.bidiclz != NULL { // if the current scrap is not the initial null scrap
-				sc.post(lookahead, pipe) // put current on channel
+				sc.post(current, pipe) // put current on channel
 			}
 			// proceed ahead, making lookahead the current scrap
 			inheritStrongTypes(lookahead, current, lastAL)
-			current = lookahead
-			pos, lapos = lapos, lapos+lookahead.len()
+			current = sc.prepareRuleBD16(r, lookahead)
+			//current = lookahead
+			// pos, lapos = lapos, lookahead.r
+			// if pos > 0 {
+			// 	// TOTO remove pos?
+			// }
 			if isAL {
 				lastAL = current.l
 			}
 		} else { // otherwise the current scrap grows
-			collapse(current, lookahead, current.bidiclz) // merge LA with current
+			//lapos = lookahead.r
+			current = collapse(current, lookahead, current.bidiclz) // merge LA with current
+			T().Debugf("current = %s, next iteration", current)
 		}
 	}
+	T().Infof("stopped bidi scanner")
 }
 
 func (sc *bidiScanner) post(s scrap, pipe chan<- scrap) {
@@ -153,7 +163,7 @@ func (sc *bidiScanner) stop(pipe chan<- scrap) {
 	T().Debugf("stopping bidi scanner, sending final scrap (stopper)")
 	s := scrap{bidiclz: NULL}
 	pipe <- s
-	T().Infof("stopped bidi scanner")
+	close(pipe)
 }
 
 /* func (sc *bidiScanner) XNextToken(expected []int) (int, interface{}, uint64, uint64) {
@@ -303,18 +313,22 @@ func isbracket(s scrap) bool {
 	return clz == BRACKO || clz == BRACKC
 }
 
-func (sc *bidiScanner) prepareRuleBD16(r rune, la, current scrap) scrap {
-	if !isbracket(la) {
-		return la
+func (sc *bidiScanner) prepareRuleBD16(r rune, s scrap) scrap {
+	if !isbracket(s) {
+		return s
 	}
-	if la.bidiclz == BRACKO {
-		var isbr bool // is LA not just a bracket, but part of a UAX#9 bracket pair?
-		isbr, sc.bd16stack = sc.bd16stack.push(r, la.l)
+	if s.bidiclz == BRACKO {
+		//var isbr bool
+		// is LA not just a bracket, but part of a UAX#9 bracket pair?
+		isbr := sc.bd16.pushOpening(r, s)
+		//isbr, sc.bd16stack = sc.bd16stack.push(r, la.l)
 		if isbr {
-			T().Debugf("pushed lookahead as bracket onto bracket stack")
+			T().Debugf("pushed lookahead onto bracket stack: %s", s)
+			sc.bd16.stack.dump()
 		}
 	} else {
 		// TODO pop bracket
+		panic("TODO pop bracket")
 	}
 	// clz, openbrpos, isbr := sc.doBD16(r, pos, s.bidiclz, true)
 	// if isbr {
@@ -323,7 +337,7 @@ func (sc *bidiScanner) prepareRuleBD16(r rune, la, current scrap) scrap {
 	// 		s.r = openbrpos // bracket scraps mis-use r for position of opening bracket
 	// 	}
 	// }
-	return la
+	return s
 }
 
 // func (sc *bidiScanner) doBD16(r rune, pos charpos, defaultclass bidi.Class, doStack bool) (
@@ -432,7 +446,7 @@ var claszaddinx = [...]uint8{0, 6, 12, 14, 19, 20}
 // ClassString returns a bidi class as a string.
 func ClassString(i bidi.Class) string {
 	if i == NULL {
-		return "bidi_class(none)"
+		return "NULL"
 	}
 	if i > bidi.PDI {
 		if i > bidi.PDI && i <= MAX {
@@ -446,20 +460,70 @@ func ClassString(i bidi.Class) string {
 
 // --- Brackets and bracket stack --------------------------------------------
 
-type bracketStack []bpos
-type bpos struct {
+type bracketPairHandler struct {
+	stack    bracketStack
+	pairings pairingsList
+}
+
+type bracketStack []brktpos
+type brktpos struct {
 	pos  charpos
 	pair bracketPair
 }
 
-func (bs bracketStack) push(r rune, pos charpos) (bool, bracketStack) {
-	if len(bs) == BS16Max { // skip in case of stack overflow, as defined in UAX#9
+type pairingsList []pairing
+type pairing struct {
+	brktpos
+	// pair    bracketPair
+	// pos     charpos
+	closing scrap
+}
+
+func makeBracketPairHandler(n int) *bracketPairHandler {
+	h := &bracketPairHandler{
+		stack:    make(bracketStack, 0, n),
+		pairings: make(pairingsList, 0, n),
+	}
+	return h
+}
+
+func (bph *bracketPairHandler) pushOpening(r rune, s scrap) bool {
+	var ok bool
+	ok, bph.stack = bph.stack.push(r, s.bidiclz, s.l)
+	return ok
+}
+
+func (bph *bracketPairHandler) findPair(r rune, s scrap) (found bool, pos charpos) {
+	var b brktpos
+	if found, b, bph.stack = bph.stack.popWith(r, s.l); !found {
+		return
+	}
+	newPairing := pairing{
+		brktpos: b,
+		closing: s,
+	}
+	inx := 0
+	for i, pair := range bph.pairings {
+		if newPairing.pos < pair.pos {
+			inx = i
+		}
+	}
+	bph.pairings = append(bph.pairings[:inx], append([]pairing{newPairing}, bph.pairings[inx:]...)...)
+	return
+}
+
+func (bs bracketStack) push(r rune, bidiclz bidi.Class, pos charpos) (bool, bracketStack) {
+	// TODO BS16Max is the limit per isolating run sequence, not overall
+	if len(bs) >= BD16Max { // skip in case of stack overflow, as defined in UAX#9
 		return false, bs
 	}
-	// TODO put bracket list in sutable data structure (map like)
+	if bidiclz != BRACKO {
+		return false, bs
+	}
+	// TODO put bracket list in sutable data structure (map like) ?
 	for _, pair := range uax9BracketPairs { // double check for UAX#9 brackets
 		if pair.o == r {
-			b := bpos{pos: pos, pair: pair}
+			b := brktpos{pos: pos, pair: pair}
 			return true, append(bs, b)
 		}
 	}
@@ -476,21 +540,21 @@ func (bs bracketStack) push(r rune, pos charpos) (bool, bracketStack) {
 // 	return false, bs
 // }
 
-func (bs bracketStack) popWith(b rune, pos uint64) (bool, int64, bracketStack) {
+func (bs bracketStack) popWith(b rune, pos charpos) (bool, brktpos, bracketStack) {
 	T().Debugf("popWith: rune=%v, bracket stack is %v", b, bs)
 	if len(bs) == 0 {
-		return false, -1, bs
+		return false, brktpos{}, bs
 	}
 	i := len(bs) - 1
 	for i >= 0 { // start at TOS, possible skip unclosed opening brackets
 		if bs[i].pair.c == b {
-			openpos := bs[i].pos
+			//openpos := bs[i].pos
 			bs = bs[:i]
-			return true, int64(openpos), bs
+			return true, bs[i], bs
 		}
 		i--
 	}
-	return false, -1, bs
+	return false, brktpos{}, bs
 }
 
 func (bs bracketStack) dump() {
