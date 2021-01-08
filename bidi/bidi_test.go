@@ -76,10 +76,9 @@ func TestScannerScraps(t *testing.T) {
 }
 
 func TestScannerBrackets(t *testing.T) {
-	//gtrace.CoreTracer = gotestingadapter.New()
-	gtrace.CoreTracer = gologadapter.New()
-	//teardown := gotestingadapter.RedirectTracing(t)
-	//defer teardown()
+	gtrace.CoreTracer = gotestingadapter.New()
+	teardown := gotestingadapter.RedirectTracing(t)
+	defer teardown()
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	input := strings.NewReader("hi (YOU[])")
@@ -88,6 +87,13 @@ func TestScannerBrackets(t *testing.T) {
 	go scnr.Scan(pipe)
 	for s := range pipe {
 		t.Logf("-> %s", s)
+		if s.bidiclz == BRACKC {
+			pair, found := scnr.bd16.FindBracketPairing(s, Closing)
+			if !found {
+				t.Errorf("expected closing bracket %s to form a pairing, did not", s)
+			}
+			t.Logf("pairing found: %v", pair)
+		}
 	}
 }
 

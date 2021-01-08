@@ -8,8 +8,10 @@ package bidi
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"strconv"
+	"sync"
 	"unicode"
 	"unicode/utf8"
 
@@ -35,8 +37,8 @@ type bidiScanner struct {
 	// buffer      []byte         // character buffer for token lexeme
 }
 
-// BD16Max is the maximum stack depth for rule BS16 as defined in UAX#9.
-const BD16Max = 63
+// BD16MaxNesting is the maximum stack depth for rule BS16 as defined in UAX#9.
+const BD16MaxNesting = 63
 
 // NewScanner creates a scanner for bidi formatting. It will read runs of text
 // as a unit, as long as all runes therein have the same Bidi_Class.
@@ -51,7 +53,7 @@ func newScanner(input io.Reader, opts ...Option) *bidiScanner {
 	sc.bidiclz = bidi.LRI
 	//sc.buffer = make([]byte, 0, buflen)
 	//sc.lookahead = make([]byte, 0, 32s)
-	sc.bd16 = makeBracketPairHandler(BD16Max + 1)
+	sc.bd16 = makeBracketPairHandler(nil) // TODO handle nested isolate runs
 	//sc.bd16stack = make(bracketStack, 0, BS16Max+1)
 	for _, opt := range opts {
 		opt(sc)
@@ -324,11 +326,14 @@ func (sc *bidiScanner) prepareRuleBD16(r rune, s scrap) scrap {
 		//isbr, sc.bd16stack = sc.bd16stack.push(r, la.l)
 		if isbr {
 			T().Debugf("pushed lookahead onto bracket stack: %s", s)
-			sc.bd16.stack.dump()
+			sc.bd16.dump()
 		}
 	} else {
-		// TODO pop bracket
-		panic("TODO pop bracket")
+		found, _ := sc.bd16.findPair(r, s)
+		if found {
+			T().Debugf("popped closing bracket: %s", s)
+			sc.bd16.dump()
+		}
 	}
 	// clz, openbrpos, isbr := sc.doBD16(r, pos, s.bidiclz, true)
 	// if isbr {
@@ -461,30 +466,35 @@ func ClassString(i bidi.Class) string {
 // --- Brackets and bracket stack --------------------------------------------
 
 type bracketPairHandler struct {
-	stack    bracketStack
-	pairings pairingsList
+	stack    bracketStack        // stack to trace bracket nesting
+	pairings pairingsList        // result list of matching bracket pairings
+	mx       sync.Mutex          // guards pairings, as parser will access them, too
+	outer    *bracketPairHandler // handlers will be stacked for nested isolate runs
 }
 
 type bracketStack []brktpos
 type brktpos struct {
-	pos  charpos
+	pos  charpos // position of an opening bracket
 	pair bracketPair
 }
 
 type pairingsList []pairing
 type pairing struct {
 	brktpos
-	// pair    bracketPair
-	// pos     charpos
-	closing scrap
+	closing scrap // closing bracket represented as a scrap
 }
 
-func makeBracketPairHandler(n int) *bracketPairHandler {
+func makeBracketPairHandler(outer *bracketPairHandler) *bracketPairHandler {
 	h := &bracketPairHandler{
-		stack:    make(bracketStack, 0, n),
-		pairings: make(pairingsList, 0, n),
+		stack:    make(bracketStack, 0, BD16MaxNesting),
+		pairings: make(pairingsList, 0, 8),
+		outer:    outer,
 	}
 	return h
+}
+
+func (pr pairing) String() string {
+	return fmt.Sprintf("[%#U,%#U] at %d → %s", pr.pair.o, pr.pair.c, pr.pos, pr.closing)
 }
 
 func (bph *bracketPairHandler) pushOpening(r rune, s scrap) bool {
@@ -503,6 +513,8 @@ func (bph *bracketPairHandler) findPair(r rune, s scrap) (found bool, pos charpo
 		closing: s,
 	}
 	inx := 0
+	bph.mx.Lock()
+	defer bph.mx.Unlock()
 	for i, pair := range bph.pairings {
 		if newPairing.pos < pair.pos {
 			inx = i
@@ -514,7 +526,7 @@ func (bph *bracketPairHandler) findPair(r rune, s scrap) (found bool, pos charpo
 
 func (bs bracketStack) push(r rune, bidiclz bidi.Class, pos charpos) (bool, bracketStack) {
 	// TODO BS16Max is the limit per isolating run sequence, not overall
-	if len(bs) >= BD16Max { // skip in case of stack overflow, as defined in UAX#9
+	if len(bs) >= BD16MaxNesting { // skip in case of stack overflow, as defined in UAX#9
 		return false, bs
 	}
 	if bidiclz != BRACKO {
@@ -548,18 +560,53 @@ func (bs bracketStack) popWith(b rune, pos charpos) (bool, brktpos, bracketStack
 	i := len(bs) - 1
 	for i >= 0 { // start at TOS, possible skip unclosed opening brackets
 		if bs[i].pair.c == b {
-			//openpos := bs[i].pos
+			open := bs[i] //.pos
 			bs = bs[:i]
-			return true, bs[i], bs
+			return true, open, bs
 		}
 		i--
 	}
 	return false, brktpos{}, bs
 }
 
-func (bs bracketStack) dump() {
-	for i, p := range bs {
-		T().Debugf("\t[%d] %v at %d", i, p.pair, p.pos)
+const (
+	Opening bool = true
+	Closing bool = false
+)
+
+func (bph *bracketPairHandler) FindBracketPairing(s scrap, open bool) (pairing, bool) {
+	bph.mx.Lock()
+	defer bph.mx.Unlock()
+	for _, pair := range bph.pairings {
+		if open {
+			if pair.pos == s.l {
+				return pair, true
+			}
+		} else {
+			if pair.closing.l == s.l {
+				return pair, true
+			}
+		}
+	}
+	return pairing{}, false
+}
+
+func (bph *bracketPairHandler) dump() {
+	if len(bph.stack) == 0 {
+		T().Debugf("BD16: Bracket Stack is empty")
+	} else {
+		T().Debugf("BD16: Bracket Stack:")
+		for i, p := range bph.stack {
+			T().Debugf("\t[%d] %v at %d", i, p.pair, p.pos)
+		}
+	}
+	if len(bph.pairings) == 0 {
+		T().Debugf("BD16: No pairings found")
+	} else {
+		T().Debugf("BD16: Bracket Pairings:")
+		for i, pair := range bph.pairings {
+			T().Debugf("\t[%d] %v", i, pair)
+		}
 	}
 }
 
