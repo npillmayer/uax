@@ -7,3 +7,4 @@
 *.pdf
 *.code-workspace
 generator
+bidi/,a.txt
