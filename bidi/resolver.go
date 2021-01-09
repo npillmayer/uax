@@ -132,7 +132,7 @@ func (p *parser) nextInputScrap(pipe <-chan scrap) (scrap, bool) {
 	T().Errorf("==> reading from pipe")
 	s := <-pipe
 	T().Errorf("    read %s from pipe", s)
-	if s.bidiclz == NULL {
+	if s.bidiclz == cNULL {
 		return s, false
 	}
 	return s, true
@@ -177,7 +177,7 @@ func (p *parser) pass2() {
 	for p.sp < len(p.stack) {
 		e := min(len(p.stack), p.sp+3)
 		T().Debugf("trying to match %v at %d", p.stack[p.sp:e], p.sp)
-		if p.stack[p.sp].bidiclz == BRACKC {
+		if p.stack[p.sp].bidiclz == cBRACKC {
 			p.performRuleN0()
 			p.sp++
 			continue
@@ -200,13 +200,13 @@ func (p *parser) pass2() {
 //
 func (p *parser) performRuleN0() {
 	T().Debugf("applying UAX#9 rule N0 (bracket pairs) with %s", p.stack[p.sp])
-	if p.stack[p.sp].bidiclz == BRACKO {
+	if p.stack[p.sp].bidiclz == cBRACKO {
 		// Identify the bracket pairs in the current isolating run sequence according to BD16.
 		openBr := p.stack[p.sp]
 		closeBr, found := p.findCorrespondingBracket(openBr)
 		if !found {
 			T().Debugf("Did not find closing bracket for %s", openBr)
-			closeBr.bidiclz = NI
+			closeBr.bidiclz = cNI
 			return
 		}
 		// a. Inspect the bidirectional types of the characters enclosed within the
@@ -234,14 +234,14 @@ func (p *parser) performRuleN0() {
 		} else {
 			// d. Otherwise, there are no strong types within the bracket pair.
 			//    Therefore, do not set the type for that bracket pair.
-			openBr.bidiclz = NI
+			openBr.bidiclz = cNI
 		}
 	} else {
 		closeBr := p.stack[p.sp]
 		if openBr, found := p.findCorrespondingBracket(closeBr); found {
 			closeBr.bidiclz = openBr.bidiclz
 		}
-		closeBr.bidiclz = NI
+		closeBr.bidiclz = cNI
 	}
 }
 
@@ -304,7 +304,7 @@ func (p *parser) matchRulesLHS(scraps []scrap, minlen int) (*bidiRule, *bidiRule
 func (p *parser) findCorrespondingBracket(s scrap) (scrap, bool) {
 	pair, found := p.sc.bd16.FindBracketPairing(s)
 	if found {
-		if s.bidiclz == BRACKO {
+		if s.bidiclz == cBRACKO {
 			return pair.closing, true
 		}
 		return pair.opening, true
@@ -324,7 +324,7 @@ type Ordering struct {
 func (o *Ordering) String() string {
 	var b strings.Builder
 	for _, s := range o.scraps {
-		b.WriteString(fmt.Sprintf("[%d-%s-%d] ", s.l, ClassString(s.bidiclz), s.r))
+		b.WriteString(fmt.Sprintf("[%d-%s-%d] ", s.l, classString(s.bidiclz), s.r))
 	}
 	return b.String()
 }
@@ -340,7 +340,7 @@ func prepareRulesTrie() *trie.TinyHashTrie {
 	if rules == nil {
 		rules = make(map[int]*bidiRule)
 	}
-	trie, err := trie.NewTinyHashTrie(103, int8(MAX))
+	trie, err := trie.NewTinyHashTrie(103, int8(cMAX))
 	if err != nil {
 		T().Errorf(err.Error())
 		panic(err.Error())

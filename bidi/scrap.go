@@ -18,32 +18,32 @@ type scrap struct {
 }
 
 func (s scrap) String() string {
-	if s.bidiclz == BRACKO || s.bidiclz == BRACKC {
-		return fmt.Sprintf("[%d.%s]", s.l, ClassString(s.bidiclz))
+	if s.bidiclz == cBRACKO || s.bidiclz == cBRACKC {
+		return fmt.Sprintf("[%d.%s]", s.l, classString(s.bidiclz))
 	}
 	if s.l == s.r-1 { // interval of length 1
-		return fmt.Sprintf("[%d.%s]", s.l, ClassString(s.bidiclz))
+		return fmt.Sprintf("[%d.%s]", s.l, classString(s.bidiclz))
 	}
 	if s.l == s.r { // interval of length 0
-		return fmt.Sprintf("|%s|", ClassString(s.bidiclz))
+		return fmt.Sprintf("|%s|", classString(s.bidiclz))
 	}
-	return fmt.Sprintf("[%d-%s-%d]", s.l, ClassString(s.bidiclz), s.r)
+	return fmt.Sprintf("[%d-%s-%d]", s.l, classString(s.bidiclz), s.r)
 }
 
 // clear initializes a scrap to neutral values.
 func (s *scrap) clear() {
 	s.l, s.r = 0, 0
-	s.bidiclz = NULL
+	s.bidiclz = cNULL
 	s.context = dirContext{}
 	s.child = nil
 }
 
 // len returns the length in bytes for a scrap.
 func (s scrap) len() charpos {
-	if s.bidiclz == NULL {
+	if s.bidiclz == cNULL {
 		return 0
 	}
-	if s.bidiclz == BRACKO || s.bidiclz == BRACKC {
+	if s.bidiclz == cBRACKO || s.bidiclz == cBRACKC {
 		return 1
 	}
 	return s.r - s.l
@@ -77,7 +77,7 @@ func opposite(dir bidi.Class) bidi.Class {
 	if dir == bidi.R || dir == bidi.AL {
 		return bidi.L
 	}
-	return NI
+	return cNI
 }
 
 // func (s scrap) LocalStrongContext(other scrap) bidi.Class {
@@ -133,7 +133,7 @@ type dirContext struct {
 
 // Context is either the strong context or, if that is neutral, the embedding context.
 func (dc dirContext) Context() bidi.Class {
-	if dc.strong == NI {
+	if dc.strong == cNI {
 		return dc.embeddingDir
 	}
 	if dc.strong == bidi.AL {
@@ -158,7 +158,7 @@ func (dc dirContext) EmbeddingDir() bidi.Class {
 // Set position of recent strong type. If it matches the embedding direction
 // and at > the previous matching position, the matching position is updated.
 func (dc dirContext) SetStrongType(c bidi.Class, at charpos) dirContext {
-	if c != bidi.L && c != bidi.R && c != bidi.AL && c != NI {
+	if c != bidi.L && c != bidi.R && c != bidi.AL && c != cNI {
 		return dc
 	}
 	dc.strong = c

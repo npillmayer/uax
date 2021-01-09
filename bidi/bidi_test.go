@@ -19,20 +19,20 @@ func TestClasses(t *testing.T) {
 	defer teardown()
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
-	t.Logf("L = %s", ClassString(bidi.L))
-	if ClassString(bidi.L) != "L" {
+	t.Logf("L = %s", classString(bidi.L))
+	if classString(bidi.L) != "L" {
 		t.Errorf("string for L not as expected")
 	}
-	t.Logf("NI = %s", ClassString(NI))
-	if ClassString(NI) != "NI" {
+	t.Logf("NI = %s", classString(cNI))
+	if classString(cNI) != "NI" {
 		t.Errorf("string for NI not as expected")
 	}
-	t.Logf("BRACKC = %s", ClassString(BRACKC))
-	if ClassString(BRACKC) != "BRACKC" {
+	t.Logf("BRACKC = %s", classString(cBRACKC))
+	if classString(cBRACKC) != "BRACKC" {
 		t.Errorf("string for BRACKC not as expected")
 	}
-	t.Logf("MAX = %s", ClassString(MAX))
-	if ClassString(MAX) != "<max>" {
+	t.Logf("MAX = %s", classString(cMAX))
+	if classString(cMAX) != "<max>" {
 		t.Errorf("string for MAX not as expected")
 	}
 }
@@ -60,7 +60,7 @@ func TestScannerScraps(t *testing.T) {
 		n := 0
 		scraps := "produced scraps:"
 		for s := range pipe {
-			if s.bidiclz == NULL {
+			if s.bidiclz == cNULL {
 				scraps += "\n----------------"
 			} else {
 				scraps += fmt.Sprintf("\n[%d %2d] -> %s", i, n, s)
@@ -87,7 +87,7 @@ func TestScannerBrackets(t *testing.T) {
 	go scnr.Scan(pipe)
 	for s := range pipe {
 		t.Logf("-> %s", s)
-		if s.bidiclz == BRACKC {
+		if s.bidiclz == cBRACKC {
 			pair, found := scnr.bd16.FindBracketPairing(s) //, Closing)
 			if !found {
 				t.Errorf("expected closing bracket %s to form a pairing, did not", s)

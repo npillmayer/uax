@@ -77,7 +77,7 @@ func (bs bracketStack) push(r rune, s scrap) (bool, bracketStack) {
 	if len(bs) >= BD16MaxNesting { // skip in case of stack overflow, as defined in UAX#9
 		return false, bs
 	}
-	if s.bidiclz != BRACKO {
+	if s.bidiclz != cBRACKO {
 		return false, bs
 	}
 	// TODO put bracket list in sutable data structure (map like) ?
@@ -122,7 +122,7 @@ func (bph *bracketPairHandler) FindBracketPairing(s scrap) (pairing, bool) {
 	bph.mx.Lock()
 	defer bph.mx.Unlock()
 	for _, pair := range bph.pairings {
-		if s.bidiclz == BRACKO { // scrap is opening bracket
+		if s.bidiclz == cBRACKO { // scrap is opening bracket
 			if pair.opening.l == s.l {
 				return pair, true
 			}
@@ -151,7 +151,7 @@ func (bph *bracketPairHandler) UpdateClosingBrackets(bidiclz bidi.Class, pos cha
 
 func isbracket(s scrap) bool {
 	clz := s.bidiclz
-	return clz == BRACKO || clz == BRACKC
+	return clz == cBRACKO || clz == cBRACKC
 }
 
 func (bph *bracketPairHandler) dump() {

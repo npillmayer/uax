@@ -106,17 +106,17 @@ func ruleW5_2() (*bidiRule, []byte) {
 
 func ruleW6_1() (*bidiRule, []byte) {
 	lhs := makeLHS(bidi.ET)
-	return makeSquashRule("W6-1", lhs, NI, 0), lhs
+	return makeSquashRule("W6-1", lhs, cNI, 0), lhs
 }
 
 func ruleW6_2() (*bidiRule, []byte) {
 	lhs := makeLHS(bidi.ES)
-	return makeSquashRule("W6-2", lhs, NI, 0), lhs
+	return makeSquashRule("W6-2", lhs, cNI, 0), lhs
 }
 
 func ruleW6_3() (*bidiRule, []byte) {
 	lhs := makeLHS(bidi.CS)
-	return makeSquashRule("W6-3", lhs, NI, 0), lhs
+	return makeSquashRule("W6-3", lhs, cNI, 0), lhs
 }
 
 // W7. Search backward from each instance of a European number until the
@@ -151,7 +151,7 @@ func ruleW7() (*bidiRule, []byte) {
 
 // This rule is currently not used.
 func ruleN0() (*bidiRule, []byte) {
-	lhs := makeLHS(BRACKC) // closing bracket has a matching opening bracket
+	lhs := makeLHS(cBRACKC) // closing bracket has a matching opening bracket
 	return &bidiRule{
 		name:   "N0",
 		lhsLen: len(lhs),
@@ -190,17 +190,17 @@ func ruleN0() (*bidiRule, []byte) {
 // EN  NI  EN  →  EN  R  EN   (10)
 
 func ruleN1_1() (*bidiRule, []byte) {
-	lhs := makeLHS(bidi.L, NI, bidi.L)
+	lhs := makeLHS(bidi.L, cNI, bidi.L)
 	return makeSquashRule("N1-1", lhs, bidi.L, 0), lhs
 }
 
 func ruleN1_2() (*bidiRule, []byte) {
-	lhs := makeLHS(bidi.R, NI, bidi.R)
+	lhs := makeLHS(bidi.R, cNI, bidi.R)
 	return makeSquashRule("N1-2", lhs, bidi.R, 0), lhs
 }
 
 func ruleN1_3() (*bidiRule, []byte) {
-	lhs := makeLHS(bidi.R, NI, bidi.AN) // R NI → R
+	lhs := makeLHS(bidi.R, cNI, bidi.AN) // R NI → R
 	return &bidiRule{
 		name:   "N1-3",
 		lhsLen: len(lhs),
@@ -215,7 +215,7 @@ func ruleN1_3() (*bidiRule, []byte) {
 }
 
 func ruleN1_4() (*bidiRule, []byte) {
-	lhs := makeLHS(bidi.R, NI, bidi.EN) // R NI → R
+	lhs := makeLHS(bidi.R, cNI, bidi.EN) // R NI → R
 	return &bidiRule{
 		name:   "N1-4",
 		lhsLen: len(lhs),
@@ -230,7 +230,7 @@ func ruleN1_4() (*bidiRule, []byte) {
 }
 
 func ruleN1_5() (*bidiRule, []byte) {
-	lhs := makeLHS(bidi.AN, NI, bidi.R) // NI R → R
+	lhs := makeLHS(bidi.AN, cNI, bidi.R) // NI R → R
 	return &bidiRule{
 		name:   "N1-5",
 		lhsLen: len(lhs),
@@ -243,17 +243,17 @@ func ruleN1_5() (*bidiRule, []byte) {
 }
 
 func ruleN1_6() (*bidiRule, []byte) {
-	lhs := makeLHS(bidi.AN, NI, bidi.AN) // NI → R
+	lhs := makeLHS(bidi.AN, cNI, bidi.AN) // NI → R
 	return makeMidSwapRule("N1-6", lhs, bidi.R, 2), lhs
 }
 
 func ruleN1_7() (*bidiRule, []byte) {
-	lhs := makeLHS(bidi.AN, NI, bidi.EN) // NI → R
+	lhs := makeLHS(bidi.AN, cNI, bidi.EN) // NI → R
 	return makeMidSwapRule("N1-7", lhs, bidi.R, 2), lhs
 }
 
 func ruleN1_8() (*bidiRule, []byte) {
-	lhs := makeLHS(bidi.EN, NI, bidi.R) // NI R → R
+	lhs := makeLHS(bidi.EN, cNI, bidi.R) // NI R → R
 	return &bidiRule{
 		name:   "N1-8",
 		lhsLen: len(lhs),
@@ -266,12 +266,12 @@ func ruleN1_8() (*bidiRule, []byte) {
 }
 
 func ruleN1_9() (*bidiRule, []byte) {
-	lhs := makeLHS(bidi.EN, NI, bidi.AN) // NI → R
+	lhs := makeLHS(bidi.EN, cNI, bidi.AN) // NI → R
 	return makeMidSwapRule("N1-9", lhs, bidi.R, 2), lhs
 }
 
 func ruleN1_10() (*bidiRule, []byte) {
-	lhs := makeLHS(bidi.EN, NI, bidi.EN) // NI → R
+	lhs := makeLHS(bidi.EN, cNI, bidi.EN) // NI → R
 	return makeMidSwapRule("N1-10", lhs, bidi.R, 2), lhs
 }
 
