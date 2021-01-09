@@ -98,16 +98,16 @@ func TestScannerBrackets(t *testing.T) {
 }
 
 func TestSimple(t *testing.T) {
-	//gtrace.CoreTracer = gotestingadapter.New()
-	gtrace.CoreTracer = gologadapter.New()
-	//teardown := gotestingadapter.RedirectTracing(t)
-	//defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	gtrace.CoreTracer = gotestingadapter.New()
+	teardown := gotestingadapter.RedirectTracing(t)
+	defer teardown()
 	//
-	reader := strings.NewReader("hello 123.456")
-	ordering := ResolveParagraph(reader)
+	reader := strings.NewReader("hello 123.45")
+	ordering := ResolveParagraph(reader, TestMode(true))
 	fmt.Printf("resulting ordering = %s\n", ordering)
-	//t.Fail()
+	if len(ordering.scraps) != 3 || ordering.scraps[2].bidiclz != bidi.L {
+		t.Errorf("expected ordering to be L + NI + L, is '%s'", ordering)
+	}
 }
 
 func TestBrackets(t *testing.T) {

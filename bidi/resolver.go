@@ -84,14 +84,16 @@ func (p *parser) reduce(n int, rhs []scrap) {
 func (p *parser) pass1() {
 	la := 0            // length of lookahead LA
 	_, ok := p.read(3) // initially load 3 scraps
-	p.eof = !ok
+	if !ok {
+		return // no input to read
+	}
 	var rule, shortrule *bidiRule
 	walk := false // if true, accept walking over 1 scrap
 	for {         // scan the complete input sequence (until EOF)
+		T().Errorf("EOF=%v", p.eof)
 		la = len(p.stack) - p.sp
-		k, ok := p.read(3 - la) // extend LA to |LA|=3, if possible
+		k, _ := p.read(3 - la) // extend LA to |LA|=3, if possible
 		la += k
-		p.eof = !ok
 		//T().Debugf("t=%v, sp=%d, la=%d, walk=%v", t, p.sp, la, walk) //, minMatchLen)
 		if la == 0 {
 			if !p.eof {
@@ -103,6 +105,7 @@ func (p *parser) pass1() {
 		if walk {
 			rule = shortrule
 			if rule == nil || rule.pass > 1 {
+				T().Debugf("walking over %s", p.stack[p.sp])
 				p.sp++ // walk by skipping
 				walk = false
 				continue
@@ -126,7 +129,9 @@ func (p *parser) pass1() {
 // nextInputScrap reads the next scrap from the scanner pipe. It returns a
 // new scrap and false if this is the EOF scrap, true otherwise.
 func (p *parser) nextInputScrap(pipe <-chan scrap) (scrap, bool) {
+	T().Errorf("==> reading from pipe")
 	s := <-pipe
+	T().Errorf("    read %s from pipe", s)
 	if s.bidiclz == NULL {
 		return s, false
 	}
@@ -136,6 +141,7 @@ func (p *parser) nextInputScrap(pipe <-chan scrap) (scrap, bool) {
 // read reads k ≤ n bidi clusters from the scanner. If k < n, EOF has been encountered.
 // Returns k.
 func (p *parser) read(n int) (int, bool) {
+	T().Errorf("----> read(%d)", n)
 	if n <= 0 || p.eof {
 		return 0, false
 	}
@@ -147,6 +153,7 @@ func (p *parser) read(n int) (int, bool) {
 		s, ok := p.nextInputScrap(p.pipe)
 		if !ok {
 			p.eof = true
+			break
 		}
 		// t = s.bidiclz
 		// if t == NULL {
@@ -161,6 +168,7 @@ func (p *parser) read(n int) (int, bool) {
 		// s.r = r
 		p.stack = append(p.stack, s)
 	}
+	T().Errorf("have read %d scraps, stack=%v", i, p.stack)
 	return i, true
 }
 
