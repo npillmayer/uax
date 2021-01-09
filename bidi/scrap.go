@@ -6,9 +6,20 @@ import (
 	"golang.org/x/text/unicode/bidi"
 )
 
+type charpos uint32 // position of a character within a paragraph
+
 // --- Scraps ----------------------------------------------------------------
 
-type charpos uint32 // position of a character within a paragraph
+// Our parser and the CSG actions resemble a system developed by Prof. Donald E. Knuth
+// called "WEB"/"CWEB". This systems uses context sensitive rules to style
+// Pascal- and C-source code with the TeX typesetting system. The source code of
+// CWEB is accessible with every TeX-installation.
+//
+// WEB/CWEB handles grammar tokens slightly similar to the bidi class clusters in
+// our algorithm and calls these tokens `scraps'. UAX#9 does not offer a name for
+// character clusters, as it handles single characters. During programming the
+// first draft of the bidi algorithm I kept being reminded of Prof Knuth's `scraps'
+// and finally sticked to the name.
 
 type scrap struct {
 	bidiclz bidi.Class // bidi character class of this scrap

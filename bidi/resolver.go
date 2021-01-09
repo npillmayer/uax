@@ -13,6 +13,17 @@ import (
 
 // --- Parser / Resolver -----------------------------------------------------
 
+// We construct a parser which processes grammar rules for a context sensitive
+// grammar. These rules will resemble the rules of UAX#9 as closely as possible.
+// Please note that this is by no means a general purpose parser. It is tightly
+// coupled to the bidi rules and their characteristics.
+//
+// The parser is a 2-pass system: the first pass reads in characters of a
+// paragraph and converts runs of characters to clusters of bidi classes, which
+// we will call 'scraps'. During the read it applies rules W* of UAX#9.
+// The second pass iterates of existing scraps left on a stack by pass 1 and
+// applies rules N* of UAX#9.
+
 // ResolveParagraph accepts character input and returns a BiDi ordering for the characters.
 // inp should be the text of a single paragraph, but this is not enforced.
 //
@@ -61,6 +72,9 @@ func newParser(sc *bidiScanner) (*parser, error) {
 	return p, nil // TODO check sc
 }
 
+// reduce applies a rule to the scraps on the stack. It takes n scraps, which need
+// not necessarily be the top scraps, and replaces them with the right-hand-side (RHS)
+// of the applied rule.
 func (p *parser) reduce(n int, rhs []scrap) {
 	T().Debugf("REDUCE at %d: %d ⇒ %v", p.sp, n, rhs)
 	diff := len(rhs) - n
@@ -118,11 +132,13 @@ func (p *parser) pass1() {
 			}
 		}
 		T().Debugf("applying UAX#9 rule %s", rule.name)
-		rhs, jmp := rule.action(p.stack[p.sp:len(p.stack)])
+		rhs, jmp, newL := rule.action(p.stack[p.sp:len(p.stack)])
 		p.reduce(rule.lhsLen, rhs)
+		if newL {
+			p.sc.bd16.UpdateClosingBrackets(p.stack[p.sp])
+		}
 		p.sp = max(0, p.sp+jmp) // avoid jumping left of 0
 		walk = false
-		//T().Debugf("next iteration, reading token")
 	}
 }
 
@@ -147,25 +163,11 @@ func (p *parser) read(n int) (int, bool) {
 	}
 	i := 0
 	for ; i < n; i++ { // read n bidi clusters
-		// var pos, length, r uint64
-		// var strong interface{}
-		// t, strong, pos, length = p.sc.NextToken(nil)
 		s, ok := p.nextInputScrap(p.pipe)
 		if !ok {
 			p.eof = true
 			break
 		}
-		// t = s.bidiclz
-		// if t == NULL {
-		// 	break
-		// }
-		// s := scrap{l: pos, bidiclz: bidi.Class(t), strong: strong.(strongTypes)}
-		// if s.bidiclz == BRACKC { // closing brackets have misused length field
-		// 	r = length
-		// } else {
-		// 	r = pos + length
-		// }
-		// s.r = r
 		p.stack = append(p.stack, s)
 	}
 	T().Errorf("have read %d scraps, stack=%v", i, p.stack)
@@ -189,7 +191,7 @@ func (p *parser) pass2() {
 			continue
 		}
 		T().Debugf("applying UAX#9 rule %s", rule.name)
-		rhs, jmp := rule.action(p.stack[p.sp:len(p.stack)])
+		rhs, jmp, _ := rule.action(p.stack[p.sp:len(p.stack)])
 		p.reduce(rule.lhsLen, rhs)
 		p.sp = max(0, p.sp+jmp) // avoid jumping left of 0
 	}
@@ -267,13 +269,13 @@ func (p *parser) performRuleN0() (jmp int) {
 func (p *parser) Ordering() *Ordering {
 	p.pipe = make(chan scrap, 0)
 	go p.sc.Scan(p.pipe)
-	T().Debugf("--- pass 1 ---")
+	T().Debugf("------ pass 1 ------")
 	p.pass1()
-	T().Debugf("--------------")
+	T().Debugf("--------------------")
 	T().Debugf("STACK = %v", p.stack)
-	T().Debugf("--- pass 2 ---")
+	T().Debugf("------ pass 2 ------")
 	p.pass2()
-	T().Debugf("--------------")
+	T().Debugf("--------------------")
 	return &Ordering{scraps: p.stack}
 }
 

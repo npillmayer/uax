@@ -37,7 +37,7 @@ type bidiRule struct {
 // will be positioned after the substitution by the parser, according to the second result
 // of the action, an integer. This position hint will be negative most of the time, telling
 // the parser to backtrack and try to re-apply other BiDi rules.
-type ruleAction func([]scrap) ([]scrap, int)
+type ruleAction func([]scrap) ([]scrap, int, bool)
 
 // Headers and header numbers of the following comment sections correspond to UAX#9.
 
@@ -131,13 +131,13 @@ func ruleW7() (*bidiRule, []byte) {
 		name:   "W7",
 		lhsLen: len(lhs),
 		pass:   1,
-		action: func(match []scrap) ([]scrap, int) {
-			if match[0].context.Context() == bidi.L {
+		action: func(match []scrap) ([]scrap, int, bool) {
+			if match[0].Context() == bidi.L {
 				L := match[:1]
 				L[0].bidiclz = bidi.L
-				return L, 0
+				return L, 0, true
 			}
-			return match, 1
+			return match, 1, true
 		},
 	}, lhs
 }
@@ -181,11 +181,11 @@ func ruleN1_3() (*bidiRule, []byte) {
 		name:   "N1-3",
 		lhsLen: len(lhs),
 		pass:   2,
-		action: func(match []scrap) ([]scrap, int) {
+		action: func(match []scrap) ([]scrap, int, bool) {
 			collapse(match[0], match[1], bidi.R)
 			match[1].bidiclz = bidi.AN
 			match[1].child = match[2].child
-			return match[:2], 1
+			return match[:2], 1, false
 		},
 	}, lhs
 }
@@ -196,11 +196,11 @@ func ruleN1_4() (*bidiRule, []byte) {
 		name:   "N1-4",
 		lhsLen: len(lhs),
 		pass:   2,
-		action: func(match []scrap) ([]scrap, int) {
+		action: func(match []scrap) ([]scrap, int, bool) {
 			collapse(match[0], match[1], bidi.R)
 			match[1].bidiclz = bidi.EN
 			match[1].child = match[2].child
-			return match[:2], 1
+			return match[:2], 1, false
 		},
 	}, lhs
 }
@@ -211,9 +211,9 @@ func ruleN1_5() (*bidiRule, []byte) {
 		name:   "N1-5",
 		lhsLen: len(lhs),
 		pass:   2,
-		action: func(match []scrap) ([]scrap, int) {
+		action: func(match []scrap) ([]scrap, int, bool) {
 			collapse(match[1], match[2], bidi.R)
-			return match[:2], 1
+			return match[:2], 1, false
 		},
 	}, lhs
 }
@@ -234,9 +234,9 @@ func ruleN1_8() (*bidiRule, []byte) {
 		name:   "N1-8",
 		lhsLen: len(lhs),
 		pass:   2,
-		action: func(match []scrap) ([]scrap, int) {
+		action: func(match []scrap) ([]scrap, int, bool) {
 			collapse(match[1], match[2], bidi.R)
-			return match[:2], 1
+			return match[:2], 1, false
 		},
 	}, lhs
 }
@@ -283,7 +283,7 @@ func makeSquashRule(name string, lhs []byte, c bidi.Class, jmp int) *bidiRule {
 }
 
 func squash(c bidi.Class, n int, jmp int) ruleAction {
-	return func(match []scrap) ([]scrap, int) {
+	return func(match []scrap) ([]scrap, int, bool) {
 		last := match[n-1]
 		//T().Debugf("squash: last = %s", last)
 		match[0].r = last.r
@@ -296,7 +296,7 @@ func squash(c bidi.Class, n int, jmp int) ruleAction {
 				appendChildren(match[0], iv)
 			}
 		}
-		return match[:1], jmp
+		return match[:1], jmp, false
 	}
 }
 
@@ -305,9 +305,9 @@ func makeMidSwapRule(name string, lhs []byte, c bidi.Class, jmp int) *bidiRule {
 		name:   name,
 		lhsLen: len(lhs),
 		pass:   2, // all mid-swap rules are Nx rules ⇒ pass 2
-		action: func(match []scrap) ([]scrap, int) {
+		action: func(match []scrap) ([]scrap, int, bool) {
 			match[1].bidiclz = c // change class of middle interval
-			return match, jmp
+			return match, jmp, false
 		},
 	}
 }
