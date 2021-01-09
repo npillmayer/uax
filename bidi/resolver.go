@@ -7,8 +7,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/uax/bidi/trie"
-	"golang.org/x/text/unicode/bidi"
 )
 
 // --- Parser / Resolver -----------------------------------------------------
@@ -186,65 +186,54 @@ func (p *parser) pass2() {
 	}
 }
 
+// N0. Process bracket pairs in an isolating run sequence sequentially in the logical
+//     order of the text positions of the opening paired brackets using the logic
+//     given below. Within this scope, bidirectional types EN and AN are treated as R.
+//
 func (p *parser) performRuleN0() {
 	T().Debugf("applying UAX#9 rule N0 (bracket pairs) with %s", p.stack[p.sp])
-	obrpos := p.stack[p.sp].r // position of opening bracket
-	T().Debugf("position of opening bracket should be %d", obrpos)
-	osp := p.findOpeningBracket(obrpos)
-	if osp >= 0 {
-		// osp is stack index of interval (of length 1) for opening bracket
-		p.stack[p.sp].r = 1 // reset the misused r field, no longer needed
-		openBr := p.stack[osp]
-		closeBr := p.stack[p.sp]
-		//ol, or := openBr.strong.LRPos()
-		cl, cr := closeBr.strong.LRPos()
-		emb := closeBr.strong.EmbeddingDir()
+	if p.stack[p.sp].bidiclz == BRACKO {
+		// Identify the bracket pairs in the current isolating run sequence according to BD16.
+		openBr := p.stack[p.sp]
+		closeBr, found := p.findCorrespondingBracket(openBr)
+		if !found {
+			T().Debugf("Did not find closing bracket for %s", openBr)
+			closeBr.bidiclz = NI
+			return
+		}
 		// a. Inspect the bidirectional types of the characters enclosed within the
 		//    bracket pair.
-		if charpos(cl) > openBr.l && emb == bidi.L {
-			// L in brackets and embedding dir = L
+		if closeBr.HasEmbeddingMatchAfter(openBr) {
 			// b. If any strong type (either L or R) matching the embedding direction
 			//    is found, set the type for both brackets in the pair to match the
 			//    embedding direction.
-		} else if charpos(cr) > openBr.l && emb == bidi.R {
-			// R in brackets and embedding dir = R
-			// b. If any strong type (either L or R) matching the embedding direction
-			//    is found, set the type for both brackets in the pair to match the
-			//    embedding direction.
-		} else if charpos(cl) > openBr.l && emb == bidi.R {
-			// L in brackets and embedding dir = R
+			openBr.bidiclz = openBr.context.embeddingDir
+		} else if closeBr.HasOppositeAfter(openBr) {
 			// c. Otherwise, if there is a strong type it must be opposite the embedding
 			//    direction. Therefore, test for an established context with a preceding
 			//    strong type by checking backwards before the opening paired bracket
 			//    until the first strong type (L, R, or sos) is found.
-			if openBr.strong.Context() == bidi.L {
+			if openBr.StrongContext() == openBr.o() {
 				// c.1. If the preceding strong type is also opposite the embedding
 				//      direction, context is established, so set the type for both
 				//      brackets in the pair to that direction.
+				openBr.bidiclz = opposite(openBr.context.embeddingDir)
 			} else {
 				// c.2. Otherwise set the type for both brackets in the pair to the
 				//      embedding direction.
-			}
-		} else if charpos(cr) > openBr.l && emb == bidi.L {
-			// R in brackets and embedding dir = L
-			// c. Otherwise, if there is a strong type it must be opposite the embedding
-			//    direction. Therefore, test for an established context with a preceding
-			//    strong type by checking backwards before the opening paired bracket
-			//    until the first strong type (L, R, or sos) is found.
-			if openBr.strong.Context() == bidi.R {
-				// c.1. If the preceding strong type is also opposite the embedding
-				//      direction, context is established, so set the type for both
-				//      brackets in the pair to that direction.
-			} else {
-				// c.2. Otherwise set the type for both brackets in the pair to the
-				//      embedding direction.
+				openBr.bidiclz = openBr.context.embeddingDir
 			}
 		} else {
 			// d. Otherwise, there are no strong types within the bracket pair.
 			//    Therefore, do not set the type for that bracket pair.
+			openBr.bidiclz = NI
 		}
 	} else {
-		panic("could not find opening bracket")
+		closeBr := p.stack[p.sp]
+		if openBr, found := p.findCorrespondingBracket(closeBr); found {
+			closeBr.bidiclz = openBr.bidiclz
+		}
+		closeBr.bidiclz = NI
 	}
 }
 
@@ -304,20 +293,15 @@ func (p *parser) matchRulesLHS(scraps []scrap, minlen int) (*bidiRule, *bidiRule
 	return rule, shortrule
 }
 
-func (p *parser) findOpeningBracket(pos charpos) int {
-	o := p.sp - 1
-	for o >= 0 {
-		s := p.stack[o]
-		if s.l <= pos && s.r > pos {
-			T().Debugf("found interval at position for closing bracket")
-			if s.bidiclz != BRACKO {
-				panic("interval at bracket position is not a bracket")
-			}
-			return o
+func (p *parser) findCorrespondingBracket(s scrap) (scrap, bool) {
+	pair, found := p.sc.bd16.FindBracketPairing(s)
+	if found {
+		if s.bidiclz == BRACKO {
+			return pair.closing, true
 		}
-		o--
+		return pair.opening, true
 	}
-	return -1 // in-band return value: not found
+	return s, false
 }
 
 // --- Ordering --------------------------------------------------------------
@@ -355,7 +339,7 @@ func prepareRulesTrie() *trie.TinyHashTrie {
 	}
 	var r *bidiRule
 	tracelevel := T().GetTraceLevel()
-	//T().SetTraceLevel(tracing.LevelInfo)
+	T().SetTraceLevel(tracing.LevelInfo)
 	var lhs []byte
 	// --- allocate all the rules ---
 	r, lhs = ruleW4_1()
@@ -404,7 +388,6 @@ func prepareRulesTrie() *trie.TinyHashTrie {
 	trie.Freeze()
 	T().SetTraceLevel(tracelevel)
 	T().Debugf("--- freeze trie -------------")
-	T().Infof("#categories=%d", MAX)
 	trie.Stats()
 	rulesTrie = trie
 	//})

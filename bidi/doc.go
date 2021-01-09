@@ -50,3 +50,15 @@ func T() tracing.Trace {
 
 // UnicodeVersion is the UAX#9 version this implementation follows.
 const UnicodeVersion = "13.0.0"
+
+// A Direction indicates the overall flow of text.
+type Direction int
+
+const (
+	// LeftToRight indicates a requirement to order the characters of a script
+	// from left to right.
+	LeftToRight Direction = iota
+	// RightToLeft indicates a requirement to order the characters of a script
+	// from right to left.
+	RightToLeft
+)

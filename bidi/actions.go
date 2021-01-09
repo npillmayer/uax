@@ -132,7 +132,7 @@ func ruleW7() (*bidiRule, []byte) {
 		lhsLen: len(lhs),
 		pass:   1,
 		action: func(match []scrap) ([]scrap, int) {
-			if match[0].strong.Context() == bidi.L {
+			if match[0].context.Context() == bidi.L {
 				L := match[:1]
 				L[0].bidiclz = bidi.L
 				return L, 0

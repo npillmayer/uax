@@ -169,9 +169,9 @@ func (sc *bidiScanner) initCurrentScrap() scrap {
 	var current scrap
 	current.bidiclz = NULL
 	if sc.hasMode(optionOuterR2L) {
-		current.strong.SetEmbedding(bidi.RightToLeft)
+		current.context.SetEmbedding(bidi.RightToLeft)
 	} else {
-		current.strong.SetEmbedding(bidi.LeftToRight)
+		current.context.SetEmbedding(bidi.LeftToRight)
 	}
 	return current
 }
@@ -296,7 +296,7 @@ func applyRulesW1to3(r rune, clz bidi.Class, current scrap) bidi.Class {
 		return currclz
 	case bidi.EN: // rule W2
 		//if sc.strtyps.IsAL() {
-		if current.strong.IsAL() {
+		if current.context.IsAL() {
 			//case bidi.AL:
 			return bidi.AN
 			// case bidi.L:
@@ -395,14 +395,16 @@ func (sc *bidiScanner) prepareRuleBD16(r rune, s scrap) scrap {
 
 // isAL is true if dest has been of bidi class AL (before UAX#9 rule W3 changed it)
 func inheritStrongTypes(dest, src scrap, lastAL charpos) {
-	dest.strong = src.strong
+	dest.context = src.context
+	dest.context.SetStrongType(bidi.AL, lastAL)
 	switch src.bidiclz {
 	case bidi.L, bidi.LRI:
-		dest.strong.SetLDist(src.l)
+		dest.context.SetStrongType(bidi.L, src.l)
 	case bidi.R, bidi.RLI:
-		dest.strong.SetRDist(src.l)
+		dest.context.SetStrongType(bidi.R, src.l)
+	case bidi.AL:
+		dest.context.SetStrongType(bidi.AL, src.l)
 	}
-	dest.strong.SetALDist(lastAL)
 }
 
 // func (sc *bidiScanner) setStrongPos(c bidi.Class) {
@@ -489,8 +491,8 @@ func RecognizeLegacy(b bool) Option {
 
 // DefaultDirection sets outer embedding level for a paragraph
 // (LeftToRight is the normal default).
-func DefaultDirection(dir bidi.Direction) Option {
-	if dir == bidi.RightToLeft {
+func DefaultDirection(dir Direction) Option {
+	if dir == RightToLeft {
 		return func(sc *bidiScanner) {
 			sc.mode |= optionOuterR2L
 		}
@@ -499,7 +501,7 @@ func DefaultDirection(dir bidi.Direction) Option {
 }
 
 // TestMode will set up the scanner to recognize UPPERCASE letters as having R2L class.
-// This is a common pattern in bidi algorithm development.
+// This is a common pattern in bidi algorithm development and testing.
 func TestMode(b bool) Option {
 	return func(sc *bidiScanner) {
 		if !sc.hasMode(optionTesting) && b ||

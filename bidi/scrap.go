@@ -11,10 +11,10 @@ import (
 type charpos uint32 // position of a character within a paragraph
 
 type scrap struct {
-	bidiclz bidi.Class  // bidi character class of this scrap
-	l, r    charpos     // left and right bounds, r not included
-	strong  strongTypes // positions of last strong bidi characters
-	child   *scrap      // some scraps may have a child worth saving
+	bidiclz bidi.Class // bidi character class of this scrap
+	l, r    charpos    // left and right bounds, r not included
+	context dirContext // directional context
+	child   *scrap     // some scraps may have a child worth saving
 }
 
 func (s scrap) String() string {
@@ -34,7 +34,7 @@ func (s scrap) String() string {
 func (s *scrap) clear() {
 	s.l, s.r = 0, 0
 	s.bidiclz = NULL
-	s.strong = [4]uint16{}
+	s.context = dirContext{}
 	s.child = nil
 }
 
@@ -60,84 +60,131 @@ func collapse(dest, src scrap, c bidi.Class) scrap {
 	return dest
 }
 
-// --- Strong types bitfield -------------------------------------------------
+// return the embedding direction for this scrap
+func (s scrap) e() bidi.Class {
+	return s.context.EmbeddingDir()
+}
 
-const ( // positions within type strongTypes:
-	lpart  uint64 = iota // position of last L
-	rpart                // position of last R
-	alpart               // position of last AL
-	embed                // embedding direction
-)
+// return the opposite direction for this scrap
+func (s scrap) o() bidi.Class {
+	return s.context.EmbeddingDir()
+}
 
-// strongTypes is a helper type to store positions of strong types within the
+func opposite(dir bidi.Class) bidi.Class {
+	if dir == bidi.L {
+		return bidi.R
+	}
+	if dir == bidi.R || dir == bidi.AL {
+		return bidi.L
+	}
+	return NI
+}
+
+// func (s scrap) LocalStrongContext(other scrap) bidi.Class {
+// 	if s.context.pos >= other.l {
+// 		return s.context.Context()
+// 	}
+// 	return NI
+// }
+
+func (s scrap) Context() bidi.Class {
+	return s.context.Context()
+}
+
+func (s scrap) StrongContext() bidi.Class {
+	return s.context.StrongContext()
+}
+
+func (s scrap) HasEmbeddingMatchAfter(other scrap) bool {
+	return s.context.matchPos >= other.l
+}
+
+func (s scrap) HasOppositeAfter(other scrap) bool {
+	pos := s.context.matchPos + charpos(s.context.odist)
+	return pos >= other.l
+}
+
+// --- Strong types context --------------------------------------------------
+
+// dirContext is a helper type to store positions of strong types within the
 // input text. Various UAX#9 rules require to find preceding occurences of strong types
 // (L, R, sos, AL) to determine context. In order to avoid travelling the text backwards
 // we save the positions of strong types.
 //
-// This is quite a memory invest, but we try to manage it by storing 4 pieces of
-// information in one 64 bit memory word. We hold that positions of characters within a
-// paragraph of text will not overflow uint16, which is ~32.000 bytes. That should be
-// enough for all but machine generated paragraphs, even when encoding non-Western languages.
-// However, we make sure the scanner doesn't break in case of overflow, but rather
-// will muddle along reasonably well (no panic, memory fault, etc). This is not
-// a difficult task, as just taking the low bits will do just fine, except for
-// handling of bracket pairs.
+// This is quite a memory invest. We have to strike a balanced trade-off between
+// speed and space efficiency. The information stored in dirContext is mainly used
+// for 2 rules:
 //
-// The memory layout will be like this:
+// * Rule W2, which changes numbers to arabic numbers if there is a recent strong
+//   type of AL (arabic letter)
+// * Rule W7, which changes numbers to type L if there is a recent strong type of L
+// * Rule N0, the handling of bracket pairings, which uses information about recent
+//   strong types L or R to decide the embedding level of brackets
 //
-//    +--------------+--------------+--------------+--------------+
-//    |  emb.dir.    |    AL pos.   |     R pos.   |    L pos.    |
-//    +--------------+--------------+--------------+--------------+
-//   64                            32                             0
+// Rule W2 could be handled by a boolean flag, but the combination of W7 and N0 is
+// more tricky (see the code dealing with bracket pairs).
 //
-type strongTypes [4]uint16
+type dirContext struct {
+	embeddingDir bidi.Class // embedding context
+	strong       bidi.Class // current strong context
+	odist        uint16     // distance between matchPos and occurrence of recent o scrap
+	matchPos     charpos    // most recent position matching the embedding dir
+}
 
-// Position of last L and R, respectively.
-func (st strongTypes) LRPos() (int, int) {
-	return int(st[lpart]), int(st[rpart])
+// Context is either the strong context or, if that is neutral, the embedding context.
+func (dc dirContext) Context() bidi.Class {
+	if dc.strong == NI {
+		return dc.embeddingDir
+	}
+	if dc.strong == bidi.AL {
+		return bidi.R
+	}
+	return dc.strong
 }
 
 // Has the last strong type been L or R?
-func (st strongTypes) Context() bidi.Class {
-	if st[lpart] >= st[rpart] {
-		return bidi.L
+func (dc dirContext) StrongContext() bidi.Class {
+	if dc.strong == bidi.AL {
+		return bidi.R
 	}
-	return bidi.R
+	return dc.strong
 }
 
 // Embedding direction, as determined by the last LRI or RLI.
-func (st strongTypes) EmbeddingDir() bidi.Class {
-	return bidi.Class(st[embed])
+func (dc dirContext) EmbeddingDir() bidi.Class {
+	return dc.embeddingDir
 }
 
-// Set position of L strong type.
-func (st strongTypes) SetLDist(d charpos) strongTypes {
-	st[lpart] = uint16(d)
-	return st
-}
-
-// Set position of R strong type.
-func (st strongTypes) SetRDist(d charpos) strongTypes {
-	st[rpart] = uint16(d)
-	return st
-}
-
-// Set position of AL.
-func (st strongTypes) SetALDist(d charpos) strongTypes {
-	st[alpart] = uint16(d)
-	return st
+// Set position of recent strong type. If it matches the embedding direction
+// and at > the previous matching position, the matching position is updated.
+func (dc dirContext) SetStrongType(c bidi.Class, at charpos) dirContext {
+	if c != bidi.L && c != bidi.R && c != bidi.AL && c != NI {
+		return dc
+	}
+	dc.strong = c
+	if c == dc.embeddingDir && at > dc.matchPos {
+		dc.matchPos = at
+	} else if c == opposite(dc.embeddingDir) && at > dc.matchPos {
+		d := at - dc.matchPos
+		if d > 65535 {
+			T().Errorf("overflow for opposite-char distance: %d", d)
+			d = 65535
+		}
+		dc.odist = uint16(d)
+	}
+	return dc
 }
 
 // Has the currently last strong type been an AL?
-func (st strongTypes) IsAL() bool {
-	return st[alpart] > st[lpart] && st[alpart] > st[rpart]
+func (dc dirContext) IsAL() bool {
+	return dc.strong == bidi.AL
 }
 
-func (st strongTypes) SetEmbedding(dir bidi.Direction) strongTypes {
+func (dc dirContext) SetEmbedding(dir bidi.Direction) dirContext {
 	if dir == bidi.LeftToRight {
-		st[embed] = uint16(bidi.L)
+		dc.embeddingDir = bidi.L
 	} else if dir == bidi.RightToLeft {
-		st[embed] = uint16(bidi.R)
+		dc.embeddingDir = bidi.R
 	}
-	return st
+	return dc
 }
