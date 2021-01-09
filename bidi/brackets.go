@@ -135,6 +135,16 @@ func (bph *bracketPairHandler) FindBracketPairing(s scrap) (pairing, bool) {
 	return pairing{}, false
 }
 
+func (bph *bracketPairHandler) changeOpeningBracketClass(s scrap) {
+	bph.mx.Lock()
+	defer bph.mx.Unlock()
+	for i, pair := range bph.pairings {
+		if pair.opening.l == s.l {
+			bph.pairings[i].opening.bidiclz = s.bidiclz
+		}
+	}
+}
+
 func (bph *bracketPairHandler) UpdateClosingBrackets(bidiclz bidi.Class, pos charpos) {
 	bph.mx.Lock()
 	defer bph.mx.Unlock()

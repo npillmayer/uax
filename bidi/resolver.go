@@ -62,7 +62,7 @@ func newParser(sc *bidiScanner) (*parser, error) {
 }
 
 func (p *parser) reduce(n int, rhs []scrap) {
-	T().Debugf("REDUCE at %d: %d⇒%v", p.sp, n, rhs)
+	T().Debugf("REDUCE at %d: %d ⇒ %v", p.sp, n, rhs)
 	diff := len(rhs) - n
 	for i, s := range rhs {
 		p.stack[p.sp+i] = s
@@ -177,9 +177,10 @@ func (p *parser) pass2() {
 	for p.sp < len(p.stack) {
 		e := min(len(p.stack), p.sp+3)
 		T().Debugf("trying to match %v at %d", p.stack[p.sp:e], p.sp)
-		if p.stack[p.sp].bidiclz == cBRACKC {
-			p.performRuleN0()
-			p.sp++
+		//if p.stack[p.sp].bidiclz == cBRACKC {
+		if isbracket(p.stack[p.sp]) {
+			jmp := p.performRuleN0()
+			p.sp = max(0, p.sp+jmp) // avoid jumping left of 0
 			continue
 		}
 		rule, _ := p.matchRulesLHS(p.stack[p.sp:len(p.stack)], 2)
@@ -198,8 +199,9 @@ func (p *parser) pass2() {
 //     order of the text positions of the opening paired brackets using the logic
 //     given below. Within this scope, bidirectional types EN and AN are treated as R.
 //
-func (p *parser) performRuleN0() {
+func (p *parser) performRuleN0() (jmp int) {
 	T().Debugf("applying UAX#9 rule N0 (bracket pairs) with %s", p.stack[p.sp])
+	jmp = 1 // default is to walk over the bracket
 	if p.stack[p.sp].bidiclz == cBRACKO {
 		// Identify the bracket pairs in the current isolating run sequence according to BD16.
 		openBr := p.stack[p.sp]
@@ -209,6 +211,9 @@ func (p *parser) performRuleN0() {
 			closeBr.bidiclz = cNI
 			return
 		}
+		T().Debugf("closing bracket for %s is %s", openBr, closeBr)
+		T().Debugf("closing bracket has context=%v", closeBr.context)
+		T().Debugf("closing bracket has match pos=%d", closeBr.context.matchPos)
 		// a. Inspect the bidirectional types of the characters enclosed within the
 		//    bracket pair.
 		if closeBr.HasEmbeddingMatchAfter(openBr) {
@@ -216,6 +221,7 @@ func (p *parser) performRuleN0() {
 			//    is found, set the type for both brackets in the pair to match the
 			//    embedding direction.
 			openBr.bidiclz = openBr.context.embeddingDir
+			jmp = -2
 		} else if closeBr.HasOppositeAfter(openBr) {
 			// c. Otherwise, if there is a strong type it must be opposite the embedding
 			//    direction. Therefore, test for an established context with a preceding
@@ -231,18 +237,29 @@ func (p *parser) performRuleN0() {
 				//      embedding direction.
 				openBr.bidiclz = openBr.context.embeddingDir
 			}
+			jmp = -2
 		} else {
+			T().Debugf("no strong types found within bracket pair")
 			// d. Otherwise, there are no strong types within the bracket pair.
 			//    Therefore, do not set the type for that bracket pair.
 			openBr.bidiclz = cNI
+			jmp = -1
 		}
+		p.changeBracketBidiClass(openBr)
+		p.stack[p.sp] = openBr
 	} else {
 		closeBr := p.stack[p.sp]
 		if openBr, found := p.findCorrespondingBracket(closeBr); found {
 			closeBr.bidiclz = openBr.bidiclz
+		} else {
+			closeBr.bidiclz = cNI
 		}
-		closeBr.bidiclz = cNI
+		p.stack[p.sp] = closeBr
+		if closeBr.bidiclz != cNI {
+			jmp = -2
+		}
 	}
+	return
 }
 
 // Ordering starts the parse and returns a bidi-ordering for the input-text gsen
@@ -254,9 +271,9 @@ func (p *parser) Ordering() *Ordering {
 	p.pass1()
 	T().Debugf("--------------")
 	T().Debugf("STACK = %v", p.stack)
-	// T().Debugf("--- pass 2 ---")
-	// p.pass2()
-	// T().Debugf("--------------")
+	T().Debugf("--- pass 2 ---")
+	p.pass2()
+	T().Debugf("--------------")
 	return &Ordering{scraps: p.stack}
 }
 
@@ -310,6 +327,10 @@ func (p *parser) findCorrespondingBracket(s scrap) (scrap, bool) {
 		return pair.opening, true
 	}
 	return s, false
+}
+
+func (p *parser) changeBracketBidiClass(s scrap) {
+	p.sc.bd16.changeOpeningBracketClass(s)
 }
 
 // --- Ordering --------------------------------------------------------------
@@ -367,6 +388,8 @@ func prepareRulesTrie() *trie.TinyHashTrie {
 	r, lhs = ruleW6_3()
 	allocRule(trie, r, lhs)
 	r, lhs = ruleW7()
+	allocRule(trie, r, lhs)
+	r, lhs = ruleN1_0()
 	allocRule(trie, r, lhs)
 	r, lhs = ruleN1_1()
 	allocRule(trie, r, lhs)

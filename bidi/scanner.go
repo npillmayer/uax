@@ -1,7 +1,11 @@
 package bidi
 
 // Notes:
+// - TODO update nach rule W7 zu brackets fehlt noch
 // - Input reader will in most cases be a cord reader
+// - implement Implicit Directional Formatting Characters 	LRM, RLM, ALM
+// - B Paragraph Separator   PARAGRAPH SEPARATOR, appropriate Newline Functions,
+//                           higher-level protocol paragraph determination
 
 import (
 	"bufio"
@@ -131,7 +135,7 @@ func (sc *bidiScanner) Scan(pipe chan<- scrap) {
 				sc.post(current, pipe) // put current on channel
 			}
 			// proceed ahead, making lookahead the current scrap
-			inheritStrongTypes(lookahead, current, lastAL)
+			lookahead = inheritStrongTypes(lookahead, current, lastAL)
 			current = sc.prepareRuleBD16(r, lookahead)
 			//current = lookahead
 			// pos, lapos = lapos, lookahead.r
@@ -391,17 +395,22 @@ func (sc *bidiScanner) prepareRuleBD16(r rune, s scrap) scrap {
 // }
 
 // isAL is true if dest has been of bidi class AL (before UAX#9 rule W3 changed it)
-func inheritStrongTypes(dest, src scrap, lastAL charpos) {
+func inheritStrongTypes(dest, src scrap, lastAL charpos) scrap {
+	T().Debugf("inherit %s => %s", src, dest)
 	dest.context = src.context
-	dest.context.SetStrongType(bidi.AL, lastAL)
+	// TODO dest.context.SetStrongType(bidi.AL, lastAL)
 	switch src.bidiclz {
 	case bidi.L, bidi.LRI:
-		dest.context.SetStrongType(bidi.L, src.l)
+		dest.context = dest.context.SetStrongType(bidi.L, src.l)
+		T().Errorf("la has L context=%v from %v", dest.context, src.context)
 	case bidi.R, bidi.RLI:
-		dest.context.SetStrongType(bidi.R, src.l)
+		dest.context = dest.context.SetStrongType(bidi.R, src.l)
+		T().Errorf("la has R context=%v from %v", dest.context, src.context)
 	case bidi.AL:
-		dest.context.SetStrongType(bidi.AL, src.l)
+		dest.context = dest.context.SetStrongType(bidi.AL, src.l)
+		T().Errorf("la has AL context=%v from %v", dest.context, src.context)
 	}
+	return dest
 }
 
 // func (sc *bidiScanner) setStrongPos(c bidi.Class) {
@@ -474,7 +483,7 @@ const (
 
 // RecognizeLegacy is not yet implemented. It was indented to make the
 // resolver recognize legacy formatting, i.e.
-// LRM, RLM, ALM, LRE, RLE, LRO, RLO, PDF. However, I changed my mind and
+// LRE, RLE, LRO, RLO, PDF. However, I changed my mind and
 // currently do not intend to support legacy formatting types,
 // thus setting this option will have no effect.
 func RecognizeLegacy(b bool) Option {

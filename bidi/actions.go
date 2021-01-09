@@ -145,33 +145,9 @@ func ruleW7() (*bidiRule, []byte) {
 // ---------------------------------------------------------------------------
 // 3.3.5 Resolving Neutral and Isolate Formatting Types
 
-// N0. Process bracket pairs in an isolating run sequence sequentially in the logical
-//     order of the text positions of the opening paired brackets using the logic
-//     given below. Within this scope, bidirectional types EN and AN are treated as R.
-
-// This rule is currently not used.
-func ruleN0() (*bidiRule, []byte) {
-	lhs := makeLHS(cBRACKC) // closing bracket has a matching opening bracket
-	return &bidiRule{
-		name:   "N0",
-		lhsLen: len(lhs),
-		pass:   2,
-		action: func(match []scrap) ([]scrap, int) {
-			// TODO find opening bracket by walking back intervals
-			//      until position of corresponding bracket contained.
-			//      opening bracket should sit in an interval by itself
-			// TODO when pushing a bracket onto the stack, include the
-			//      value of strong with it. N0 needs the embedding direction
-			//      and the value of the last strong character.
-			// TODO this rule is probably better to hardcode into the
-			//      parser code, not as a rule
-			// From the spec: Any number of characters that had original bidirectional
-			//   character type NSM prior to the application of W1 that immediately follow
-			//   a paired bracket which changed to L or R under N0 should change to match the
-			//   type of their preceding bracket. -> this is hard; omit it?
-			return match, 1 // for now: skip bracket
-		},
-	}, lhs
+func ruleN1_0() (*bidiRule, []byte) {
+	lhs := makeLHS(cNI, cNI)
+	return makeSquashRule("N1-0", lhs, bidi.L, 0), lhs
 }
 
 // N1. A sequence of NIs takes the direction of the surrounding strong text if the text
@@ -296,7 +272,7 @@ func makeSquashRule(name string, lhs []byte, c bidi.Class, jmp int) *bidiRule {
 	r := &bidiRule{
 		name:   name,
 		lhsLen: len(lhs),
-		action: squash(c, jmp),
+		action: squash(c, len(lhs), jmp),
 	}
 	if strings.HasPrefix(name, "W") {
 		r.pass = 1
@@ -306,9 +282,10 @@ func makeSquashRule(name string, lhs []byte, c bidi.Class, jmp int) *bidiRule {
 	return r
 }
 
-func squash(c bidi.Class, jmp int) ruleAction {
+func squash(c bidi.Class, n int, jmp int) ruleAction {
 	return func(match []scrap) ([]scrap, int) {
-		last := match[len(match)-1]
+		last := match[n-1]
+		//T().Debugf("squash: last = %s", last)
 		match[0].r = last.r
 		match[0].bidiclz = c
 		for i, iv := range match {

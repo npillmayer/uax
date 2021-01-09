@@ -111,14 +111,30 @@ func TestSimple(t *testing.T) {
 }
 
 func TestBrackets(t *testing.T) {
+	gtrace.CoreTracer = gotestingadapter.New()
+	teardown := gotestingadapter.RedirectTracing(t)
+	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	reader := strings.NewReader("hello (World)")
+	ordering := ResolveParagraph(reader, TestMode(true))
+	fmt.Printf("resulting ordering = %s\n", ordering)
+	if len(ordering.scraps) != 3 || ordering.scraps[2].bidiclz != bidi.L {
+		t.Errorf("expected ordering to be L + R + L, is '%s'", ordering)
+	}
+}
+
+func TestTODO(t *testing.T) {
 	//gtrace.CoreTracer = gotestingadapter.New()
 	gtrace.CoreTracer = gologadapter.New()
 	//teardown := gotestingadapter.RedirectTracing(t)
 	//defer teardown()
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
-	reader := strings.NewReader("hello (WORLD)")
+	reader := strings.NewReader("hello")
 	ordering := ResolveParagraph(reader, TestMode(true))
 	fmt.Printf("resulting ordering = %s\n", ordering)
-	//t.Fail()
+	// if len(ordering.scraps) != 3 || ordering.scraps[2].bidiclz != bidi.L {
+	// 	t.Errorf("expected ordering to be L + R + L, is '%s'", ordering)
+	// }
 }
