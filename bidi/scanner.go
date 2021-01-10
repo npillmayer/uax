@@ -402,13 +402,13 @@ func inheritStrongTypes(dest, src scrap, lastAL charpos) scrap {
 	switch src.bidiclz {
 	case bidi.L, bidi.LRI:
 		dest.context = dest.context.SetStrongType(bidi.L, src.l)
-		T().Errorf("la has L context=%v from %v", dest.context, src.context)
+		T().Debugf("la has L context=%v from %v", dest.context, src.context)
 	case bidi.R, bidi.RLI:
 		dest.context = dest.context.SetStrongType(bidi.R, src.l)
-		T().Errorf("la has R context=%v from %v", dest.context, src.context)
+		T().Debugf("la has R context=%v from %v", dest.context, src.context)
 	case bidi.AL:
 		dest.context = dest.context.SetStrongType(bidi.AL, src.l)
-		T().Errorf("la has AL context=%v from %v", dest.context, src.context)
+		T().Debugf("la has AL context=%v from %v", dest.context, src.context)
 	}
 	return dest
 }
