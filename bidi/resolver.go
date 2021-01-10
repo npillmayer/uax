@@ -174,6 +174,17 @@ func (p *parser) read(n int) (int, bool) {
 	return i, true
 }
 
+// pass 2 operates on the scraps laying on the stack, starting at the
+// bottom of the stack. The scanner already has stopped and we no longer
+// have access to the original text input, but rather must have accumulated
+// enough information to perform the Bidi rules of pass 2.
+//
+// The number of iterations in pass 2 will almost always be much lower
+// than for pass 1. Pass 2 will result in a stack on which unresolvable
+// scraps remain. These are then the directional runs of an isolating run
+// sequence. If an isolating run sequence has just, say, left-to-right text,
+// there should be only a single scrap on the stack with bidi class L.
+//
 func (p *parser) pass2() {
 	p.sp = 0
 	for p.sp < len(p.stack) {
@@ -279,7 +290,24 @@ func (p *parser) Ordering() *Ordering {
 	return &Ordering{scraps: p.stack}
 }
 
-// matchRulesLHS trys to find 2 rules matching a gsen interval:
+// matchRulesLHS will match a sequence of scraps laying on the stack to left hand
+// sides of grammar rules. In parsing theory, this process is usually called
+// handle recgonition and is applied to the top symbols of the parsing stack
+// (in reverse sequence). Which handles to look for is determined by a regular
+// automaton to restrict the set of possible handles to the legal ones at this
+// position of a parse. However, we do not deal with a context free grammar here,
+// thus we will not employ an automaton and we will not be restricted to the top
+// symbols of the stack. Instead, we will walk the stack from bottom to top,
+// trying to reach TOS all the while the scanner puts further scraps onto the stack.
+// Matching LHS handles is done mid-stack. However, this is of course a white lie,
+// as most of the time we well be operating very close to TOS.
+//
+// Finding applicable rules via their LHS is supported by the way we store the
+// rules: A trie lets us find a rule for a LHS very efficiently. Left hand sides
+// of UAX#9 rules are short (3 scraps at most) and a trie lets us find a rule
+// with at most 3 index accesses.
+//
+// matchRulesLHS trys to find 2 rules matching a given interval:
 // a long one (returned as the first return value), and possibly one just matching
 // the first interval (returned as the second return value).
 //

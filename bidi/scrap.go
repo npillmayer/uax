@@ -19,7 +19,16 @@ type charpos uint32 // position of a character within a paragraph
 // our algorithm and calls these tokens `scraps'. UAX#9 does not offer a name for
 // character clusters, as it handles single characters. During programming the
 // first draft of the bidi algorithm I kept being reminded of Prof Knuth's `scraps'
-// and finally sticked to the name.
+// and finally stuck to the name.
+//
+// A scrap may be imagined as an interval with a bidi class value. Interval boundaries
+// are positions in the input text. Scrap intervals may grow by being melted together
+// with other scraps, e.g. two consecutive L-scraps (denoting writing direction
+// Left-to-right) will become a single L-scrap spanning the two scraps.
+//
+//    [15 L 23] [23 L 148]   ⇒   [15 L 148]
+//
+// The resulting scrap represents a text interval with left-to-right direction.
 
 type scrap struct {
 	bidiclz bidi.Class // bidi character class of this scrap
@@ -54,12 +63,14 @@ func (s scrap) len() charpos {
 	if s.bidiclz == cNULL {
 		return 0
 	}
-	if s.bidiclz == cBRACKO || s.bidiclz == cBRACKC {
-		return 1
-	}
+	// if s.bidiclz == cBRACKO || s.bidiclz == cBRACKC {
+	// 	return 1
+	// }
 	return s.r - s.l
 }
 
+// collapse unifies two input scraps to a single resulting scrap with
+// bidi class c.
 func collapse(dest, src scrap, c bidi.Class) scrap {
 	//x := dest
 	if src.child != nil {

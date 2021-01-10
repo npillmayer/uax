@@ -135,9 +135,9 @@ func ruleW7() (*bidiRule, []byte) {
 			if match[0].Context() == bidi.L {
 				L := match[:1]
 				L[0].bidiclz = bidi.L
-				return L, 0, true
+				return L, 0, true // replace EN with L, start again with L
 			}
-			return match, 1, true
+			return match, 1, true // step over EN
 		},
 	}, lhs
 }
