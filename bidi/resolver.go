@@ -57,8 +57,7 @@ type parser struct {
 }
 
 // newParser creates a Parser, which is used to parse paragraphs of text and identify
-// bidi runs. Parser is made public for cases where clients want to provide their own
-// implementation of a scanner. Usually it's much simpler to call bidi.Parse(…)
+// bidi runs.
 func newParser(sc *bidiScanner) (*parser, error) {
 	p := &parser{
 		sc:    sc,
@@ -104,7 +103,7 @@ func (p *parser) pass1() {
 	var rule, shortrule *bidiRule
 	walk := false // if true, accept walking over 1 scrap
 	for {         // scan the complete input sequence (until EOF)
-		T().Errorf("EOF=%v", p.eof)
+		T().Debugf("EOF=%v", p.eof)
 		la = len(p.stack) - p.sp
 		k, _ := p.read(3 - la) // extend LA to |LA|=3, if possible
 		la += k
@@ -145,9 +144,9 @@ func (p *parser) pass1() {
 // nextInputScrap reads the next scrap from the scanner pipe. It returns a
 // new scrap and false if this is the EOF scrap, true otherwise.
 func (p *parser) nextInputScrap(pipe <-chan scrap) (scrap, bool) {
-	T().Errorf("==> reading from pipe")
+	T().Debugf("==> reading from pipe")
 	s := <-pipe
-	T().Errorf("    read %s from pipe", s)
+	T().Debugf("    read %s from pipe", s)
 	if s.bidiclz == cNULL {
 		return s, false
 	}
@@ -157,7 +156,7 @@ func (p *parser) nextInputScrap(pipe <-chan scrap) (scrap, bool) {
 // read reads k ≤ n bidi clusters from the scanner. If k < n, EOF has been encountered.
 // Returns k.
 func (p *parser) read(n int) (int, bool) {
-	T().Errorf("----> read(%d)", n)
+	T().Debugf("----> read(%d)", n)
 	if n <= 0 || p.eof {
 		return 0, false
 	}
@@ -170,7 +169,7 @@ func (p *parser) read(n int) (int, bool) {
 		}
 		p.stack = append(p.stack, s)
 	}
-	T().Errorf("have read %d scraps, stack=%v", i, p.stack)
+	T().Debugf("have read %d scraps, stack=%v", i, p.stack)
 	return i, true
 }
 
@@ -300,7 +299,7 @@ func (p *parser) Ordering() *Ordering {
 // symbols of the stack. Instead, we will walk the stack from bottom to top,
 // trying to reach TOS all the while the scanner puts further scraps onto the stack.
 // Matching LHS handles is done mid-stack. However, this is of course a white lie,
-// as most of the time we well be operating very close to TOS.
+// as most of the time during pass 1 we will be operating very close to TOS.
 //
 // Finding applicable rules via their LHS is supported by the way we store the
 // rules: A trie lets us find a rule for a LHS very efficiently. Left hand sides

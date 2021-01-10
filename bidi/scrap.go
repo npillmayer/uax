@@ -89,7 +89,7 @@ func (s scrap) e() bidi.Class {
 
 // return the opposite direction for this scrap
 func (s scrap) o() bidi.Class {
-	return s.context.EmbeddingDir()
+	return opposite(s.context.EmbeddingDir())
 }
 
 func opposite(dir bidi.Class) bidi.Class {
@@ -135,7 +135,7 @@ func (s scrap) HasOppositeAfter(other scrap) bool {
 //
 // This is quite a memory invest. We have to strike a balanced trade-off between
 // speed and space efficiency. The information stored in dirContext is mainly used
-// for 2 rules:
+// for the following rules:
 //
 // * Rule W2, which changes numbers to arabic numbers if there is a recent strong
 //   type of AL (arabic letter)
