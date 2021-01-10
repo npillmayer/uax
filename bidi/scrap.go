@@ -22,7 +22,7 @@ type charpos uint32 // position of a character within a paragraph
 // and finally stuck to the name.
 //
 // A scrap may be imagined as an interval with a bidi class value. Interval boundaries
-// are positions in the input text. Scrap intervals may grow by being melted together
+// are positions in the input text. Scrap intervals may grow by being melded together
 // with other scraps, e.g. two consecutive L-scraps (denoting writing direction
 // Left-to-right) will become a single L-scrap spanning the two scraps.
 //
