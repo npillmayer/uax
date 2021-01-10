@@ -68,7 +68,9 @@ type bracketPairHandler struct {
 	stack    bracketStack        // stack to trace bracket nesting
 	pairings pairingsList        // result list of matching bracket pairings
 	mx       sync.Mutex          // guards pairings, as parser will access them, too
-	outer    *bracketPairHandler // handlers will be stacked for nested isolate runs
+	next     *bracketPairHandler // handlers will be stacked for nested isolate runs
+	firstpos charpos             // text position of first character in isolating run sequence
+	lastpos  charpos             // text position of PDI
 }
 
 // This is the stack to perform the algorithm described above
@@ -86,11 +88,14 @@ type pairing struct {
 	closing scrap // closing bracket represented as a scrap
 }
 
-func makeBracketPairHandler(outer *bracketPairHandler) *bracketPairHandler {
+func makeBracketPairHandler(first charpos, previous *bracketPairHandler) *bracketPairHandler {
 	h := &bracketPairHandler{
 		stack:    make(bracketStack, 0, BD16MaxNesting),
 		pairings: make(pairingsList, 0, 8),
-		outer:    outer,
+		firstpos: first,
+	}
+	if previous != nil {
+		previous.next = h
 	}
 	return h
 }

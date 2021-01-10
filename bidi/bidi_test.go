@@ -126,17 +126,17 @@ func TestBrackets(t *testing.T) {
 	}
 }
 
-func TestTODO(t *testing.T) {
+func TestIRS(t *testing.T) {
 	//gtrace.CoreTracer = gotestingadapter.New()
 	gtrace.CoreTracer = gologadapter.New()
 	//teardown := gotestingadapter.RedirectTracing(t)
 	//defer teardown()
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
-	reader := strings.NewReader("hello")
+	reader := strings.NewReader("hel<lo WORLD=")
 	ordering := ResolveParagraph(reader, TestMode(true))
 	fmt.Printf("resulting ordering = %s\n", ordering)
-	// if len(ordering.scraps) != 3 || ordering.scraps[2].bidiclz != bidi.L {
-	// 	t.Errorf("expected ordering to be L + R + L, is '%s'", ordering)
-	// }
+	if len(ordering.scraps) != 3 || ordering.scraps[2].bidiclz != bidi.L {
+		t.Errorf("expected ordering to be L + R + L, is '%s'", ordering)
+	}
 }

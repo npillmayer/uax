@@ -134,7 +134,8 @@ func (p *parser) pass1() {
 		rhs, jmp, newL := rule.action(p.stack[p.sp:len(p.stack)])
 		p.reduce(rule.lhsLen, rhs)
 		if newL {
-			p.sc.bd16.UpdateClosingBrackets(p.stack[p.sp])
+			bd16 := p.sc.findBD16ForPos(p.stack[p.sp].l)
+			bd16.UpdateClosingBrackets(p.stack[p.sp])
 		}
 		p.sp = max(0, p.sp+jmp) // avoid jumping left of 0
 		walk = false
@@ -348,7 +349,8 @@ func (p *parser) matchRulesLHS(scraps []scrap, minlen int) (*bidiRule, *bidiRule
 }
 
 func (p *parser) findCorrespondingBracket(s scrap) (scrap, bool) {
-	pair, found := p.sc.bd16.FindBracketPairing(s)
+	bd16 := p.sc.findBD16ForPos(s.l)
+	pair, found := bd16.FindBracketPairing(s)
 	if found {
 		if s.bidiclz == cBRACKO {
 			return pair.closing, true
@@ -359,7 +361,8 @@ func (p *parser) findCorrespondingBracket(s scrap) (scrap, bool) {
 }
 
 func (p *parser) changeBracketBidiClass(s scrap) {
-	p.sc.bd16.changeOpeningBracketClass(s)
+	bd16 := p.sc.findBD16ForPos(s.l)
+	bd16.changeOpeningBracketClass(s)
 }
 
 // --- Ordering --------------------------------------------------------------

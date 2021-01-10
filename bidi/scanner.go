@@ -8,6 +8,7 @@ package bidi
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"strconv"
 	"unicode"
@@ -19,10 +20,11 @@ import (
 // bidiScanner will read runs of text as a unit, as long as all runes therein have the
 // same Bidi class.
 type bidiScanner struct {
-	mode        uint8               // scanner modes, set by scanner options
-	ISLevel     int                 // nesting level of isolating run sequences
-	runeScanner *bufio.Scanner      // we're using an embedded rune reader
-	bd16        *bracketPairHandler // support type for handling bracket pairings
+	mode        uint8                           // scanner modes, set by scanner options
+	runeScanner *bufio.Scanner                  // we're using an embedded rune reader
+	bd16        *bracketPairHandler             // support type for handling bracket pairings
+	IRS         map[charpos]*bracketPairHandler // isolating run sequences and their pair handlers
+	IRSStack    []charpos
 }
 
 // NewScanner creates a scanner for bidi formatting. It will read runs of text
@@ -35,7 +37,11 @@ func newScanner(input io.Reader, opts ...Option) *bidiScanner {
 	sc := &bidiScanner{}
 	sc.runeScanner = bufio.NewScanner(input)
 	sc.runeScanner.Split(bufio.ScanRunes)
-	sc.bd16 = makeBracketPairHandler(nil) // TODO handle nested isolate runs
+	sc.bd16 = makeBracketPairHandler(0, nil)
+	sc.IRS = make(map[charpos]*bracketPairHandler)
+	sc.IRS[0] = sc.bd16
+	sc.IRSStack = make([]charpos, 0, 16)
+	sc.IRSStack = append(sc.IRSStack, 0)
 	for _, opt := range opts {
 		if opt != nil {
 			opt(sc)
@@ -98,14 +104,21 @@ func (sc *bidiScanner) Scan(pipe chan<- scrap) {
 	for {
 		r, length, bidiclz, ok := sc.nextRune() // read the next input rune
 		if !ok {                                // if EOF, drain lookahead and quit
-			sc.post(lookahead, pipe) // use lookahead as current scrap and put it onto pipe
-			sc.stop(pipe)            // then send quit signal to parser
+			if isisolate(current) { // if last character is PDI
+				sc.handleIsolatingRunSwitch(current)
+			}
+			sc.post(current, pipe) // use lookahead as current scrap and put it onto pipe
+			sc.stop(pipe)          // then send quit signal to parser
 			break
 		}
 
 		// a rune has successfully been read ⇒ make it the new lookahead
-		if sc.hasMode(optionTesting) && unicode.IsUpper(r) {
-			bidiclz = bidi.R // during testing, UPPERCASE is R2L
+		if sc.hasMode(optionTesting) {
+			if unicode.IsUpper(r) {
+				bidiclz = bidi.R // during testing, UPPERCASE is R2L
+			} else { // check for isolating run sequence delimiters
+				bidiclz = setTestingIRSDelimiter(r, bidiclz)
+			}
 		}
 		isAL := bidiclz == bidi.AL                     // AL will be changed by rule W3
 		bidiclz = applyRulesW1to3(r, bidiclz, current) // UAX#9 W1–3 handled by scanner
@@ -114,8 +127,11 @@ func (sc *bidiScanner) Scan(pipe chan<- scrap) {
 		T().Debugf("bidi scanner lookahead = %v", lookahead) // finally a new lookahead
 
 		// the current scrap is finished if the lookahead cannot extend it
-		if current.bidiclz == cNULL || current.bidiclz != lookahead.bidiclz || isbracket(current) {
+		if current.bidiclz == cNULL || current.bidiclz != lookahead.bidiclz || isbracket(current) || isisolate(current) {
 			if current.bidiclz != cNULL { // if the current scrap is not the initial null scrap
+				if isisolate(current) {
+					sc.handleIsolatingRunSwitch(current)
+				}
 				sc.post(current, pipe) // put current on channel
 			}
 			// proceed ahead, making lookahead the current scrap
@@ -226,6 +242,72 @@ func inheritStrongTypes(dest, src scrap, lastAL charpos) scrap {
 	return dest
 }
 
+// --- Nesting isolating run sequences ---------------------------------------
+
+func isisolate(s scrap) bool {
+	switch s.bidiclz {
+	case bidi.LRI, bidi.RLI, bidi.FSI, bidi.PDI:
+		return true
+	}
+	return false
+}
+
+func (sc *bidiScanner) handleIsolatingRunSwitch(s scrap) {
+	if s.bidiclz == bidi.PDI {
+		// re-establish outer BD16 handler
+		if len(sc.IRSStack) == 0 {
+			T().Debugf("non-paired PDI at position %d", s.l)
+			return
+		}
+		sc.bd16.lastpos = s.l
+		sc.IRSStack = sc.IRSStack[:len(sc.IRSStack)-1] // pop current IRS level
+		tos := sc.IRSStack[len(sc.IRSStack)-1]
+		sc.bd16 = sc.IRS[tos]
+		T().Debugf("PDI read, switch back to outer IRS with position %d", sc.bd16.firstpos)
+		return
+	}
+	// establish new BD16 handler
+	irs := sc.IRS[0]
+	for irs.next != nil { // find most rightward isolating run sequence
+		irs = irs.next
+	}
+	sc.bd16 = makeBracketPairHandler(s.l, irs)
+	sc.IRS[s.l] = sc.bd16
+	sc.IRSStack = append(sc.IRSStack, s.l)
+	T().Debugf("new IRS with position %d, nesting level is %d", sc.bd16.firstpos, len(sc.IRSStack)-1)
+}
+
+func (sc *bidiScanner) findBD16ForPos(pos charpos) *bracketPairHandler {
+	irs := sc.IRS[0]
+	bd16 := irs
+	for irs.next != nil { // find most rightward isolating run sequence
+		if irs.firstpos <= pos {
+			if irs.lastpos == 0 || irs.lastpos >= pos {
+				bd16 = irs
+			}
+		}
+		irs = irs.next
+	}
+	if bd16 == nil {
+		panic(fmt.Sprintf("could not find IRS for position %d", pos))
+	}
+	return bd16
+}
+
+// As explained for option TestingMode(…), certain characters are interpreted as
+// isolating run sequence delimiters during testing.
+func setTestingIRSDelimiter(r rune, clz bidi.Class) bidi.Class {
+	switch r {
+	case '>':
+		return bidi.LRI
+	case '<':
+		return bidi.RLI
+	case '=':
+		return bidi.PDI
+	}
+	return clz
+}
+
 // --- Bidi_Classes ----------------------------------------------------------
 
 // We use some additional Bidi_Classes, which reflect additional knowledge about
@@ -303,6 +385,17 @@ func DefaultDirection(dir Direction) Option {
 
 // TestMode will set up the scanner to recognize UPPERCASE letters as having R2L class.
 // This is a common pattern in bidi algorithm development and testing.
+// Additionally we follow a convention of the UAX#9 algorithm documentation:
+// “The invisible, zero-width formatting characters LRI, RLI, and PDI are
+// represented with the symbols '>', '<', and '=', respectively.” Thus it is
+// possible to replay the examples of section 3.4 of UAX#9:
+//
+//     <car MEANS CAR.=
+//
+// or
+//
+//     DID YOU SAY ’>he said “<car MEANS CAR=”=‘?
+//
 func TestMode(b bool) Option {
 	return func(sc *bidiScanner) {
 		if !sc.hasMode(optionTesting) && b ||
