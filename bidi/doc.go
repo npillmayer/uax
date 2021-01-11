@@ -9,6 +9,8 @@ certain rules to determine writing directions. The algorithm is not perfect and
 there are some cases where manual overriding will be necessary to produce correct
 output, but it is good enough for many real-life cases.
 
+Deviations from the Standard
+
 This package will interpret some of the Bidi algorithm's rules a bit differently
 than a strict adhering to the standard would require, the reason being that we
 postulate some general requirements which make it hard to conform to the standard
@@ -16,7 +18,7 @@ postulate some general requirements which make it hard to conform to the standar
 input text: We operate on an `io.Reader` and do not buffer the characters read from
 it. As a consequence, we will never travel backwards over characters and will never
 read a character twice. However, some parts of the UAX#9 algorithm are presented
-as operations on “look-behinds”, or as setting properties per character (Bidi class,
+as operations on “look-behinds,” or as setting properties per character (Bidi class,
 embedding level) or a multi-pass approach. This package employs strategies borrowed
 from parsing theory to arrive at the same results as the original UAX#9 algorithm.
 
@@ -34,9 +36,11 @@ We do not implement legacy formatting directives, which the Annex calls
 “Explicit Directional Embedding and Override Formatting Characters”, i.e. the
 formatting directives LRE, RLE, LRO, RLO and PDF. Unicode recommends sticking
 to the more modern “Isolate Formatting Characters” LRI, RLI, FSI and PDI.
-This package will deal with isolate run sequences produces by isolate formatting
+This package will deal with isolate run sequences produced by isolate formatting
 characters (or external markup) only. The need to deal with legacy formatting
 characters may arise in the future, but currently I do not plan to implement them.
+
+API
 
 As the algorithms in this package will not copy any input characters, it leaves
 the burden to store the text to the calling client. This package will return
