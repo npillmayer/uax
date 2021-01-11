@@ -105,8 +105,8 @@ func TestSimple(t *testing.T) {
 	reader := strings.NewReader("hello 123.45")
 	ordering := ResolveParagraph(reader, TestMode(true))
 	fmt.Printf("resulting ordering = %s\n", ordering)
-	if len(ordering.scraps) != 1 || ordering.scraps[0].bidiclz != bidi.L {
-		t.Errorf("expected ordering to be L + NI + L, is '%s'", ordering)
+	if len(ordering.scraps) != 3 || ordering.scraps[1].bidiclz != bidi.L {
+		t.Errorf("expected ordering to be L, is '%s'", ordering.scraps)
 	}
 }
 
@@ -121,22 +121,23 @@ func TestBrackets(t *testing.T) {
 	reader := strings.NewReader("hello (World)")
 	ordering := ResolveParagraph(reader, TestMode(true))
 	fmt.Printf("resulting ordering = %s\n", ordering)
-	if len(ordering.scraps) != 3 || ordering.scraps[2].bidiclz != bidi.L {
-		t.Errorf("expected ordering to be L + R + L, is '%s'", ordering)
+	if len(ordering.scraps) != 5 || ordering.scraps[3].bidiclz != bidi.L {
+		t.Errorf("expected ordering to be L + R + L, is '%s'", ordering.scraps)
 	}
 }
 
 func TestIRS(t *testing.T) {
 	//gtrace.CoreTracer = gotestingadapter.New()
-	gtrace.CoreTracer = gologadapter.New()
 	//teardown := gotestingadapter.RedirectTracing(t)
 	//defer teardown()
+	//
+	gtrace.CoreTracer = gologadapter.New()
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	reader := strings.NewReader("hel<lo WORLD=")
 	ordering := ResolveParagraph(reader, TestMode(true))
 	fmt.Printf("resulting ordering = %s\n", ordering)
-	if len(ordering.scraps) != 3 || ordering.scraps[2].bidiclz != bidi.L {
-		t.Errorf("expected ordering to be L + R + L, is '%s'", ordering)
+	if len(ordering.scraps) != 4 || ordering.scraps[1].bidiclz != bidi.L {
+		t.Errorf("expected ordering to be L, is '%v'", ordering.scraps)
 	}
 }

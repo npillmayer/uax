@@ -31,10 +31,10 @@ type charpos uint32 // position of a character within a paragraph
 // The resulting scrap represents a text interval with left-to-right direction.
 
 type scrap struct {
-	bidiclz bidi.Class // bidi character class of this scrap
-	l, r    charpos    // left and right bounds, r not included
-	context dirContext // directional context
-	child   *scrap     // some scraps may have a child worth saving
+	bidiclz  bidi.Class // bidi character class of this scrap
+	l, r     charpos    // left and right bounds, r not included
+	context  dirContext // directional context
+	children [][]scrap  // may build up a tree of isolating run sequences
 }
 
 func (s scrap) String() string {
@@ -55,7 +55,26 @@ func (s *scrap) clear() {
 	s.l, s.r = 0, 0
 	s.bidiclz = cNULL
 	s.context = dirContext{}
-	s.child = nil
+	s.children = nil
+}
+
+func (s *scrap) appendChild(ch []scrap) {
+	if ch == nil {
+		return
+	}
+	if s.children == nil {
+		s.children = make([][]scrap, 0, 2)
+	}
+	s.children = append(s.children, ch)
+}
+
+func (s *scrap) appendAllChildrenOf(other scrap) {
+	if other.children == nil || len(other.children) == 0 {
+		return
+	}
+	for _, ch := range other.children {
+		s.appendChild(ch)
+	}
 }
 
 // len returns the length in bytes for a scrap.
@@ -63,9 +82,6 @@ func (s scrap) len() charpos {
 	if s.bidiclz == cNULL {
 		return 0
 	}
-	// if s.bidiclz == cBRACKO || s.bidiclz == cBRACKC {
-	// 	return 1
-	// }
 	return s.r - s.l
 }
 
@@ -73,9 +89,7 @@ func (s scrap) len() charpos {
 // bidi class c.
 func collapse(dest, src scrap, c bidi.Class) scrap {
 	//x := dest
-	if src.child != nil {
-		appendChildren(dest, src)
-	}
+	dest.appendAllChildrenOf(src)
 	dest.r = src.r
 	dest.bidiclz = c
 	//T().Debugf("%s + %s = %s", x, src, dest)

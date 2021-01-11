@@ -184,7 +184,7 @@ func ruleN1_3() (*bidiRule, []byte) {
 		action: func(match []scrap) ([]scrap, int, bool) {
 			collapse(match[0], match[1], bidi.R)
 			match[1].bidiclz = bidi.AN
-			match[1].child = match[2].child
+			match[1].appendAllChildrenOf(match[2])
 			return match[:2], 1, false
 		},
 	}, lhs
@@ -199,7 +199,7 @@ func ruleN1_4() (*bidiRule, []byte) {
 		action: func(match []scrap) ([]scrap, int, bool) {
 			collapse(match[0], match[1], bidi.R)
 			match[1].bidiclz = bidi.EN
-			match[1].child = match[2].child
+			match[1].appendAllChildrenOf(match[2])
 			return match[:2], 1, false
 		},
 	}, lhs
@@ -292,9 +292,7 @@ func squash(c bidi.Class, n int, jmp int) ruleAction {
 			if i == 0 {
 				continue
 			}
-			if iv.child != nil {
-				appendChildren(match[0], iv)
-			}
+			match[0].appendAllChildrenOf(iv)
 		}
 		return match[:1], jmp, false
 	}

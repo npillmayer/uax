@@ -55,6 +55,7 @@ type parser struct {
 	stack []scrap            // we manage a stack of bidi class scraps
 	sp    int                // 'pointer' into the stack; start of LHS matching
 	trie  *trie.TinyHashTrie // dictionary of bidi rules
+	spIRS []int              // stack pointers for isolating run sequences
 }
 
 // newParser creates a Parser, which is used to parse paragraphs of text and identify
@@ -65,6 +66,7 @@ func newParser(sc *bidiScanner) (*parser, error) {
 		stack: make([]scrap, 0, 64),
 		trie:  prepareRulesTrie(),
 		sp:    0,
+		spIRS: make([]int, 0, 16),
 	}
 	if p.trie == nil {
 		return nil, errors.New("internal error creating rules table")
@@ -75,7 +77,7 @@ func newParser(sc *bidiScanner) (*parser, error) {
 // reduce applies a rule to the scraps on the stack. It takes n scraps, which need
 // not necessarily be the top scraps, and replaces them with the right-hand-side (RHS)
 // of the applied rule.
-func (p *parser) reduce(n int, rhs []scrap) {
+func (p *parser) reduce(n int, rhs []scrap, startIRS int) {
 	T().Debugf("REDUCE at %d: %d ⇒ %v", p.sp, n, rhs)
 	diff := len(rhs) - n
 	for i, s := range rhs {
@@ -83,7 +85,7 @@ func (p *parser) reduce(n int, rhs []scrap) {
 	}
 	//pos := max(0, len(p.stack)-n+len(rhs)) // avoid jumping left of 0
 	//pos := max(0, len(p.stack)+diff)
-	pos := max(0, p.sp+len(rhs))
+	pos := max(startIRS, p.sp+len(rhs))
 	//T().Debugf("STACK = %v", p.stack)
 	//T().Debugf("sp = %d, diff = %d, pos = %d", p.sp, diff, pos)
 	p.stack = append(p.stack[:pos], p.stack[pos-diff:]...)
@@ -98,14 +100,16 @@ func (p *parser) reduce(n int, rhs []scrap) {
 // pass1 will return false if it has not been terminated by a PDI but rather by
 // reading a (premature) EOF.
 //
-func (p *parser) pass1() bool {
+func (p *parser) pass1(startIRS int) bool {
+	p.sp = startIRS              // start at beginning of isolating run sequence
 	la := 0                      // length of lookahead LA
 	if _, ok := p.read(3); !ok { // initially load 3 scraps
 		return false // no input to read
 	}
 	var rule, shortrule *bidiRule
 	walk := false // if true, accept walking over 1 scrap
-	for {         // scan the complete input sequence (until EOF)
+	pdi := false
+	for { // scan the complete input sequence (until EOF)
 		T().Debugf("EOF=%v", p.eof)
 		la = len(p.stack) - p.sp
 		k, _ := p.read(3 - la) // extend LA to |LA|=3, if possible
@@ -124,11 +128,20 @@ func (p *parser) pass1() bool {
 				T().Debugf("walking over %s", p.stack[p.sp])
 				if p.stack[p.sp].bidiclz == bidi.PDI {
 					p.sp++ // walk over PDI
+					pdi = true
 					break
 				} else if isisolate(p.stack[p.sp]) {
-					// TODO start parseIRS
-					// TODO pack result into cNI child
-					// TODO or repair and backtrack if return = false
+					rhs, startSubIRS, runlen, ok := p.parseIRS(p.sp)
+					if ok { // received a cNI with IRS as single child
+						p.sp = startSubIRS // jump back to start of “IRS match”
+						p.reduce(runlen, rhs, startIRS)
+						p.sp++ // walk over cNI
+						walk = false
+						continue
+					} else {
+						// TODO or repair and backtrack if return = false
+						panic("not yet implemented: repair and backtrack if return = false")
+					}
 				} else {
 					p.sp++ // walk by skipping
 					walk = false
@@ -144,15 +157,15 @@ func (p *parser) pass1() bool {
 		}
 		T().Debugf("applying UAX#9 rule %s", rule.name)
 		rhs, jmp, newL := rule.action(p.stack[p.sp:len(p.stack)])
-		p.reduce(rule.lhsLen, rhs)
+		p.reduce(rule.lhsLen, rhs, startIRS)
 		if newL {
 			bd16 := p.sc.findBD16ForPos(p.stack[p.sp].l)
 			bd16.UpdateClosingBrackets(p.stack[p.sp])
 		}
-		p.sp = max(0, p.sp+jmp) // avoid jumping left of 0
+		p.sp = max(startIRS, p.sp+jmp) // avoid jumping left of 0
 		walk = false
 	}
-	return !p.eof
+	return pdi
 }
 
 // nextInputScrap reads the next scrap from the scanner pipe. It returns a
@@ -198,15 +211,15 @@ func (p *parser) read(n int) (int, bool) {
 // sequence. If an isolating run sequence has just, say, left-to-right text,
 // there should be only a single scrap on the stack with bidi class L.
 //
-func (p *parser) pass2() {
-	p.sp = 0
+func (p *parser) pass2(startIRS int) {
+	p.sp = startIRS
 	for p.sp < len(p.stack) {
 		e := min(len(p.stack), p.sp+3)
 		T().Debugf("trying to match %v at %d", p.stack[p.sp:e], p.sp)
 		//if p.stack[p.sp].bidiclz == cBRACKC {
 		if isbracket(p.stack[p.sp]) {
 			jmp := p.performRuleN0()
-			p.sp = max(0, p.sp+jmp) // avoid jumping left of 0
+			p.sp = max(startIRS, p.sp+jmp) // avoid jumping left of 0
 			continue
 		}
 		rule, _ := p.matchRulesLHS(p.stack[p.sp:len(p.stack)], 2)
@@ -216,7 +229,7 @@ func (p *parser) pass2() {
 		}
 		T().Debugf("applying UAX#9 rule %s", rule.name)
 		rhs, jmp, _ := rule.action(p.stack[p.sp:len(p.stack)])
-		p.reduce(rule.lhsLen, rhs)
+		p.reduce(rule.lhsLen, rhs, startIRS)
 		p.sp = max(0, p.sp+jmp) // avoid jumping left of 0
 	}
 }
@@ -293,29 +306,57 @@ func (p *parser) performRuleN0() (jmp int) {
 func (p *parser) Ordering() *Ordering {
 	p.pipe = make(chan scrap, 0)
 	go p.sc.Scan(p.pipe)
-	p.parseIRS()
-	return &Ordering{scraps: p.stack}
+	initial := p.sc.initialOuterScrap()
+	if initial.Context() == bidi.R {
+		initial.bidiclz = bidi.RLI
+	} else {
+		initial.bidiclz = bidi.LRI
+	}
+	//initial.r = initial.l // is default; IRS delimiters have size 0
+	p.stack = append(p.stack, initial) // start outer-most stack with syntetic IRS delimiter
+	runs, _, _, _ := p.parseIRS(0)
+	end := runs[len(runs)-1].r
+	runs = append(runs, scrap{
+		l:       end,
+		r:       end,
+		bidiclz: bidi.PDI,
+	})
+	return &Ordering{scraps: runs}
 }
 
-func (p *parser) parseIRS() ([]scrap, bool) {
-	outerStack := p.stack
-	outerSP := p.sp
-	localStack := make([]scrap, 0, 64)
-	p.stack = localStack
-	T().Debugf("------ pass 1 ------")
-	ok := p.pass1()
-	T().Debugf("--------------------")
+func (p *parser) parseIRS(startIRS int) ([]scrap, int, int, bool) {
+	p.spIRS = append(p.spIRS, startIRS) // put start of isolating run sequence on IRS stack
+	T().Debugf("------ pass 1 (%d) ------", len(p.spIRS))
+	T().Debugf("starting pass 1 with stack %v", p.stack[startIRS:])
+	ok := p.pass1(startIRS + 1) // start after IRS delimiter
+	T().Debugf("--------- (%d) ----------", len(p.spIRS))
 	T().Debugf("STACK = %v", p.stack)
-	if ok {
-		T().Debugf("------ pass 2 ------")
-		p.pass2()
-		T().Debugf("--------------------")
-	} else { // IRS has been terminated by EOF instead of PDI
+	if ok || len(p.spIRS) == 1 {
+		T().Debugf("------ pass 2 (%d) ------", len(p.spIRS))
+		p.pass2(startIRS)
+		T().Debugf("--------- (%d) ----------", len(p.spIRS))
+	} else if len(p.spIRS) > 1 { // IRS has been terminated by EOF instead of PDI
 		// merge scanner IRS and repair bracket contexts
+		T().Debugf("IRS nesting level=%d", len(p.spIRS))
+		panic("not yet implemented: merge scanner IRS and repair bracket contexts")
 	}
-	p.stack = outerStack
-	p.sp = outerSP
-	return localStack, ok
+	// calculate reduce-parameters for IRS “action”
+	runlen := p.sp - startIRS
+	var result []scrap
+	if len(p.spIRS) > 1 { // if not at top level isolating run sequence
+		ni := scrap{ // prepare a reduce action [IRS scraps] ⇒ [cNI]
+			bidiclz:  cNI,
+			l:        p.stack[startIRS].l,
+			r:        p.stack[startIRS+runlen-1].r,
+			children: [][]scrap{copyStackSegm(p.stack, startIRS, runlen)},
+		}
+		T().Debugf("bidi parser created NI-child %v", ni.children[0])
+		result = []scrap{ni}
+	} else {
+		result = p.stack
+	}
+	p.spIRS = p.spIRS[:len(p.spIRS)-1] // pop this nested isolating run sequence
+	return result, startIRS, runlen, ok
 }
 
 // matchRulesLHS will match a sequence of scraps laying on the stack to left hand
@@ -493,6 +534,12 @@ func allocRule(trie *trie.TinyHashTrie, rule *bidiRule, lhs []byte) {
 }
 
 // ---------------------------------------------------------------------------
+
+func copyStackSegm(a []scrap, start, runlen int) []scrap {
+	cp := make([]scrap, runlen, runlen)
+	copy(cp, a[start:start+runlen])
+	return cp
+}
 
 func min(a, b int) int {
 	if a < b {

@@ -74,7 +74,7 @@ func (sc *bidiScanner) nextRune() (rune, int, bidi.Class, bool) {
 			bidiclz = cBRACKC
 		}
 	}
-	T().Debugf("scanner rune %#U (%s)", r, classString(bidiclz))
+	T().Debugf("bidi scanner rune %#U (%s)", r, classString(bidiclz))
 	return r, length, bidiclz, true
 }
 
@@ -102,7 +102,7 @@ func makeScrap(r rune, clz bidi.Class, pos charpos, length int) scrap {
 //
 func (sc *bidiScanner) Scan(pipe chan<- scrap) {
 	var lookahead scrap
-	current := sc.initCurrentScrap()
+	current := sc.initialOuterScrap()
 	var lastAL charpos // position of last AL character-run in input
 	for {
 		r, length, bidiclz, ok := sc.nextRune() // read the next input rune
@@ -145,7 +145,7 @@ func (sc *bidiScanner) Scan(pipe chan<- scrap) {
 			}
 		} else { // otherwise the current scrap grows
 			current = collapse(current, lookahead, current.bidiclz) // meld LA with current
-			T().Debugf("current = %s, next iteration", current)
+			T().Debugf("current bidi scanner scrap = %s, next iteration", current)
 		}
 	}
 	T().Infof("stopped bidi scanner")
@@ -163,7 +163,7 @@ func (sc *bidiScanner) stop(pipe chan<- scrap) {
 	close(pipe)
 }
 
-func (sc *bidiScanner) initCurrentScrap() scrap {
+func (sc *bidiScanner) initialOuterScrap() scrap {
 	var current scrap
 	current.bidiclz = cNULL
 	if sc.hasMode(optionOuterR2L) {
@@ -213,13 +213,13 @@ func (sc *bidiScanner) prepareRuleBD16(r rune, s scrap) scrap {
 		// is LA not just a bracket, but part of a UAX#9 bracket pair?
 		isbr := sc.bd16.pushOpening(r, s)
 		if isbr {
-			T().Debugf("pushed lookahead onto bracket stack: %s", s)
+			T().Debugf("bidi scanner pushed lookahead onto bracket stack: %s", s)
 			sc.bd16.dump()
 		}
 	} else {
 		found, _ := sc.bd16.findPair(r, s)
 		if found {
-			T().Debugf("popped closing bracket: %s", s)
+			T().Debugf("bidi scanner popped closing bracket: %s", s)
 			sc.bd16.dump()
 		}
 	}
@@ -259,14 +259,14 @@ func (sc *bidiScanner) handleIsolatingRunSwitch(s scrap) {
 	if s.bidiclz == bidi.PDI {
 		// re-establish outer BD16 handler
 		if len(sc.IRSStack) == 0 {
-			T().Debugf("non-paired PDI at position %d", s.l)
+			T().Debugf("bidi scanner found non-paired PDI at position %d", s.l)
 			return
 		}
 		sc.bd16.lastpos = s.l
 		sc.IRSStack = sc.IRSStack[:len(sc.IRSStack)-1] // pop current IRS level
 		tos := sc.IRSStack[len(sc.IRSStack)-1]
 		sc.bd16 = sc.IRS[tos]
-		T().Debugf("PDI read, switch back to outer IRS with position %d", sc.bd16.firstpos)
+		T().Debugf("bidi scanner read PDI, switch back to outer IRS at %d", sc.bd16.firstpos)
 		return
 	}
 	// establish new BD16 handler
@@ -277,7 +277,7 @@ func (sc *bidiScanner) handleIsolatingRunSwitch(s scrap) {
 	sc.bd16 = makeBracketPairHandler(s.l, irs)
 	sc.IRS[s.l] = sc.bd16
 	sc.IRSStack = append(sc.IRSStack, s.l)
-	T().Debugf("new IRS with position %d, nesting level is %d", sc.bd16.firstpos, len(sc.IRSStack)-1)
+	T().Debugf("bidi scanner: new IRS with position %d, nesting level is %d", sc.bd16.firstpos, len(sc.IRSStack)-1)
 }
 
 func (sc *bidiScanner) findBD16ForPos(pos charpos) *bracketPairHandler {
@@ -292,7 +292,7 @@ func (sc *bidiScanner) findBD16ForPos(pos charpos) *bracketPairHandler {
 		irs = irs.next
 	}
 	if bd16 == nil {
-		panic(fmt.Sprintf("could not find IRS for position %d", pos))
+		panic(fmt.Sprintf("bidi scanner: could not find IRS for position %d", pos))
 	}
 	return bd16
 }
