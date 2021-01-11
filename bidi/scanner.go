@@ -3,6 +3,9 @@ package bidi
 // Notes:
 // - Input reader will in most cases be a cord reader
 // - implement Implicit Directional Formatting Characters 	LRM, RLM, ALM
+// - If a IRS turns out to have no matching PDI and should be treated as NI,
+//   nestend IRS levels must be unified and stored bracket pairs must be
+//   corrected. parser will stop IRS after pass 1 and return false
 // - B Paragraph Separator   PARAGRAPH SEPARATOR, appropriate Newline Functions,
 //                           higher-level protocol paragraph determination
 

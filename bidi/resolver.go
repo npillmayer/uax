@@ -9,6 +9,7 @@ import (
 
 	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/uax/bidi/trie"
+	"golang.org/x/text/unicode/bidi"
 )
 
 // --- Parser / Resolver -----------------------------------------------------
@@ -94,11 +95,13 @@ func (p *parser) reduce(n int, rhs []scrap) {
 // cluster of characters. Then we do an immediate match for pass-1 rules, which are
 // basically the Wx-rules from section 3.3.4 “Resolving Weak Types”.
 //
-func (p *parser) pass1() {
-	la := 0            // length of lookahead LA
-	_, ok := p.read(3) // initially load 3 scraps
-	if !ok {
-		return // no input to read
+// pass1 will return false if it has not been terminated by a PDI but rather by
+// reading a (premature) EOF.
+//
+func (p *parser) pass1() bool {
+	la := 0                      // length of lookahead LA
+	if _, ok := p.read(3); !ok { // initially load 3 scraps
+		return false // no input to read
 	}
 	var rule, shortrule *bidiRule
 	walk := false // if true, accept walking over 1 scrap
@@ -109,7 +112,7 @@ func (p *parser) pass1() {
 		la += k
 		//T().Debugf("t=%v, sp=%d, la=%d, walk=%v", t, p.sp, la, walk) //, minMatchLen)
 		if la == 0 {
-			if !p.eof {
+			if !p.eof { // TODO remove this test
 				panic("no LA, but not at EOF?")
 			}
 			break
@@ -119,9 +122,18 @@ func (p *parser) pass1() {
 			rule = shortrule
 			if rule == nil || rule.pass > 1 {
 				T().Debugf("walking over %s", p.stack[p.sp])
-				p.sp++ // walk by skipping
-				walk = false
-				continue
+				if p.stack[p.sp].bidiclz == bidi.PDI {
+					p.sp++ // walk over PDI
+					break
+				} else if isisolate(p.stack[p.sp]) {
+					// TODO start parseIRS
+					// TODO pack result into cNI child
+					// TODO or repair and backtrack if return = false
+				} else {
+					p.sp++ // walk by skipping
+					walk = false
+					continue
+				}
 			}
 		} else { // apply long rule, if present
 			rule, shortrule = p.matchRulesLHS(p.stack[p.sp:len(p.stack)], 0) //minMatchLen)
@@ -140,6 +152,7 @@ func (p *parser) pass1() {
 		p.sp = max(0, p.sp+jmp) // avoid jumping left of 0
 		walk = false
 	}
+	return !p.eof
 }
 
 // nextInputScrap reads the next scrap from the scanner pipe. It returns a
@@ -280,14 +293,29 @@ func (p *parser) performRuleN0() (jmp int) {
 func (p *parser) Ordering() *Ordering {
 	p.pipe = make(chan scrap, 0)
 	go p.sc.Scan(p.pipe)
+	p.parseIRS()
+	return &Ordering{scraps: p.stack}
+}
+
+func (p *parser) parseIRS() ([]scrap, bool) {
+	outerStack := p.stack
+	outerSP := p.sp
+	localStack := make([]scrap, 0, 64)
+	p.stack = localStack
 	T().Debugf("------ pass 1 ------")
-	p.pass1()
+	ok := p.pass1()
 	T().Debugf("--------------------")
 	T().Debugf("STACK = %v", p.stack)
-	T().Debugf("------ pass 2 ------")
-	p.pass2()
-	T().Debugf("--------------------")
-	return &Ordering{scraps: p.stack}
+	if ok {
+		T().Debugf("------ pass 2 ------")
+		p.pass2()
+		T().Debugf("--------------------")
+	} else { // IRS has been terminated by EOF instead of PDI
+		// merge scanner IRS and repair bracket contexts
+	}
+	p.stack = outerStack
+	p.sp = outerSP
+	return localStack, ok
 }
 
 // matchRulesLHS will match a sequence of scraps laying on the stack to left hand
