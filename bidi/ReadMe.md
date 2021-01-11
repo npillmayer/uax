@@ -1,3 +1,5 @@
+## Unicode Bidirectional Algorithm
+
 Package bidi will implement a variant of the Unicode UAX#9 Bidirectional Algorithm.
 It is not fully standards-conforming, but good enough for practical purposes.
 
@@ -8,7 +10,7 @@ certain rules to determine writing directions. The algorithm is not perfect and
 there are some cases where manual overriding will be necessary to produce correct
 output, but it is good enough for many real-life cases.
 
-Deviations from the Standard
+### Deviations from the Standard
 
 This package will interpret some of the Bidi algorithm's rules a bit differently
 than a strict adhering to the standard would require, the reason being that we
@@ -39,7 +41,7 @@ This package will deal with isolate run sequences produced by isolate formatting
 characters (or external markup) only. The need to deal with legacy formatting
 characters may arise in the future, but currently I do not plan to implement them.
 
-API
+### API
 
 As the algorithms in this package will not copy any input characters, it leaves
 the burden to store the text to the calling client. This package will return
