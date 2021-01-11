@@ -19,7 +19,7 @@ input text: We operate on an `io.Reader` and do not buffer the characters read f
 it. As a consequence, we will never travel backwards over characters and will never
 read a character twice. However, some parts of the UAX#9 algorithm are presented
 as operations on “look-behinds,” or as setting properties per character (Bidi class,
-embedding level) or a multi-pass approach. This package employs strategies borrowed
+embedding level) or as a multi-pass approach. This package employs strategies borrowed
 from parsing theory to arrive at the same results as the original UAX#9 algorithm.
 
 That said, this package will implement UAX#9 in a way that conforms to the standard
