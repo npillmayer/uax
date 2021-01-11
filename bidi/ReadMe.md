@@ -1,7 +1,7 @@
 ## Unicode Bidirectional Algorithm
 
 Package bidi will implement a variant of the
-[Unicode UAX#9 Bidirectional Algorithm](http://www.unicode.org/reports/tr9/#Reordering_Resolved_Levels).
+[Unicode UAX#9 Bidirectional Algorithm](http://www.unicode.org/reports/tr9).
 It is not fully standards-conforming, but good enough for practical purposes.
 
 Unicode Annex UAX#9 presents an algorithm to identify directional runs within
