@@ -68,10 +68,67 @@ func newParser(sc *bidiScanner) (*parser, error) {
 		sp:    0,
 		spIRS: make([]int, 0, 16),
 	}
-	if p.trie == nil {
+	if p.trie == nil { // this will never happen if trie size is found by experiment
 		return nil, errors.New("internal error creating rules table")
 	}
-	return p, nil // TODO check sc
+	return p, nil // TODO check for scanner validity?
+}
+
+// --- Parsing ---------------------------------------------------------------
+
+// Ordering starts the parse and returns a bidi-ordering for the input-text gsen
+// when creating the parser.
+func (p *parser) Ordering() *Ordering {
+	p.pipe = make(chan scrap, 0)
+	go p.sc.Scan(p.pipe)                // start the scanner which will process input characters
+	initial := p.sc.initialOuterScrap() // initial pseudo-IRS delimiter
+	if initial.Context() == bidi.R {
+		initial.bidiclz = bidi.RLI // paragraph context is right-to-left
+	} else {
+		initial.bidiclz = bidi.LRI // paragraph context is left-to-right
+	}
+	//initial.r = initial.l // is default; IRS delimiters usually have size 0
+	p.stack = append(p.stack, initial) // start outer-most stack with syntetic IRS delimiter
+	runs, _, _, _ := p.parseIRS(0)     // parse paragraph as outer isolating run sequence
+	end := runs[len(runs)-1].r         // we append a PDI at the end of the result
+	runs = append(runs, scrap{
+		l:       end,
+		r:       end,
+		bidiclz: bidi.PDI,
+	})
+	return &Ordering{scraps: runs}
+}
+
+// nextInputScrap reads the next scrap from the scanner pipe. It returns a
+// new scrap and false if this is the EOF scrap, true otherwise.
+func (p *parser) nextInputScrap(pipe <-chan scrap) (scrap, bool) {
+	T().Debugf("==> reading from pipe")
+	s := <-pipe
+	T().Debugf("    read %s from pipe", s)
+	if s.bidiclz == cNULL {
+		return s, false
+	}
+	return s, true
+}
+
+// read reads k ≤ n bidi clusters from the scanner. If k < n, EOF has been encountered.
+// Returns k.
+func (p *parser) read(n int) (int, bool) {
+	T().Debugf("----> read(%d)", n)
+	if n <= 0 || p.eof {
+		return 0, false
+	}
+	i := 0
+	for ; i < n; i++ { // read n bidi clusters
+		s, ok := p.nextInputScrap(p.pipe)
+		if !ok {
+			p.eof = true
+			break
+		}
+		p.stack = append(p.stack, s)
+	}
+	T().Debugf("have read %d scraps, stack=%v", i, p.stack)
+	return i, true
 }
 
 // reduce applies a rule to the scraps on the stack. It takes n scraps, which need
@@ -83,13 +140,8 @@ func (p *parser) reduce(n int, rhs []scrap, startIRS int) {
 	for i, s := range rhs {
 		p.stack[p.sp+i] = s
 	}
-	//pos := max(0, len(p.stack)-n+len(rhs)) // avoid jumping left of 0
-	//pos := max(0, len(p.stack)+diff)
 	pos := max(startIRS, p.sp+len(rhs))
-	//T().Debugf("STACK = %v", p.stack)
-	//T().Debugf("sp = %d, diff = %d, pos = %d", p.sp, diff, pos)
 	p.stack = append(p.stack[:pos], p.stack[pos-diff:]...)
-	//T().Debugf("STACK = %v", p.stack)
 	T().Debugf("sp=%d, stack-LA is now %v", p.sp, p.stack[p.sp:])
 }
 
@@ -158,38 +210,6 @@ func (p *parser) pass1(startIRS int) bool {
 	return pdi
 }
 
-// nextInputScrap reads the next scrap from the scanner pipe. It returns a
-// new scrap and false if this is the EOF scrap, true otherwise.
-func (p *parser) nextInputScrap(pipe <-chan scrap) (scrap, bool) {
-	T().Debugf("==> reading from pipe")
-	s := <-pipe
-	T().Debugf("    read %s from pipe", s)
-	if s.bidiclz == cNULL {
-		return s, false
-	}
-	return s, true
-}
-
-// read reads k ≤ n bidi clusters from the scanner. If k < n, EOF has been encountered.
-// Returns k.
-func (p *parser) read(n int) (int, bool) {
-	T().Debugf("----> read(%d)", n)
-	if n <= 0 || p.eof {
-		return 0, false
-	}
-	i := 0
-	for ; i < n; i++ { // read n bidi clusters
-		s, ok := p.nextInputScrap(p.pipe)
-		if !ok {
-			p.eof = true
-			break
-		}
-		p.stack = append(p.stack, s)
-	}
-	T().Debugf("have read %d scraps, stack=%v", i, p.stack)
-	return i, true
-}
-
 func (p *parser) applySubIRS(startIRS int) int {
 	rhs, startSubIRS, runlen, ok := p.parseIRS(p.sp)
 	if !ok {
@@ -200,8 +220,9 @@ func (p *parser) applySubIRS(startIRS int) int {
 		if runlen == 0 { // should at least contain IRS start delimiter
 			panic("sub-IRS is void; internal inconsistency")
 		}
-		p.sp = startSubIRS                  // jump back to start of “IRS match”
-		p.reduce(runlen, rhs[1:], startIRS) // insert the complete sub-sequence
+		p.sp = startSubIRS              // jump back to start of “IRS match”
+		rhs[0].bidiclz = cNI            // make LRI/RLI an NI
+		p.reduce(runlen, rhs, startIRS) // insert the complete sub-sequence
 		return max(startIRS, p.sp-2)
 	}
 	// received a cNI with IRS as single child
@@ -232,106 +253,19 @@ func (p *parser) pass2(startIRS int) {
 			p.sp = max(startIRS, p.sp+jmp) // avoid jumping left of 0
 			continue
 		}
-		rule, _ := p.matchRulesLHS(p.stack[p.sp:len(p.stack)], 2)
+		rule, shortrule := p.matchRulesLHS(p.stack[p.sp:len(p.stack)], 2)
 		if rule == nil || rule.pass < 2 {
-			p.sp++
-			continue
+			if shortrule == nil || shortrule.pass < 2 {
+				p.sp++
+				continue
+			}
+			rule = shortrule
 		}
 		T().Debugf("applying UAX#9 rule %s", rule.name)
 		rhs, jmp, _ := rule.action(p.stack[p.sp:len(p.stack)])
 		p.reduce(rule.lhsLen, rhs, startIRS)
 		p.sp = max(0, p.sp+jmp) // avoid jumping left of 0
 	}
-}
-
-// N0. Process bracket pairs in an isolating run sequence sequentially in the logical
-//     order of the text positions of the opening paired brackets using the logic
-//     given below. Within this scope, bidirectional types EN and AN are treated as R.
-//
-func (p *parser) performRuleN0() (jmp int) {
-	T().Debugf("applying UAX#9 rule N0 (bracket pairs) with %s", p.stack[p.sp])
-	jmp = 1 // default is to walk over the bracket
-	if p.stack[p.sp].bidiclz == cBRACKO {
-		// Identify the bracket pairs in the current isolating run sequence according to BD16.
-		openBr := p.stack[p.sp]
-		closeBr, found := p.findCorrespondingBracket(openBr)
-		if !found {
-			T().Debugf("Did not find closing bracket for %s", openBr)
-			closeBr.bidiclz = cNI
-			return
-		}
-		T().Debugf("closing bracket for %s is %s", openBr, closeBr)
-		T().Debugf("closing bracket has context=%v", closeBr.context)
-		T().Debugf("closing bracket has match pos=%d", closeBr.context.matchPos)
-		// a. Inspect the bidirectional types of the characters enclosed within the
-		//    bracket pair.
-		if closeBr.HasEmbeddingMatchAfter(openBr) {
-			// b. If any strong type (either L or R) matching the embedding direction
-			//    is found, set the type for both brackets in the pair to match the
-			//    embedding direction.
-			openBr.bidiclz = openBr.context.embeddingDir
-			jmp = -2
-		} else if closeBr.HasOppositeAfter(openBr) {
-			// c. Otherwise, if there is a strong type it must be opposite the embedding
-			//    direction. Therefore, test for an established context with a preceding
-			//    strong type by checking backwards before the opening paired bracket
-			//    until the first strong type (L, R, or sos) is found.
-			if openBr.StrongContext() == openBr.o() {
-				// c.1. If the preceding strong type is also opposite the embedding
-				//      direction, context is established, so set the type for both
-				//      brackets in the pair to that direction.
-				openBr.bidiclz = opposite(openBr.context.embeddingDir)
-			} else {
-				// c.2. Otherwise set the type for both brackets in the pair to the
-				//      embedding direction.
-				openBr.bidiclz = openBr.context.embeddingDir
-			}
-			jmp = -2
-		} else {
-			T().Debugf("no strong types found within bracket pair")
-			// d. Otherwise, there are no strong types within the bracket pair.
-			//    Therefore, do not set the type for that bracket pair.
-			openBr.bidiclz = cNI
-			jmp = -1
-		}
-		p.changeBracketBidiClass(openBr)
-		p.stack[p.sp] = openBr
-	} else {
-		closeBr := p.stack[p.sp]
-		if openBr, found := p.findCorrespondingBracket(closeBr); found {
-			closeBr.bidiclz = openBr.bidiclz
-		} else {
-			closeBr.bidiclz = cNI
-		}
-		p.stack[p.sp] = closeBr
-		if closeBr.bidiclz != cNI {
-			jmp = -2
-		}
-	}
-	return
-}
-
-// Ordering starts the parse and returns a bidi-ordering for the input-text gsen
-// when creating the parser.
-func (p *parser) Ordering() *Ordering {
-	p.pipe = make(chan scrap, 0)
-	go p.sc.Scan(p.pipe)
-	initial := p.sc.initialOuterScrap()
-	if initial.Context() == bidi.R {
-		initial.bidiclz = bidi.RLI
-	} else {
-		initial.bidiclz = bidi.LRI
-	}
-	//initial.r = initial.l // is default; IRS delimiters have size 0
-	p.stack = append(p.stack, initial) // start outer-most stack with syntetic IRS delimiter
-	runs, _, _, _ := p.parseIRS(0)
-	end := runs[len(runs)-1].r
-	runs = append(runs, scrap{
-		l:       end,
-		r:       end,
-		bidiclz: bidi.PDI,
-	})
-	return &Ordering{scraps: runs}
 }
 
 // parseIRS parses an isolating run sequence (IRS). If everything works out well
@@ -441,6 +375,75 @@ func (p *parser) matchRulesLHS(scraps []scrap, minlen int) (*bidiRule, *bidiRule
 	return rule, shortrule
 }
 
+// --- Handling of paired brackets -------------------------------------------
+
+// N0. Process bracket pairs in an isolating run sequence sequentially in the logical
+//     order of the text positions of the opening paired brackets using the logic
+//     given below. Within this scope, bidirectional types EN and AN are treated as R.
+//
+func (p *parser) performRuleN0() (jmp int) {
+	T().Debugf("applying UAX#9 rule N0 (bracket pairs) with %s", p.stack[p.sp])
+	jmp = 1 // default is to walk over the bracket
+	if p.stack[p.sp].bidiclz == cBRACKO {
+		// Identify the bracket pairs in the current isolating run sequence according to BD16.
+		openBr := p.stack[p.sp]
+		closeBr, found := p.findCorrespondingBracket(openBr)
+		if !found {
+			T().Debugf("Did not find closing bracket for %s", openBr)
+			closeBr.bidiclz = cNI
+			return
+		}
+		T().Debugf("closing bracket for %s is %s", openBr, closeBr)
+		T().Debugf("closing bracket has context=%v", closeBr.context)
+		T().Debugf("closing bracket has match pos=%d", closeBr.context.matchPos)
+		// a. Inspect the bidirectional types of the characters enclosed within the
+		//    bracket pair.
+		if closeBr.HasEmbeddingMatchAfter(openBr) {
+			// b. If any strong type (either L or R) matching the embedding direction
+			//    is found, set the type for both brackets in the pair to match the
+			//    embedding direction.
+			openBr.bidiclz = openBr.context.embeddingDir
+			jmp = -2
+		} else if closeBr.HasOppositeAfter(openBr) {
+			// c. Otherwise, if there is a strong type it must be opposite the embedding
+			//    direction. Therefore, test for an established context with a preceding
+			//    strong type by checking backwards before the opening paired bracket
+			//    until the first strong type (L, R, or sos) is found.
+			if openBr.StrongContext() == openBr.o() {
+				// c.1. If the preceding strong type is also opposite the embedding
+				//      direction, context is established, so set the type for both
+				//      brackets in the pair to that direction.
+				openBr.bidiclz = opposite(openBr.context.embeddingDir)
+			} else {
+				// c.2. Otherwise set the type for both brackets in the pair to the
+				//      embedding direction.
+				openBr.bidiclz = openBr.context.embeddingDir
+			}
+			jmp = -2
+		} else {
+			T().Debugf("no strong types found within bracket pair")
+			// d. Otherwise, there are no strong types within the bracket pair.
+			//    Therefore, do not set the type for that bracket pair.
+			openBr.bidiclz = cNI
+			jmp = -1
+		}
+		p.changeBracketBidiClass(openBr)
+		p.stack[p.sp] = openBr
+	} else {
+		closeBr := p.stack[p.sp]
+		if openBr, found := p.findCorrespondingBracket(closeBr); found {
+			closeBr.bidiclz = openBr.bidiclz
+		} else {
+			closeBr.bidiclz = cNI
+		}
+		p.stack[p.sp] = closeBr
+		if closeBr.bidiclz != cNI {
+			jmp = -2
+		}
+	}
+	return
+}
+
 func (p *parser) findCorrespondingBracket(s scrap) (scrap, bool) {
 	bd16 := p.sc.findBD16ForPos(s.l)
 	pair, found := bd16.FindBracketPairing(s)
@@ -477,83 +480,84 @@ func (o *Ordering) String() string {
 
 // --- Rules trie ------------------------------------------------------------
 
-var rules map[int]*bidiRule      // TODO this is probably not the best idea
+const dictsize = 103 // must be a prime; found through experiments
+
+var rules [dictsize]*bidiRule    // has a smaller memory footprint than a map?!
 var rulesTrie *trie.TinyHashTrie // global dictionary for rules
 var prepareTrieOnce sync.Once    // all parsers will share a single rules dictionary
 
 func prepareRulesTrie() *trie.TinyHashTrie {
-	//prepareTrieOnce.Do(func() {
-	if rules == nil {
-		rules = make(map[int]*bidiRule)
-	}
-	trie, err := trie.NewTinyHashTrie(103, int8(cMAX))
-	if err != nil {
-		T().Errorf(err.Error())
-		panic(err.Error())
-	}
-	var r *bidiRule
-	tracelevel := T().GetTraceLevel()
-	T().SetTraceLevel(tracing.LevelInfo)
-	var lhs []byte
-	// --- allocate all the rules ---
-	r, lhs = ruleW4_1()
-	allocRule(trie, r, lhs)
-	r, lhs = ruleW4_2()
-	allocRule(trie, r, lhs)
-	r, lhs = ruleW4_3()
-	allocRule(trie, r, lhs)
-	r, lhs = ruleW5_1()
-	allocRule(trie, r, lhs)
-	r, lhs = ruleW5_2()
-	allocRule(trie, r, lhs)
-	r, lhs = ruleW6_1()
-	allocRule(trie, r, lhs)
-	r, lhs = ruleW6_2()
-	allocRule(trie, r, lhs)
-	r, lhs = ruleW6_3()
-	allocRule(trie, r, lhs)
-	r, lhs = ruleW7()
-	allocRule(trie, r, lhs)
-	r, lhs = ruleN1_0()
-	allocRule(trie, r, lhs)
-	r, lhs = ruleN1_1()
-	allocRule(trie, r, lhs)
-	r, lhs = ruleN1_2()
-	allocRule(trie, r, lhs)
-	r, lhs = ruleN1_3()
-	allocRule(trie, r, lhs)
-	r, lhs = ruleN1_4()
-	allocRule(trie, r, lhs)
-	r, lhs = ruleN1_5()
-	allocRule(trie, r, lhs)
-	r, lhs = ruleN1_6()
-	allocRule(trie, r, lhs)
-	r, lhs = ruleN1_7()
-	allocRule(trie, r, lhs)
-	r, lhs = ruleN1_8()
-	allocRule(trie, r, lhs)
-	r, lhs = ruleN1_9()
-	allocRule(trie, r, lhs)
-	r, lhs = ruleN1_10()
-	allocRule(trie, r, lhs)
-	r, lhs = ruleL()
-	allocRule(trie, r, lhs)
-	r, lhs = ruleR()
-	allocRule(trie, r, lhs)
-	// ------------------------------
-	trie.Freeze()
-	T().SetTraceLevel(tracelevel)
-	T().Debugf("--- freeze trie -------------")
-	trie.Stats()
-	rulesTrie = trie
-	//})
+	prepareTrieOnce.Do(func() {
+		trie, err := trie.NewTinyHashTrie(dictsize, int8(cMAX))
+		if err != nil {
+			T().Errorf(err.Error())
+			panic(err.Error())
+		}
+		var r *bidiRule
+		tracelevel := T().GetTraceLevel()
+		T().SetTraceLevel(tracing.LevelInfo)
+		var lhs []byte
+		// --- allocate all the rules ---
+		r, lhs = ruleW4_1()
+		allocRule(trie, r, lhs)
+		r, lhs = ruleW4_2()
+		allocRule(trie, r, lhs)
+		r, lhs = ruleW4_3()
+		allocRule(trie, r, lhs)
+		r, lhs = ruleW5_1()
+		allocRule(trie, r, lhs)
+		r, lhs = ruleW5_2()
+		allocRule(trie, r, lhs)
+		r, lhs = ruleW6_1()
+		allocRule(trie, r, lhs)
+		r, lhs = ruleW6_2()
+		allocRule(trie, r, lhs)
+		r, lhs = ruleW6_3()
+		allocRule(trie, r, lhs)
+		r, lhs = ruleW7()
+		allocRule(trie, r, lhs)
+		r, lhs = ruleN1_0()
+		allocRule(trie, r, lhs)
+		r, lhs = ruleN1_1()
+		allocRule(trie, r, lhs)
+		r, lhs = ruleN1_2()
+		allocRule(trie, r, lhs)
+		r, lhs = ruleN1_3()
+		allocRule(trie, r, lhs)
+		r, lhs = ruleN1_4()
+		allocRule(trie, r, lhs)
+		r, lhs = ruleN1_5()
+		allocRule(trie, r, lhs)
+		r, lhs = ruleN1_6()
+		allocRule(trie, r, lhs)
+		r, lhs = ruleN1_7()
+		allocRule(trie, r, lhs)
+		r, lhs = ruleN1_8()
+		allocRule(trie, r, lhs)
+		r, lhs = ruleN1_9()
+		allocRule(trie, r, lhs)
+		r, lhs = ruleN1_10()
+		allocRule(trie, r, lhs)
+		r, lhs = ruleN2()
+		allocRule(trie, r, lhs)
+		r, lhs = ruleL()
+		allocRule(trie, r, lhs)
+		r, lhs = ruleR()
+		allocRule(trie, r, lhs)
+		// ------------------------------
+		trie.Freeze()
+		T().SetTraceLevel(tracelevel)
+		T().Debugf("--- freeze trie -------------")
+		trie.Stats()
+		rulesTrie = trie
+	})
 	return rulesTrie
 }
 
 func allocRule(trie *trie.TinyHashTrie, rule *bidiRule, lhs []byte) {
 	T().Debugf("storing rule %s for LHS=%v", rule.name, lhs)
 	pointer := trie.AllocPositionForWord(lhs)
-	T().Debugf("  -> %d", pointer)
+	//T().Debugf("  -> %d", pointer)
 	rules[pointer] = rule
 }
 

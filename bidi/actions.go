@@ -253,8 +253,20 @@ func ruleN1_10() (*bidiRule, []byte) {
 
 // N2. Any remaining NIs take the embedding direction.
 // NI → e
-// TODO this will not be implemented 1:1, I think.
-//      probably better and easier to include it during flatten operation
+func ruleN2() (*bidiRule, []byte) {
+	lhs := makeLHS(cNI) // NI → e
+	return &bidiRule{
+		name:   "N2",
+		lhsLen: len(lhs),
+		pass:   2,
+		action: func(match []scrap) ([]scrap, int, bool) {
+			ni := match[0]
+			ni.bidiclz = ni.e()
+			T().Debugf("rule N2: produced e=%s with context=%v", ni, ni.context)
+			return []scrap{ni}, -1, false
+		},
+	}, lhs
+}
 
 func ruleL() (*bidiRule, []byte) {
 	lhs := makeLHS(bidi.L, bidi.L)

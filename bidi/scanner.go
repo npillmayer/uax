@@ -232,17 +232,24 @@ func (sc *bidiScanner) prepareRuleBD16(r rune, s scrap) scrap {
 func inheritStrongTypes(dest, src scrap, lastAL charpos) scrap {
 	T().Debugf("inherit %s => %s", src, dest)
 	dest.context = src.context
-	// TODO dest.context.SetStrongType(bidi.AL, lastAL)
-	switch src.bidiclz {
-	case bidi.L, bidi.LRI:
-		dest.context = dest.context.SetStrongType(bidi.L, src.l)
-		T().Debugf("la has L context=%v from %v", dest.context, src.context)
-	case bidi.R, bidi.RLI:
-		dest.context = dest.context.SetStrongType(bidi.R, src.l)
-		T().Debugf("la has R context=%v from %v", dest.context, src.context)
-	case bidi.AL:
-		dest.context = dest.context.SetStrongType(bidi.AL, src.l)
-		T().Debugf("la has AL context=%v from %v", dest.context, src.context)
+	switch dest.bidiclz {
+	case bidi.LRI:
+		dest.context.embeddingDir = bidi.L
+	case bidi.RLI:
+		dest.context.embeddingDir = bidi.R
+	default:
+		dest.context.SetStrongType(bidi.AL, lastAL)
+		switch src.bidiclz {
+		case bidi.L, bidi.LRI:
+			dest.context = dest.context.SetStrongType(bidi.L, src.l)
+			T().Debugf("la has L context=%v from %v", dest.context, src.context)
+		case bidi.R, bidi.RLI:
+			dest.context = dest.context.SetStrongType(bidi.R, src.l)
+			T().Debugf("la has R context=%v from %v", dest.context, src.context)
+		case bidi.AL:
+			dest.context = dest.context.SetStrongType(bidi.AL, src.l)
+			T().Debugf("la has AL context=%v from %v", dest.context, src.context)
+		}
 	}
 	return dest
 }

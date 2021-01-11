@@ -9,7 +9,7 @@ import (
 	"github.com/npillmayer/schuko/tracing"
 	"golang.org/x/text/unicode/bidi"
 
-	"github.com/npillmayer/schuko/tracing/gologadapter"
+	//"github.com/npillmayer/schuko/tracing/gologadapter"
 	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 )
 
@@ -101,6 +101,7 @@ func TestSimple(t *testing.T) {
 	gtrace.CoreTracer = gotestingadapter.New()
 	teardown := gotestingadapter.RedirectTracing(t)
 	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	reader := strings.NewReader("hello 123.45")
 	ordering := ResolveParagraph(reader, TestMode(true))
@@ -114,46 +115,53 @@ func TestBrackets(t *testing.T) {
 	gtrace.CoreTracer = gotestingadapter.New()
 	teardown := gotestingadapter.RedirectTracing(t)
 	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	// gtrace.CoreTracer = gologadapter.New()
 	// gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
-	reader := strings.NewReader("hello (World)")
+	reader := strings.NewReader("hello (WORLD)")
 	ordering := ResolveParagraph(reader, TestMode(true))
 	fmt.Printf("resulting ordering = %s\n", ordering)
-	if len(ordering.scraps) != 5 || ordering.scraps[3].bidiclz != bidi.L {
+	if len(ordering.scraps) != 5 || ordering.scraps[2].bidiclz != bidi.R {
 		t.Errorf("expected ordering to be L + R + L, is '%s'", ordering.scraps)
 	}
 }
 
 func TestIRS(t *testing.T) {
-	//gtrace.CoreTracer = gotestingadapter.New()
-	//teardown := gotestingadapter.RedirectTracing(t)
-	//defer teardown()
-	//
-	gtrace.CoreTracer = gologadapter.New()
+	gtrace.CoreTracer = gotestingadapter.New()
+	teardown := gotestingadapter.RedirectTracing(t)
+	defer teardown()
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	// gtrace.CoreTracer = gologadapter.New()
+	// gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	reader := strings.NewReader("hel<lo WORLD=")
 	ordering := ResolveParagraph(reader, TestMode(true))
 	fmt.Printf("resulting ordering = %s\n", ordering)
-	if len(ordering.scraps) != 4 || ordering.scraps[1].bidiclz != bidi.L {
+	if len(ordering.scraps) != 3 || ordering.scraps[1].bidiclz != bidi.L {
 		t.Errorf("expected ordering to be L, is '%v'", ordering.scraps)
 	}
+	if len(ordering.scraps[1].children) != 1 {
+		t.Errorf("expected sub-IRS to be wrapped as a child, isn't")
+	}
+	fmt.Printf("  %s → %v\n", ordering.scraps[1], ordering.scraps[1].children[0])
 }
 
 func TestIRSLoner(t *testing.T) {
-	//gtrace.CoreTracer = gotestingadapter.New()
-	//teardown := gotestingadapter.RedirectTracing(t)
-	//defer teardown()
-	//
-	gtrace.CoreTracer = gologadapter.New()
+	gtrace.CoreTracer = gotestingadapter.New()
+	teardown := gotestingadapter.RedirectTracing(t)
+	defer teardown()
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	// gtrace.CoreTracer = gologadapter.New()
+	// gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	reader := strings.NewReader("hel<lo WORLD")
 	ordering := ResolveParagraph(reader, TestMode(true))
 	fmt.Printf("resulting ordering = %s\n", ordering)
-	if len(ordering.scraps) != 5 || ordering.scraps[1].bidiclz != bidi.L {
+	if len(ordering.scraps) != 4 || ordering.scraps[1].bidiclz != bidi.L {
 		t.Errorf("expected ordering to be L + R, is '%v'", ordering.scraps)
 	}
 }
