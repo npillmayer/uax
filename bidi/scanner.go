@@ -6,8 +6,10 @@ package bidi
 // - If a IRS turns out to have no matching PDI and should be treated as NI,
 //   nestend IRS levels must be unified and stored bracket pairs must be
 //   corrected. parser will stop IRS after pass 1 and return false
+//   Remark: I will not implement this as I consider it a waste of time
 // - B Paragraph Separator   PARAGRAPH SEPARATOR, appropriate Newline Functions,
 //                           higher-level protocol paragraph determination
+// - TODO remove several safety panics, as soon as package is stable
 
 import (
 	"bufio"

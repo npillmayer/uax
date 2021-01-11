@@ -109,7 +109,7 @@ func (p *parser) pass1(startIRS int) bool {
 	var rule, shortrule *bidiRule
 	walk := false // if true, accept walking over 1 scrap
 	pdi := false
-	for { // scan the complete input sequence (until EOF)
+	for { // scan the input sequence until PDI or EOF
 		T().Debugf("EOF=%v", p.eof)
 		la = len(p.stack) - p.sp
 		k, _ := p.read(3 - la) // extend LA to |LA|=3, if possible
@@ -131,22 +131,12 @@ func (p *parser) pass1(startIRS int) bool {
 					pdi = true
 					break
 				} else if isisolate(p.stack[p.sp]) {
-					rhs, startSubIRS, runlen, ok := p.parseIRS(p.sp)
-					if ok { // received a cNI with IRS as single child
-						p.sp = startSubIRS // jump back to start of “IRS match”
-						p.reduce(runlen, rhs, startIRS)
-						p.sp++ // walk over cNI
-						walk = false
-						continue
-					} else {
-						// TODO or repair and backtrack if return = false
-						panic("not yet implemented: repair and backtrack if return = false")
-					}
+					p.sp = p.applySubIRS(startIRS)
 				} else {
-					p.sp++ // walk by skipping
-					walk = false
-					continue
+					p.sp++ // walk by skipping the current scrap without applying a rule
 				}
+				walk = false
+				continue
 			}
 		} else { // apply long rule, if present
 			rule, shortrule = p.matchRulesLHS(p.stack[p.sp:len(p.stack)], 0) //minMatchLen)
@@ -198,6 +188,26 @@ func (p *parser) read(n int) (int, bool) {
 	}
 	T().Debugf("have read %d scraps, stack=%v", i, p.stack)
 	return i, true
+}
+
+func (p *parser) applySubIRS(startIRS int) int {
+	rhs, startSubIRS, runlen, ok := p.parseIRS(p.sp)
+	if !ok {
+		// we do not repair and backtrack if unclosed IRS
+		irs := p.stack[startSubIRS]
+		T().Infof("bidi resolver detected an unclosed isolate run sequence at %d", irs.l)
+		T().Errorf("bidi resolver won't adhere to UAX#9 for unclosed isolate run sequences")
+		if runlen == 0 { // should at least contain IRS start delimiter
+			panic("sub-IRS is void; internal inconsistency")
+		}
+		p.sp = startSubIRS                  // jump back to start of “IRS match”
+		p.reduce(runlen, rhs[1:], startIRS) // insert the complete sub-sequence
+		return max(startIRS, p.sp-2)
+	}
+	// received a cNI with IRS as single child
+	p.sp = startSubIRS // jump back to start of “IRS match”
+	p.reduce(runlen, rhs, startIRS)
+	return p.sp + 1 // walk over cNI just produced
 }
 
 // pass 2 operates on the scraps laying on the stack, starting at the
@@ -324,6 +334,17 @@ func (p *parser) Ordering() *Ordering {
 	return &Ordering{scraps: runs}
 }
 
+// parseIRS parses an isolating run sequence (IRS). If everything works out well
+// the sub-IRS is delimited by LRI…PDI or RLI…PDI. In these cases the result of the
+// sub-IRS will be attached to a NI-scrap, with the sub-IRS as a child. The calling
+// (outer) IRS will just see the NI, backtrack 2 steps and re-resolve from there.
+//
+// In cases where the closing PDI for an isolating run sequence is missing, pass 1
+// will return !ok. In those cases, the UAX#9 standard would require us to drop the
+// loner LRI/RLI and backtrack, re-evalutating the context starting at the beginning
+// of the outer IRS. However, I will not follow the standard in this respect. For a
+// discussion of why this is, please refer to the ReadMe of the github repo.
+//
 func (p *parser) parseIRS(startIRS int) ([]scrap, int, int, bool) {
 	p.spIRS = append(p.spIRS, startIRS) // put start of isolating run sequence on IRS stack
 	T().Debugf("------ pass 1 (%d) ------", len(p.spIRS))
@@ -335,15 +356,18 @@ func (p *parser) parseIRS(startIRS int) ([]scrap, int, int, bool) {
 		T().Debugf("------ pass 2 (%d) ------", len(p.spIRS))
 		p.pass2(startIRS)
 		T().Debugf("--------- (%d) ----------", len(p.spIRS))
-	} else if len(p.spIRS) > 1 { // IRS has been terminated by EOF instead of PDI
-		// merge scanner IRS and repair bracket contexts
-		T().Debugf("IRS nesting level=%d", len(p.spIRS))
-		panic("not yet implemented: merge scanner IRS and repair bracket contexts")
 	}
+	// Handling of unclosed IRSs according to UAX has been abondened.
+	// else if len(p.spIRS) > 1 { // IRS has been terminated by EOF instead of PDI
+	// 	// merge scanner IRS and repair bracket contexts
+	// 	T().Debugf("IRS nesting level=%d", len(p.spIRS))
+	// 	panic("not yet implemented: merge scanner IRS and repair bracket contexts")
+	// }
+
 	// calculate reduce-parameters for IRS “action”
 	runlen := p.sp - startIRS
 	var result []scrap
-	if len(p.spIRS) > 1 { // if not at top level isolating run sequence
+	if ok && len(p.spIRS) > 1 { // if not at top level isolating run sequence
 		ni := scrap{ // prepare a reduce action [IRS scraps] ⇒ [cNI]
 			bidiclz:  cNI,
 			l:        p.stack[startIRS].l,
@@ -353,7 +377,7 @@ func (p *parser) parseIRS(startIRS int) ([]scrap, int, int, bool) {
 		T().Debugf("bidi parser created NI-child %v", ni.children[0])
 		result = []scrap{ni}
 	} else {
-		result = p.stack
+		result = p.stack[startIRS:]
 	}
 	p.spIRS = p.spIRS[:len(p.spIRS)-1] // pop this nested isolating run sequence
 	return result, startIRS, runlen, ok

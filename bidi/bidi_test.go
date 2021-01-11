@@ -141,3 +141,19 @@ func TestIRS(t *testing.T) {
 		t.Errorf("expected ordering to be L, is '%v'", ordering.scraps)
 	}
 }
+
+func TestIRSLoner(t *testing.T) {
+	//gtrace.CoreTracer = gotestingadapter.New()
+	//teardown := gotestingadapter.RedirectTracing(t)
+	//defer teardown()
+	//
+	gtrace.CoreTracer = gologadapter.New()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	reader := strings.NewReader("hel<lo WORLD")
+	ordering := ResolveParagraph(reader, TestMode(true))
+	fmt.Printf("resulting ordering = %s\n", ordering)
+	if len(ordering.scraps) != 5 || ordering.scraps[1].bidiclz != bidi.L {
+		t.Errorf("expected ordering to be L + R, is '%v'", ordering.scraps)
+	}
+}
