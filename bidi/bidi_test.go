@@ -1,7 +1,10 @@
 package bidi
 
 import (
+	"bufio"
 	"fmt"
+	"log"
+	"os"
 	"strings"
 	"testing"
 
@@ -9,7 +12,7 @@ import (
 	"github.com/npillmayer/schuko/tracing"
 	"golang.org/x/text/unicode/bidi"
 
-	//"github.com/npillmayer/schuko/tracing/gologadapter"
+	"github.com/npillmayer/schuko/tracing/gologadapter"
 	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 )
 
@@ -164,4 +167,56 @@ func TestIRSLoner(t *testing.T) {
 	if len(ordering.scraps) != 4 || ordering.scraps[1].bidiclz != bidi.L {
 		t.Errorf("expected ordering to be L + R, is '%v'", ordering.scraps)
 	}
+}
+
+func TestUAXFile(t *testing.T) {
+	// gtrace.CoreTracer = gotestingadapter.New()
+	// teardown := gotestingadapter.RedirectTracing(t)
+	// defer teardown()
+	// gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	gtrace.CoreTracer = gologadapter.New()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	// reader := strings.NewReader("hel<lo WORLD")
+	// ordering := ResolveParagraph(reader, TestMode(true))
+	// fmt.Printf("resulting ordering = %s\n", ordering)
+	// if len(ordering.scraps) != 4 || ordering.scraps[1].bidiclz != bidi.L {
+	// 	t.Errorf("expected ordering to be L + R, is '%v'", ordering.scraps)
+	// }
+	//
+	readBidiTests("./uaxbiditest/BidiCharacterTest.txt")
+}
+
+// ---------------------------------------------------------------------------
+
+const batchsize = 1
+
+func readBidiTests(path string) {
+	file, err := os.Open(path)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	header := true
+	cnt := batchsize
+	for cnt > 0 && scanner.Scan() {
+		//fmt.Println(scanner.Text())
+		line := scanner.Text()
+		if len(line) == 0 {
+			header = false
+		} else if !header {
+			if strings.HasPrefix(line, "#") && !strings.HasSuffix(line, "#") {
+				cnt--
+				fmt.Println(line)
+			}
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		log.Fatal(err)
+	}
+
 }
