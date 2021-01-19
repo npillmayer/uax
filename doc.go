@@ -102,7 +102,7 @@ therefore utilize the helper types from package uax.
 
 We perform segmenting Unicode text based on rules, which are short
 regular expressions, i.e. finite state automata. This corresponds well with
-the formal UAX description of rules.
+the formal UAX description of rules (expect for the bidi rules).
 Every step within a
 rule is performed by executing a function. This function recognizes a single
 code-point class and returns another function. The returned function
@@ -118,8 +118,8 @@ from UAX#29:
 The 'x' denotes a suppressed break. All the identifiers are UAX#29-specific
 classes for code-points. Matching them will call two functions in sequence:
 
-      rule_WB13b(...)   // match ExtendNumLet
-   -> finish_WB13b(...) // match any of ALetter...Katakana
+      rule_WB13b( … )   // match ExtendNumLet
+   -> finish_WB13b( … ) // match any of ALetter … Katakana
 
 The final return value will either signal an accept or abort.
 
@@ -157,11 +157,15 @@ representing the desirability of the break. Negative values denote a
 negative penalty, i.e. a merit. High enough penalties signal the complete
 suppression of a break opportunity, causing the segmenter to not report
 this break.
-
 The UnicodeBreakers in this package (including sub-packages)
-will apply the following logic: (1) Mandatory breaks will have a penalty/merit
-of -1000. (2) Inhibited breaks will have penalty >= 1000.
-(2) Neutral breaks will have a penalty of 0.  */
+will apply the following logic:
+
+(1) Mandatory breaks will have a penalty/merit of -1000 (uax.InfinitePenalty)
+
+(2) Inhibited breaks will have penalty >= 1000 (uax.InfiniteMerits)
+
+(3) Neutral breaks will have a penalty of 0.
+*/
 package uax
 
 import (
@@ -173,3 +177,10 @@ import (
 func CT() tracing.Trace {
 	return gtrace.CoreTracer
 }
+
+// We define constants for flagging break points as infinitely bad and
+// infinitely good, respectively.
+const (
+	InfinitePenalty = 1000
+	InfiniteMerits  = -1000
+)

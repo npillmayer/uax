@@ -111,10 +111,12 @@ type Segmenter struct {
 	buffer                     *bytes.Buffer        // wrapper around activeSegment
 	lastPenalties              [2]int               // penalties at last break opportunity
 	maxSegmentLen              int                  // maximum length allowed for segments
+	primaryAgg, secondaryAgg   uax.PenaltyAggregator
+	primarySeed, secondarySeed int
 	longestActiveMatch         int
 	positionOfBreakOpportunity int
-	atEOF                      bool
 	err                        error
+	atEOF                      bool
 	inUse                      bool // Next() has been called; buffer is in use.
 }
 
@@ -123,16 +125,18 @@ type Segmenter struct {
 const MaxSegmentSize = 64 * 1024
 const startBufSize = 4096 // Size of initial allocation for buffer.
 
-// ErrTooLong is returned if a segment does not fit into the buffer.
+// ErrTooLong flags a buffer overflow.
+// ErrNotInitialized is returned if a segmenters Next-function is called without
+// first setting an input source.
 var (
-	ErrTooLong        = errors.New("segment.Segmenter: segment too long for buffer")
-	ErrNotInitialized = errors.New("Segmenter not initialized: no input; must call Init(...) first")
+	ErrTooLong        = errors.New("UAX segmenter: segment too long for buffer")
+	ErrNotInitialized = errors.New("UAX segmenter not initialized; must call Init(...) first")
 )
 
 // NewSegmenter creates a new Segmenter by providing breaking logic (UnicodeBreaker).
 // Clients may provide more than one UnicodeBreaker. Specifying no
 // UnicodeBreaker results in getting a SimpleWordBreaker, which will
-// simply break on whitespace (see SimpleWordBreaker in this package).
+// break on whitespace (see SimpleWordBreaker in this package).
 //
 // Before using newly created segmenters, clients will have to call Init(...)
 // on them, i.e. initialize them for a rune reader.
@@ -142,6 +146,8 @@ func NewSegmenter(breakers ...uax.UnicodeBreaker) *Segmenter {
 		breakers = []uax.UnicodeBreaker{NewSimpleWordBreaker()}
 	}
 	s.breakers = breakers
+	s.primaryAgg = uax.AddPenalties
+	s.secondaryAgg = uax.AddPenalties
 	return s
 }
 
@@ -167,14 +173,6 @@ func (s *Segmenter) Init(reader io.RuneReader) {
 		s.lastPenalties[1] = 0
 	}
 	s.positionOfBreakOpportunity = -1
-	/*
-		if s.aggregate == nil {
-			s.aggregate = uax.AddPenalties
-		}
-		if s.nullPenalty == nil {
-			s.nullPenalty = tooBad
-		}
-	*/
 }
 
 // Buffer sets the initial buffer to use when scanning and the maximum size of
@@ -183,7 +181,7 @@ func (s *Segmenter) Init(reader io.RuneReader) {
 // If max <= cap(buf), Next() will use this buffer only and do no allocation.
 //
 // By default, Segmenter uses an internal buffer and sets the maximum token size
-// to MaxSegmentntSize.
+// to MaxSegmentSize.
 //
 // Buffer panics if it is called after scanning has started. Clients will have
 // to call Init(...) again to permit re-setting the buffer.
@@ -229,9 +227,9 @@ func (s *Segmenter) SetNullPenalty(bInx int, isNull func(int) bool) {
 }
 */
 
-// Penalties >= 1000 are considered too bad for being a break opportunity.
+// Penalties >= InfinitePenalty are considered too bad for being a break opportunity.
 func tooBad(p int) bool {
-	return p >= 1000
+	return p >= uax.InfinitePenalty
 }
 
 // Next gets the next segment, together with the accumulated penalty for this break.
@@ -279,8 +277,11 @@ func (s *Segmenter) Text() string {
 }
 
 // Penalties returns the last penalties a segmenter calculated.
-func (s *Segmenter) Penalties() [2]int {
-	return s.lastPenalties
+// Two penalties are returned. The first one is the penalty returned from the
+// primary breaker, the second one is the aggregate of all penalties of all the
+// secondary breakers (if any).
+func (s *Segmenter) Penalties() (int, int) {
+	return s.lastPenalties[0], s.lastPenalties[1]
 }
 
 // setErr() records the first error encountered.
@@ -290,14 +291,31 @@ func (s *Segmenter) setErr(err error) {
 	}
 }
 
-// TODO
-/*
-func (s *Segmenter) SetPenaltyAggregator(pa uax.PenaltyAggregator) {
+// SetPenaltyAggregator sets an aggregate function for penalties from the primary
+// breaker.
+// Default is uax.AddPenalties. Not all aggregators may be monoids; for
+// aggregators which are semi-groups (i.e., have not neutral element), a seed
+// is required to give a starting
+// point for aggregation.
+func (s *Segmenter) SetPenaltyAggregator(pa uax.PenaltyAggregator, seed int) {
 	if pa != nil {
-		s.aggregate = pa
+		s.primaryAgg = pa
+		s.primarySeed = seed
 	}
 }
-*/
+
+// SetSecondaryPenaltyAggregator sets an aggregate function for penalties
+// from all the secondary breaks.
+// Default is uax.AddPenalties. Not all aggregators may be monoids; for
+// aggregators which are semi-groups (i.e., have not neutral element), a seed
+// is required to give a starting
+// point for aggregation.
+func (s *Segmenter) SetSecondaryPenaltyAggregator(pa uax.PenaltyAggregator, seed int) {
+	if pa != nil {
+		s.secondaryAgg = pa
+		s.secondarySeed = seed
+	}
+}
 
 func (s *Segmenter) readRune() (err error) {
 	if s.atEOF {
@@ -307,7 +325,7 @@ func (s *Segmenter) readRune() (err error) {
 		r, _, err = s.reader.ReadRune()
 		CT().P("rune", fmt.Sprintf("%+q", r)).Debugf("--------------------------------------")
 		if err == nil {
-			s.deque.PushBack(r, 0, 0)
+			s.deque.PushBack(r, s.primarySeed, s.secondarySeed)
 		} else if err == io.EOF {
 			s.deque.PushBack(eotAtom.r, eotAtom.penalty0, eotAtom.penalty1)
 			s.atEOF = true
@@ -380,12 +398,10 @@ func (s *Segmenter) insertPenalties(bInx int, penalties []int) {
 	}
 	for i, p := range penalties {
 		r, total0, total1 := s.deque.At(l - 1 - i)
-		//total0 = s.aggregate(total0, p)
-		//total1 = s.aggregate(total1, p)
 		if bInx == 0 {
-			total0 = total0 + p
+			total0 = s.primaryAgg(total0, p)
 		} else {
-			total1 = total1 + p
+			total1 = s.secondaryAgg(total1, p)
 		}
 		s.deque.SetAt(l-1-i, r, total0, total1)
 	}
