@@ -78,6 +78,49 @@ func TestScannerScraps(t *testing.T) {
 	}
 }
 
+func TestSimpleReverse(t *testing.T) {
+	gtrace.CoreTracer = gotestingadapter.New()
+	teardown := gotestingadapter.RedirectTracing(t)
+	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	var scraps = [...]scrap{
+		scrap{l: 0, r: 5, bidiclz: bidi.L},
+		scrap{l: 5, r: 10, bidiclz: bidi.R},
+		scrap{l: 10, r: 15, bidiclz: bidi.EN},
+		scrap{l: 15, r: 20, bidiclz: bidi.R},
+	}
+	t.Logf("scraps=%v", scraps)
+	rev := reverse(scraps[:], 0, len(scraps))
+	t.Logf("   rev=%v", rev)
+	if rev[0].bidiclz != bidi.R {
+		t.Fatalf("expected reversed run to have R at position 0, has L")
+	}
+}
+
+func TestSimpleL2RReorder(t *testing.T) {
+	gtrace.CoreTracer = gotestingadapter.New()
+	teardown := gotestingadapter.RedirectTracing(t)
+	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	var scraps = [...]scrap{
+		scrap{l: 0, r: 5, bidiclz: bidi.L},
+		scrap{l: 5, r: 10, bidiclz: bidi.R},
+		scrap{l: 10, r: 15, bidiclz: bidi.EN},
+		scrap{l: 15, r: 20, bidiclz: bidi.R},
+	}
+	t.Logf("scraps=%v", scraps)
+	rev := reorder(scraps[:], 0, len(scraps), LeftToRight)
+	t.Logf("   rev=%v", rev)
+	if rev[0].bidiclz != bidi.L {
+		t.Fatalf("expected reversed run to have L at position 0, has R")
+	}
+	if rev[1].r != 20 {
+		t.Fatalf("expected 2nd (R) to end at position 20, is %d", rev[1].r)
+	}
+}
+
 func TestScannerBrackets(t *testing.T) {
 	gtrace.CoreTracer = gotestingadapter.New()
 	teardown := gotestingadapter.RedirectTracing(t)

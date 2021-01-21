@@ -10,9 +10,9 @@ import (
 // To understand the rules it is probably best to consult the UAX algorithm
 // description. Headers and rule names will be similar to names in UAX#9.
 //
-// Rules are struct which contain an action function. The rule's struct
+// Rules are structs which contain an action function. The rule's struct
 // has an left-hand-side (LHS) part that will be matched against the input text
-// (more specific: against bidi class clusters) and the rule's action will
+// (more specific: against bidi class clusters = scraps) and the rule's action will
 // substitute the LHS with an appropriate RHS.
 //
 // Invariants:
@@ -27,7 +27,7 @@ import (
 type bidiRule struct {
 	name   string     // name of the rule according to UAX#9
 	lhsLen int        // number of symbols in the left hand side (LHS)
-	pass   int        // this is a 2-pass system
+	pass   int        // this is a 2-pass system, every rule is active during just one phase
 	action ruleAction // action to perform on match of LHS
 }
 

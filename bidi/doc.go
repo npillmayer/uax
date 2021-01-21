@@ -112,3 +112,14 @@ const (
 	// from right to left.
 	RightToLeft
 )
+
+// String returns either "L2R" or "R2L".
+func (dir Direction) String() string {
+	switch dir {
+	case LeftToRight:
+		return "L2R"
+	case RightToLeft:
+		return "R2L"
+	}
+	return "unknown direction"
+}

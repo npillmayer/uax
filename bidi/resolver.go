@@ -4,13 +4,26 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strings"
 	"sync"
 
 	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/uax/bidi/trie"
 	"golang.org/x/text/unicode/bidi"
 )
+
+// Some recurring abbreviations used throughout this package:
+//
+// IRS   = isolating run sequence
+// PDI   = a Bidi control signalling the end of an isolating run sequence
+// BD16  = rule BD16 of UAX#9 governs the handling of bracket pairs
+// EOF   = end of file, meaning end of input text
+// LA    = lookahead (a scrap)
+// LHS   = left hand side
+// RHS   = right hand side
+// e, o  = embedding direction and opposite of embedding direction
+//
+// To understand what's going on in the code I highly recommend stepping through
+// UAX#9 and the code side by side.
 
 // --- Parser / Resolver -----------------------------------------------------
 
@@ -35,19 +48,21 @@ import (
 // Resolving means identifying runs of left-to-right or right-to-left text fragements.
 //
 // The subsequent phases (3.4 and 3.5) require the text to be segmented into lines,
-// which is not handled by this package.
+// which is not handled by this package. Reordering is done on a line by line basis
+// and this package contains functions to support that phase, but will not help
+// in line-breaking.
 //
-func ResolveParagraph(inp io.Reader, opts ...Option) *Ordering {
+func ResolveParagraph(inp io.Reader, opts ...Option) *ResolvedLevels {
 	sc := newScanner(inp, opts...)
 	p, err := newParser(sc) // TODO create a global one and re-use it
 	if err != nil {
 		panic(fmt.Sprintf("something went wrong creating a parser: %s", err.Error()))
 	}
-	return p.Ordering()
+	return p.ResolveLevels()
 }
 
 // parser is used to parse paragraphs of text and identify bidi runs.
-// clients will not instantiate one, but rather call bidi.Parse(…)
+// clients will not instantiate one, but rather call bidi.ResolveParagraph(…)
 type parser struct {
 	sc    *bidiScanner       // parser uses a bidi-specific scanner
 	pipe  chan scrap         // communication with the scanner
@@ -76,9 +91,8 @@ func newParser(sc *bidiScanner) (*parser, error) {
 
 // --- Parsing ---------------------------------------------------------------
 
-// Ordering starts the parse and returns a bidi-ordering for the input-text gsen
-// when creating the parser.
-func (p *parser) Ordering() *Ordering {
+// ResolveLevels starts the parse and returns resolved levels for the input-text.
+func (p *parser) ResolveLevels() *ResolvedLevels {
 	p.pipe = make(chan scrap, 0)
 	go p.sc.Scan(p.pipe)                // start the scanner which will process input characters
 	initial := p.sc.initialOuterScrap() // initial pseudo-IRS delimiter
@@ -96,7 +110,7 @@ func (p *parser) Ordering() *Ordering {
 		r:       end,
 		bidiclz: bidi.PDI,
 	})
-	return &Ordering{scraps: runs}
+	return &ResolvedLevels{scraps: runs}
 }
 
 // nextInputScrap reads the next scrap from the scanner pipe. It returns a
@@ -111,7 +125,8 @@ func (p *parser) nextInputScrap(pipe <-chan scrap) (scrap, bool) {
 	return s, true
 }
 
-// read reads k ≤ n bidi clusters from the scanner. If k < n, EOF has been encountered.
+// read reads k ≤ n bidi clusters (scraps) from the scanner. If k < n, EOF has been
+// encountered.
 // Returns k.
 func (p *parser) read(n int) (int, bool) {
 	T().Debugf("----> read(%d)", n)
@@ -459,23 +474,6 @@ func (p *parser) findCorrespondingBracket(s scrap) (scrap, bool) {
 func (p *parser) changeBracketBidiClass(s scrap) {
 	bd16 := p.sc.findBD16ForPos(s.l)
 	bd16.changeOpeningBracketClass(s)
-}
-
-// --- Ordering --------------------------------------------------------------
-
-// An Ordering holds the computed visual order of bidi-runs of a paragraph of text.
-type Ordering struct {
-	// TODO
-	// scraps = runs ?
-	scraps []scrap
-}
-
-func (o *Ordering) String() string {
-	var b strings.Builder
-	for _, s := range o.scraps {
-		b.WriteString(fmt.Sprintf("[%d-%s-%d] ", s.l, classString(s.bidiclz), s.r))
-	}
-	return b.String()
 }
 
 // --- Rules trie ------------------------------------------------------------
