@@ -85,10 +85,10 @@ func TestSimpleReverse(t *testing.T) {
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	var scraps = [...]scrap{
-		scrap{l: 0, r: 5, bidiclz: bidi.L},
-		scrap{l: 5, r: 10, bidiclz: bidi.R},
-		scrap{l: 10, r: 15, bidiclz: bidi.EN},
-		scrap{l: 15, r: 20, bidiclz: bidi.R},
+		{l: 0, r: 5, bidiclz: bidi.L},
+		{l: 5, r: 10, bidiclz: bidi.R},
+		{l: 10, r: 15, bidiclz: bidi.EN},
+		{l: 15, r: 20, bidiclz: bidi.R},
 	}
 	t.Logf("scraps=%v", scraps)
 	rev := reverse(scraps[:], 0, len(scraps))
@@ -105,10 +105,10 @@ func TestSimpleL2RReorder(t *testing.T) {
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	var scraps = [...]scrap{
-		scrap{l: 0, r: 5, bidiclz: bidi.L},
-		scrap{l: 5, r: 10, bidiclz: bidi.R},
-		scrap{l: 10, r: 15, bidiclz: bidi.EN},
-		scrap{l: 15, r: 20, bidiclz: bidi.R},
+		{l: 0, r: 5, bidiclz: bidi.L},
+		{l: 5, r: 10, bidiclz: bidi.R},
+		{l: 10, r: 15, bidiclz: bidi.EN},
+		{l: 15, r: 20, bidiclz: bidi.R},
 	}
 	t.Logf("scraps=%v", scraps)
 	rev := reorder(scraps[:], 0, len(scraps), LeftToRight)
@@ -118,6 +118,64 @@ func TestSimpleL2RReorder(t *testing.T) {
 	}
 	if rev[1].r != 20 {
 		t.Fatalf("expected 2nd (R) to end at position 20, is %d", rev[1].r)
+	}
+}
+
+func TestRecursiveL2RReorder(t *testing.T) {
+	gtrace.CoreTracer = gotestingadapter.New()
+	teardown := gotestingadapter.RedirectTracing(t)
+	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	var scraps = [...]scrap{
+		{l: 0, r: 10, bidiclz: bidi.R},
+		{l: 10, r: 15, bidiclz: bidi.EN},
+		{l: 15, r: 20, bidiclz: bidi.R},
+		{l: 20, r: 50, bidiclz: bidi.L},
+	}
+	var chRL = [...]scrap{
+		{l: 40, r: 40, bidiclz: bidi.RLI},
+		{l: 40, r: 40, bidiclz: bidi.R},
+		{l: 40, r: 45, bidiclz: bidi.EN},
+		{l: 45, r: 45, bidiclz: bidi.PDI},
+	}
+	scraps[2].children = append(scraps[2].children, chRL[:])
+	t.Logf("scraps=%v", scraps)
+	rev := reorder(scraps[:], 0, len(scraps), LeftToRight)
+	t.Logf("   rev=%v", rev)
+	if rev[0].bidiclz != bidi.R {
+		t.Fatalf("expected reordered run to have R at position 0, has L")
+	}
+}
+
+func TestFlatten1(t *testing.T) {
+	gtrace.CoreTracer = gotestingadapter.New()
+	teardown := gotestingadapter.RedirectTracing(t)
+	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	var scraps = [...]scrap{
+		{l: 0, r: 10, bidiclz: bidi.R},
+		{l: 10, r: 15, bidiclz: bidi.EN},
+		{l: 15, r: 20, bidiclz: bidi.R},
+		{l: 20, r: 50, bidiclz: bidi.L},
+	}
+	var chRL = [...]scrap{
+		{l: 35, r: 35, bidiclz: bidi.RLI},
+		{l: 35, r: 40, bidiclz: bidi.R},
+		{l: 40, r: 45, bidiclz: bidi.EN},
+		{l: 45, r: 45, bidiclz: bidi.PDI},
+	}
+	scraps[3].children = append(scraps[2].children, chRL[:])
+	t.Logf("scraps=%v", scraps)
+	rev := reorder(scraps[:], 0, len(scraps), LeftToRight)
+	t.Logf("   rev=%v", rev)
+	T().Debugf("=====================================")
+	flat := flatten(rev, LeftToRight)
+	t.Logf("flat runs = %v", flat)
+	//  [{R2L 15 20} {L2R 10 15} {R2L 0 10} {L2R 20 35} {R2L 35 40} {L2R 40 50}]
+	if flat[len(flat)-1].L != 40 {
+		t.Errorf("expected last run to be {L2R 40 50}, is %v", flat[len(flat)-1])
 	}
 }
 
@@ -151,7 +209,7 @@ func TestSimple(t *testing.T) {
 	//
 	reader := strings.NewReader("hello 123.45")
 	ordering := ResolveParagraph(reader, TestMode(true))
-	fmt.Printf("resulting ordering = %s\n", ordering)
+	fmt.Printf("resulting levels = %s\n", ordering)
 	if len(ordering.scraps) != 3 || ordering.scraps[1].bidiclz != bidi.L {
 		t.Errorf("expected ordering to be L, is '%s'", ordering.scraps)
 	}
@@ -168,7 +226,7 @@ func TestBrackets(t *testing.T) {
 	//
 	reader := strings.NewReader("hello (WORLD)")
 	ordering := ResolveParagraph(reader, TestMode(true))
-	fmt.Printf("resulting ordering = %s\n", ordering)
+	fmt.Printf("resulting levels = %s\n", ordering)
 	if len(ordering.scraps) != 5 || ordering.scraps[2].bidiclz != bidi.R {
 		t.Errorf("expected ordering to be L + R + L, is '%s'", ordering.scraps)
 	}
@@ -185,7 +243,7 @@ func TestIRS(t *testing.T) {
 	//
 	reader := strings.NewReader("hel<lo WORLD=")
 	ordering := ResolveParagraph(reader, TestMode(true))
-	fmt.Printf("resulting ordering = %s\n", ordering)
+	fmt.Printf("resulting levels = %s\n", ordering)
 	if len(ordering.scraps) != 3 || ordering.scraps[1].bidiclz != bidi.L {
 		t.Errorf("expected ordering to be L, is '%v'", ordering.scraps)
 	}
@@ -206,7 +264,7 @@ func TestIRSLoner(t *testing.T) {
 	//
 	reader := strings.NewReader("hel<lo WORLD")
 	ordering := ResolveParagraph(reader, TestMode(true))
-	fmt.Printf("resulting ordering = %s\n", ordering)
+	fmt.Printf("resulting levels = %s\n", ordering)
 	if len(ordering.scraps) != 4 || ordering.scraps[1].bidiclz != bidi.L {
 		t.Errorf("expected ordering to be L + R, is '%v'", ordering.scraps)
 	}
@@ -223,7 +281,7 @@ func TestUAXFile(t *testing.T) {
 	//
 	// reader := strings.NewReader("hel<lo WORLD")
 	// ordering := ResolveParagraph(reader, TestMode(true))
-	// fmt.Printf("resulting ordering = %s\n", ordering)
+	// fmt.Printf("resulting levels = %s\n", ordering)
 	// if len(ordering.scraps) != 4 || ordering.scraps[1].bidiclz != bidi.L {
 	// 	t.Errorf("expected ordering to be L + R, is '%v'", ordering.scraps)
 	// }
