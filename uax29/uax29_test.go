@@ -47,7 +47,8 @@ func TestWordBreaks2(t *testing.T) {
 	segmenter.Init(strings.NewReader("lime-tree"))
 	n := 0
 	for segmenter.Next() {
-		t.Logf("'%s'  (p=%v)", segmenter.Text(), segmenter.Penalties())
+		p1, p2 := segmenter.Penalties()
+		t.Logf("'%s'  (p=%d|%d)", segmenter.Text(), p1, p2)
 		n++
 	}
 	if n != 3 {
