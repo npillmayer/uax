@@ -29,7 +29,8 @@ type bidiScanner struct {
 	runeScanner *bufio.Scanner                  // we're using an embedded rune reader
 	bd16        *bracketPairHandler             // support type for handling bracket pairings
 	IRS         map[charpos]*bracketPairHandler // isolating run sequences and their pair handlers
-	IRSStack    []charpos
+	IRSStack    []charpos                       // start positions of IRSs
+	ctxstack    []dirContext                    // context stack for IRSs
 }
 
 // NewScanner creates a scanner for bidi formatting. It will read runs of text
@@ -100,7 +101,7 @@ func makeScrap(r rune, clz bidi.Class, pos charpos, length int) scrap {
 // It will manage internal counters that may overflow when scanning complete texts.
 // As opposed to the generic scanner interface, which will handle character positions
 // as uint64, the bidi scanner has certain internal limits which have to fit into
-// uint16.
+// uint32.
 //
 func (sc *bidiScanner) Scan(pipe chan<- scrap) {
 	var lookahead scrap
@@ -140,6 +141,13 @@ func (sc *bidiScanner) Scan(pipe chan<- scrap) {
 				sc.post(current, pipe) // put current on channel
 			}
 			// proceed ahead, making lookahead the current scrap
+			if isisolate(lookahead) && lookahead.bidiclz != bidi.PDI {
+				sc.ctxstack = append(sc.ctxstack, current.context)
+			} else if current.bidiclz == bidi.PDI {
+				// TODO check for stack empty
+				current.context = sc.ctxstack[len(sc.ctxstack)-1]
+				sc.ctxstack = sc.ctxstack[:len(sc.ctxstack)-1]
+			}
 			lookahead = inheritStrongTypes(lookahead, current, lastAL)
 			current = sc.prepareRuleBD16(r, lookahead)
 			if isAL {
@@ -230,13 +238,14 @@ func (sc *bidiScanner) prepareRuleBD16(r rune, s scrap) scrap {
 
 // isAL is true if dest has been of bidi class AL (before UAX#9 rule W3 changed it)
 func inheritStrongTypes(dest, src scrap, lastAL charpos) scrap {
-	T().Debugf("inherit %s => %s", src, dest)
+	T().Debugf("inherit %s => %s     %v", src, dest, src.context)
 	dest.context = src.context
 	switch dest.bidiclz {
 	case bidi.LRI:
 		dest.context.embeddingDir = bidi.L
 	case bidi.RLI:
 		dest.context.embeddingDir = bidi.R
+		//panic("R2")
 	default:
 		dest.context.SetStrongType(bidi.AL, lastAL)
 		switch src.bidiclz {
@@ -278,6 +287,7 @@ func (sc *bidiScanner) handleIsolatingRunSwitch(s scrap) {
 		T().Debugf("bidi scanner read PDI, switch back to outer IRS at %d", sc.bd16.firstpos)
 		return
 	}
+	T().Debugf("handleIsolatingRunSwitch(%v | %v)", s, s.context)
 	// establish new BD16 handler
 	irs := sc.IRS[0]
 	for irs.next != nil { // find most rightward isolating run sequence

@@ -110,7 +110,10 @@ func (p *parser) ResolveLevels() *ResolvedLevels {
 		r:       end,
 		bidiclz: bidi.PDI,
 	})
-	return &ResolvedLevels{scraps: runs}
+	return &ResolvedLevels{
+		scraps:    runs,
+		embedding: directionFromBidiClass(initial, LeftToRight),
+	}
 }
 
 // nextInputScrap reads the next scrap from the scanner pipe. It returns a
@@ -129,7 +132,7 @@ func (p *parser) nextInputScrap(pipe <-chan scrap) (scrap, bool) {
 // encountered.
 // Returns k.
 func (p *parser) read(n int) (int, bool) {
-	T().Debugf("----> read(%d)", n)
+	//T().Debugf("----> read(%d)", n)
 	if n <= 0 || p.eof {
 		return 0, false
 	}
@@ -142,7 +145,8 @@ func (p *parser) read(n int) (int, bool) {
 		}
 		p.stack = append(p.stack, s)
 	}
-	T().Debugf("have read %d scraps, stack=%v", i, p.stack)
+	T().Debugf("bidi parser: have read %d scraps", i)
+	T().Debugf("bidi parser: stack now %v", p.stack)
 	return i, true
 }
 
@@ -177,7 +181,7 @@ func (p *parser) pass1(startIRS int) bool {
 	walk := false // if true, accept walking over 1 scrap
 	pdi := false
 	for { // scan the input sequence until PDI or EOF
-		T().Debugf("EOF=%v", p.eof)
+		//T().Debugf("EOF=%v", p.eof)
 		la = len(p.stack) - p.sp
 		k, _ := p.read(3 - la) // extend LA to |LA|=3, if possible
 		la += k
@@ -188,7 +192,7 @@ func (p *parser) pass1(startIRS int) bool {
 			}
 			break
 		}
-		T().Debugf("trying to match %v at %d", p.stack[p.sp:len(p.stack)], p.sp)
+		T().Debugf("bidi parser: trying to match %v at %d", p.stack[p.sp:len(p.stack)], p.sp)
 		if walk {
 			rule = shortrule
 			if rule == nil || rule.pass > 1 {
@@ -243,7 +247,8 @@ func (p *parser) applySubIRS(startIRS int) int {
 	// received a cNI with IRS as single child
 	p.sp = startSubIRS // jump back to start of “IRS match”
 	p.reduce(runlen, rhs, startIRS)
-	return p.sp + 1 // walk over cNI just produced
+	//return p.sp + 1 // walk over cNI just produced
+	return p.sp
 }
 
 // pass 2 operates on the scraps laying on the stack, starting at the
@@ -259,7 +264,7 @@ func (p *parser) applySubIRS(startIRS int) int {
 //
 func (p *parser) pass2(startIRS int) {
 	p.sp = startIRS
-	for p.sp < len(p.stack) {
+	for !p.passed(bidi.PDI) && p.sp < len(p.stack) {
 		e := min(len(p.stack), p.sp+3)
 		T().Debugf("trying to match %v at %d", p.stack[p.sp:e], p.sp)
 		//if p.stack[p.sp].bidiclz == cBRACKC {
@@ -281,6 +286,10 @@ func (p *parser) pass2(startIRS int) {
 		p.reduce(rule.lhsLen, rhs, startIRS)
 		p.sp = max(0, p.sp+jmp) // avoid jumping left of 0
 	}
+}
+
+func (p *parser) passed(c bidi.Class) bool {
+	return p.sp > 0 && p.stack[p.sp-1].bidiclz == c
 }
 
 // parseIRS parses an isolating run sequence (IRS). If everything works out well
@@ -313,6 +322,7 @@ func (p *parser) parseIRS(startIRS int) ([]scrap, int, int, bool) {
 	// 	panic("not yet implemented: merge scanner IRS and repair bracket contexts")
 	// }
 
+	//T().Debugf("pass 2 left: %d … %d (sp)", startIRS, p.sp)
 	// calculate reduce-parameters for IRS “action”
 	runlen := p.sp - startIRS
 	var result []scrap
@@ -512,10 +522,12 @@ func prepareRulesTrie() *trie.TinyHashTrie {
 		allocRule(trie, r, lhs)
 		r, lhs = ruleW6_3()
 		allocRule(trie, r, lhs)
+		r, lhs = ruleW6x()
+		allocRule(trie, r, lhs)
 		r, lhs = ruleW7()
 		allocRule(trie, r, lhs)
-		r, lhs = ruleN1_0()
-		allocRule(trie, r, lhs)
+		// r, lhs = ruleN1_0()
+		// allocRule(trie, r, lhs)
 		r, lhs = ruleN1_1()
 		allocRule(trie, r, lhs)
 		r, lhs = ruleN1_2()

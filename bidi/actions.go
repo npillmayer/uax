@@ -119,6 +119,11 @@ func ruleW6_3() (*bidiRule, []byte) {
 	return makeSquashRule("W6-3", lhs, cNI, 0), lhs
 }
 
+func ruleW6x() (*bidiRule, []byte) {
+	lhs := makeLHS(cNI, cNI)
+	return makeSquashRule("W6-x", lhs, cNI, -1), lhs
+}
+
 // W7. Search backward from each instance of a European number until the
 // first strong type (R, L, or sos) is found. If an L is found, then change the
 // type of the European number to L.
@@ -143,12 +148,12 @@ func ruleW7() (*bidiRule, []byte) {
 }
 
 // ---------------------------------------------------------------------------
-// 3.3.5 Resolving Neutral and Isolate Formatting Types
+// 3.3.5 Resolving Neutral and Iolate Formatting Types
 
-func ruleN1_0() (*bidiRule, []byte) {
-	lhs := makeLHS(cNI, cNI)
-	return makeSquashRule("N1-0", lhs, bidi.L, 0), lhs
-}
+// func ruleN1_0() (*bidiRule, []byte) {
+// 	lhs := makeLHS(cNI, cNI)
+// 	return makeSquashRule("N1-0", lhs, bidi.L, 0), lhs
+// }
 
 // N1. A sequence of NIs takes the direction of the surrounding strong text if the text
 //     on both sides has the same direction. European and Arabic numbers act as if they
@@ -297,10 +302,10 @@ func makeSquashRule(name string, lhs []byte, c bidi.Class, jmp int) *bidiRule {
 func squash(c bidi.Class, n int, jmp int) ruleAction {
 	return func(match []scrap) ([]scrap, int, bool) {
 		last := match[n-1]
-		//T().Debugf("squash: last = %s", last)
+		//T().Debugf("squash: match=%v,  last = %s", match, last)
 		match[0].r = last.r
 		match[0].bidiclz = c
-		for i, iv := range match {
+		for i, iv := range match[:n] {
 			if i == 0 {
 				continue
 			}

@@ -26,7 +26,8 @@ import (
 // ResolvedLevels is a type for holding the result of phase 3.3
 // “Resolving Embedded Levels”.
 type ResolvedLevels struct {
-	scraps []scrap
+	embedding Direction // TODO set this from parser
+	scraps    []scrap
 }
 
 func (rl *ResolvedLevels) String() string {
@@ -133,8 +134,46 @@ func irsContains(scraps []scrap, pos charpos) bool {
 // (i.e., a continuous sequence of characters of a single direction).
 // Type Run holds the positions of characters, not the characters themselves.
 type Run struct {
-	Dir  Direction // either LeftToRight or RightToLeft
-	L, R uint64    // left text position and right text position
+	Dir    Direction // either LeftToRight or RightToLeft
+	Length int64     // length of run in bytes
+	scraps []scrap   //
+	//L, R uint64    // left text position and right text position
+}
+
+func run(s scrap, embedding Direction) Run {
+	return Run{
+		Dir:    directionFromBidiClass(s, embedding),
+		Length: int64(s.len()),
+		scraps: []scrap{s},
+	}
+}
+
+func (r Run) String() string {
+	s := fmt.Sprintf("(%s %d", r.Dir, r.Length)
+	for _, sc := range r.scraps {
+		s += fmt.Sprintf(" %d…%d|%s", sc.l, sc.r, classString(sc.bidiclz))
+	}
+	s += ")"
+	return s
+}
+
+func (r *Run) concat(other Run) {
+	if other.Length == 0 {
+		return
+	}
+	r.Length += other.Length
+	if other.Dir != r.Dir {
+		panic("cannot concat Run with Run of other direction")
+	}
+	lscr := r.scraps[len(r.scraps)-1]
+	ofst := other.scraps[0]
+	if lscr.r == ofst.l {
+		lscr.r = ofst.r
+		r.scraps[len(r.scraps)-1] = lscr
+		r.scraps = append(r.scraps, other.scraps[1:]...)
+	} else {
+		r.scraps = append(r.scraps, other.scraps...)
+	}
 }
 
 // reorder IRS destructively, recursively.
@@ -156,8 +195,16 @@ func reorder(scraps []scrap, i, j int, embedded Direction) []scrap {
 		for _, ch := range s.children {
 			dir := findEmbeddingDir(ch, embedded)
 			T().Debugf("scrap has child = %v", ch)
+			if dir != embedded {
+				T().Debugf("child dir is different from embedding")
+			}
 			reorder(ch, 0, len(ch), dir)
 			T().Debugf("reordered child = %v", ch)
+			if dir != embedded {
+				T().Debugf("reversing total child %v", ch)
+				reverseWithoutIsolates(ch, 0, len(ch))
+				T().Debugf("                child = %v", ch)
+			}
 		}
 		switch state {
 		case 0: // skipping e's, looking for o, EN, AN
@@ -206,6 +253,24 @@ func reverse(scraps []scrap, i, j int) []scrap {
 	return scraps
 }
 
+func reverseWithoutIsolates(scraps []scrap, i, j int) []scrap {
+	if len(scraps) == 0 {
+		return scraps
+	}
+	if i > j {
+		i, j = j, i
+	}
+	j = min(j, len(scraps))
+	if isisolate(scraps[i]) {
+		i++
+	}
+	if isisolate((scraps[j-1])) {
+		j--
+	}
+	T().Debugf("reverse w/ isolates %d…%d : %v", i, j, scraps)
+	return reverse(scraps, i, j)
+}
+
 func findEmbeddingDir(scraps []scrap, inherited Direction) Direction {
 	if len(scraps) == 0 {
 		return inherited
@@ -226,11 +291,14 @@ func findEmbeddingDir(scraps []scrap, inherited Direction) Direction {
 }
 
 func flatten(scraps []scrap, embedding Direction) []Run {
-	T().Debugf("will flatten( %v )", scraps)
+	T().Debugf("will flatten( %v ), emb=%v", scraps, embedding)
 	var runs []Run
 	var last Run
+	if len(scraps) > 0 && isisolate(scraps[0]) {
+		embedding = directionFromBidiClass(scraps[0], embedding)
+	}
 	for _, s := range scraps {
-		T().Debugf("s=%v, |ch|=%d", s, len(s.children))
+		T().Debugf("s=%v, |ch|=%d, last=%v", s, len(s.children), last)
 		if len(s.children) == 0 {
 			last, runs = extendRuns(s, last, runs, embedding)
 			T().Debugf("runs = %v", runs)
@@ -249,7 +317,9 @@ func flatten(scraps []scrap, embedding Direction) []Run {
 			T().Debugf("flattened child = %v", chruns)
 			T().Debugf("----------------------------------------------------------------")
 			last, runs = appendRuns(chruns, last, runs)
+			T().Debugf("runs+child=%v, last=%v", runs, last)
 		}
+		T().Debugf("after children: s=%v, runs=%v", s, runs)
 		last, runs = extendRuns(s, last, runs, embedding)
 		T().Debugf("runs = %v", runs)
 	}
@@ -257,21 +327,32 @@ func flatten(scraps []scrap, embedding Direction) []Run {
 }
 
 func extendRuns(s scrap, last Run, runs []Run, embedding Direction) (Run, []Run) {
+	T().Debugf("extendRuns(%v), last=%v, runs=%v", s, last, runs)
+	if s.len() == 0 { // important. must correlate to semantics of runappend()
+		return last, runs
+	}
 	dir := directionFromBidiClass(s, embedding)
-	if last.R == 0 { // we are at the start of a sequence
-		last.L = uint64(s.l)
-		last.R = uint64(s.r)
-		last.Dir = dir
+	if last.Length == 0 { // we are at the start of a sequence
+		// last.L = uint64(s.l)
+		// last.R = uint64(s.r)
+		last = run(s, embedding)
+		//last.concat(last)
+		//last.Length = int64(s.len())
 		runs = runappend(runs, last)
 	} else if last.Dir == dir { // just extend last with s
-		last.R = uint64(s.r)
+		//last.R = uint64(s.r)
+		last.concat(run(s, embedding))
+		T().Debugf("extending %v with %v", runs, last)
 		runs[len(runs)-1] = last
 	} else { // have to switch directions
-		last = Run{
-			L:   uint64(s.l),
-			R:   uint64(s.r),
-			Dir: dir,
-		}
+		T().Debugf("switching dir")
+		last = run(s, embedding)
+		// last = Run{
+		// 	// L:   uint64(s.l),
+		// 	// R:   uint64(s.r),
+		// 	Dir:    dir,
+		// 	Length: int64(s.len()),
+		// }
 		runs = runappend(runs, last)
 	}
 	return last, runs
@@ -299,7 +380,8 @@ func appendRuns(childRuns []Run, last Run, runs []Run) (Run, []Run) {
 		return last, runs
 	}
 	if childRuns[0].Dir == last.Dir {
-		last.R = childRuns[0].R
+		//last.Length = childRuns[0].Length
+		last.concat(childRuns[0])
 		runs = append(runs, childRuns[1:]...)
 	} else {
 		runs = append(runs, childRuns...)
@@ -309,7 +391,7 @@ func appendRuns(childRuns []Run, last Run, runs []Run) (Run, []Run) {
 }
 
 func runappend(runs []Run, r Run) []Run {
-	if r.R-r.L > 0 {
+	if r.Length > 0 {
 		runs = append(runs, r)
 	}
 	return runs
@@ -317,24 +399,31 @@ func runappend(runs []Run, r Run) []Run {
 
 func directionFromBidiClass(s scrap, embedding Direction) Direction {
 	switch s.bidiclz {
-	case bidi.L:
+	case bidi.L, bidi.LRI:
 		return LeftToRight
-	case bidi.R:
+	case bidi.R, bidi.RLI:
 		return RightToLeft
 	case bidi.EN, bidi.AN:
 		return LeftToRight
+	case bidi.PDI:
+		return embedding
 	}
 	return embedding
 }
 
 // An Ordering holds the computed visual order of bidi-runs of a paragraph of text.
 type Ordering struct {
-	runs []Run
+	Runs []Run
 }
 
 // Reorder reorders runs of resolved levels and returns an ordering reflecting runs
 // of characters with either L2R or R2L direction.
 func (rl *ResolvedLevels) Reorder() *Ordering {
-	//
-	return nil
+	if len(rl.scraps) == 0 {
+		return &Ordering{}
+	}
+	rscr := reorder(rl.scraps, 0, len(rl.scraps), rl.embedding)
+	T().Debugf("=====reorder done, flatten ========")
+	r := flatten(rscr, rl.embedding)
+	return &Ordering{Runs: r}
 }

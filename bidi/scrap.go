@@ -171,6 +171,10 @@ type dirContext struct {
 	matchPos     charpos    // most recent position matching the embedding dir
 }
 
+func (dc dirContext) Print() string {
+	return fmt.Sprintf("«e:%s %s»", classString(dc.embeddingDir), classString((dc.strong)))
+}
+
 // Context is either the strong context or, if that is neutral, the embedding context.
 func (dc dirContext) Context() bidi.Class {
 	if dc.strong == cNI {
@@ -212,7 +216,7 @@ func (dc dirContext) SetStrongType(c bidi.Class, at charpos) dirContext {
 		}
 		dc.odist = uint16(d)
 	}
-	T().Debugf("setting strong type %s at pos=%d, context=%v", classString(c), at, dc)
+	//T().Debugf("setting strong type %s at pos=%d, context=%v", classString(c), at, dc)
 	return dc
 }
 
@@ -226,6 +230,7 @@ func (dc dirContext) SetEmbedding(dir bidi.Direction) dirContext {
 		dc.embeddingDir = bidi.L
 	} else if dir == bidi.RightToLeft {
 		dc.embeddingDir = bidi.R
+		//panic("R")
 	}
 	return dc
 }
