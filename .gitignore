@@ -6,5 +6,6 @@
 *.dot
 *.pdf
 *.code-workspace
+*.swp
 generator
-bidi/,a.txt
+,*.txt
