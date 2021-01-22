@@ -37,14 +37,70 @@ func (rl *ResolvedLevels) String() string {
 	return b.String()
 }
 
-func (rl *ResolvedLevels) Split(uint64) (*ResolvedLevels, *ResolvedLevels) {
+// Split cuts a resolved level run into 2 pieces at position at. The character
+// at position at will be the first character of the second (cut-off) piece.
+//
+// Clients typically use this for line-wrapping. Cut-off level runs (= lines) can then
+// be reordered one by one.
+//
+func (rl *ResolvedLevels) Split(at uint64) (*ResolvedLevels, *ResolvedLevels) {
+	prefix, suffix := split(rl.scraps, charpos(at))
+	return &ResolvedLevels{scraps: prefix}, &ResolvedLevels{scraps: suffix}
+}
+
+func split(scraps []scrap, at charpos) ([]scrap, []scrap) {
 	// resulting level runs end up unbalanced, i.e. the nested IRS are
-	// split, too.
-	//
-	// Is ordering a separate step or do we return 2 orderings directly?
-	// usually only one fragment will be finished, the other one will be
-	// split further, thus ordering should probably a separate step.
-	return nil, nil
+	// split, too. In fact, we need to introduce a LRI/RLI at the beginning of
+	// the right rest and can spare PDIs in left parts.
+	T().Debugf("split @%d, irs = %v", at, scraps)
+	if !irsContains(scraps, at) {
+		return scraps, []scrap{}
+	}
+	for i, s := range scraps {
+		if !s.contains(at) {
+			continue
+		}
+		var restch [][]scrap
+		if len(s.children) > 0 { // TODO omit this
+			T().Debugf("split in %v with |ch|=%d", s, len(s.children))
+			for j, ch := range s.children {
+				if irsContains(ch, at) {
+					prefix, suffix := split(ch, at)
+					restch = [][]scrap{suffix}
+					if j < len(s.children)-1 {
+						restch = append(restch, s.children[j+1:]...)
+					}
+					s.children = s.children[:j]
+					s.children = append(s.children, prefix)
+					break
+				}
+			}
+		}
+		// children are split at this point
+		// restch is set to right part of children split
+		rest := scrap{r: s.r}
+		s.r, rest.l = at, at
+		rest.children = restch
+		rseg := make([]scrap, len(scraps)-i+1)
+		if isisolate(scraps[0]) {
+			rseg[0] = scraps[0] // copy IRS start
+			copy(rseg[1:], scraps[i:])
+			scraps[i], rseg[1] = s, rest
+		} else {
+			copy(rseg, scraps[i:])
+			rseg = rseg[:len(rseg)-1]
+			scraps[i], rseg[0] = s, rest
+		}
+		prefix := scraps[:i+1]
+		T().Debugf("prefix=%v", prefix)
+		T().Debugf("suffix=%v", rseg)
+		return scraps[:i+1], rseg
+	}
+	panic("split iterated over all scraps, did not find cut line")
+}
+
+func irsContains(scraps []scrap, pos charpos) bool {
+	return scraps[0].l <= pos && scraps[len(scraps)-1].r > pos
 }
 
 // The Reordering Phase of the UAX#9 algorithm is basically building a tree

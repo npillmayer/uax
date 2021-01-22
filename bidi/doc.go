@@ -9,8 +9,6 @@ certain rules to determine writing directions. The algorithm is not perfect and
 there are some cases where manual overriding will be necessary to produce correct
 output, but it is good enough for many real-life cases.
 
-Deviations from the Standard
-
 This package will interpret some of the Bidi algorithm's rules a bit differently
 than a strict adhering to the standard would require, the reason being that we
 postulate some general requirements which make it hard to conform to the standard
@@ -22,16 +20,19 @@ as operations on “look-behinds,” or as setting properties per character (Bid
 embedding level) or as a multi-pass approach. This package employs strategies borrowed
 from parsing theory to arrive at the same results as the original UAX#9 algorithm.
 
-That said, this package will implement UAX#9 in a way that conforms to the standard
-for “reasonable texts”, i.e. text produced by humans for humans. Deviation from the
-standard is confined to areas of the standard that deal with rather obscure border
-cases. As an example, the Bidi Annex postulates a clear maximum nesting level of
-bracket pairings (63 levels) per isolating run sequence. However, this package
+Deviations from the Standard
+
+This package implements UAX#9 in a way that is standards-conforming for
+“reasonable texts”, i.e. text produced by humans for humans. Deviations from the
+standard are confined to two areas of the standard: error handling and legacy
+formatting directives.
+
+As an example for error handling, the Bidi Annex postulates a clear maximum nesting
+level of bracket pairings (63 levels) per isolating run sequence. However, this package
 will ignore this boundary in a certain case when markers ending an isolating run
 sequence go missing. The only clients to ever recognize this deviation are most
 probably UAX#9 conformity tests.
 
-There is one limitation, however, which ignores the standard in a relevant way:
 We do not implement legacy formatting directives, which the Annex calls
 “Explicit Directional Embedding and Override Formatting Characters”, i.e. the
 formatting directives LRE, RLE, LRO, RLO and PDF. Unicode recommends sticking

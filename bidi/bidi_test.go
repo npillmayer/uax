@@ -179,6 +179,34 @@ func TestFlatten1(t *testing.T) {
 	}
 }
 
+func TestSplit(t *testing.T) {
+	gtrace.CoreTracer = gotestingadapter.New()
+	teardown := gotestingadapter.RedirectTracing(t)
+	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	var scraps = [...]scrap{
+		{l: 0, r: 0, bidiclz: bidi.LRI},
+		{l: 0, r: 10, bidiclz: bidi.R},
+		{l: 10, r: 15, bidiclz: bidi.EN},
+		{l: 15, r: 20, bidiclz: bidi.R},
+		{l: 20, r: 50, bidiclz: bidi.L},
+		{l: 50, r: 50, bidiclz: bidi.PDI},
+	}
+	var chRL = [...]scrap{
+		{l: 35, r: 35, bidiclz: bidi.RLI},
+		{l: 35, r: 40, bidiclz: bidi.R},
+		{l: 40, r: 45, bidiclz: bidi.EN},
+		{l: 45, r: 45, bidiclz: bidi.PDI},
+	}
+	scraps[4].children = append(scraps[2].children, chRL[:])
+	t.Logf("scraps=%v", scraps)
+	prefix, suffix := split(scraps[:], 37)
+	if len(prefix) != 5 || len(suffix) != 3 {
+		t.Errorf("expected split into 5|3, is not")
+	}
+}
+
 func TestScannerBrackets(t *testing.T) {
 	gtrace.CoreTracer = gotestingadapter.New()
 	teardown := gotestingadapter.RedirectTracing(t)

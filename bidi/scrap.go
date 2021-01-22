@@ -85,6 +85,10 @@ func (s scrap) len() charpos {
 	return s.r - s.l
 }
 
+func (s scrap) contains(pos charpos) bool {
+	return s.l <= pos && s.r > pos
+}
+
 // collapse unifies two input scraps to a single resulting scrap with
 // bidi class c.
 func collapse(dest, src scrap, c bidi.Class) scrap {
