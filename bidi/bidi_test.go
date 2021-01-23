@@ -256,10 +256,10 @@ func TestSimple(t *testing.T) {
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	reader := strings.NewReader("hello 123.45")
-	ordering := ResolveParagraph(reader, TestMode(true))
-	fmt.Printf("resulting levels = %s\n", ordering)
-	if len(ordering.scraps) != 3 || ordering.scraps[1].bidiclz != bidi.L {
-		t.Errorf("expected ordering to be L, is '%s'", ordering.scraps)
+	levels := ResolveParagraph(reader, TestMode(true))
+	fmt.Printf("resulting levels = %s\n", levels)
+	if len(levels.scraps) != 3 || levels.scraps[1].bidiclz != bidi.L {
+		t.Errorf("expected ordering to be L, is '%s'", levels.scraps)
 	}
 }
 
@@ -273,10 +273,10 @@ func TestBrackets(t *testing.T) {
 	// gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	reader := strings.NewReader("hello (WORLD)")
-	ordering := ResolveParagraph(reader, TestMode(true))
-	fmt.Printf("resulting levels = %s\n", ordering)
-	if len(ordering.scraps) != 5 || ordering.scraps[2].bidiclz != bidi.R {
-		t.Errorf("expected ordering to be L + R + L, is '%s'", ordering.scraps)
+	levels := ResolveParagraph(reader, TestMode(true))
+	fmt.Printf("resulting levels = %s\n", levels)
+	if len(levels.scraps) != 5 || levels.scraps[2].bidiclz != bidi.R {
+		t.Errorf("expected ordering to be L + R + L, is '%s'", levels.scraps)
 	}
 }
 
@@ -290,15 +290,15 @@ func TestIRS(t *testing.T) {
 	// gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	reader := strings.NewReader("hel<lo WORLD=")
-	ordering := ResolveParagraph(reader, TestMode(true))
-	fmt.Printf("resulting levels = %s\n", ordering)
-	if len(ordering.scraps) != 3 || ordering.scraps[1].bidiclz != bidi.L {
-		t.Errorf("expected ordering to be L, is '%v'", ordering.scraps)
+	levels := ResolveParagraph(reader, TestMode(true))
+	fmt.Printf("resulting levels = %s\n", levels)
+	if len(levels.scraps) != 3 || levels.scraps[1].bidiclz != bidi.L {
+		t.Errorf("expected ordering to be L, is '%v'", levels.scraps)
 	}
-	if len(ordering.scraps[1].children) != 1 {
+	if len(levels.scraps[1].children) != 1 {
 		t.Errorf("expected sub-IRS to be wrapped as a child, isn't")
 	}
-	fmt.Printf("  %s → %v\n", ordering.scraps[1], ordering.scraps[1].children[0])
+	fmt.Printf("  %s → %v\n", levels.scraps[1], levels.scraps[1].children[0])
 }
 
 func TestIRSLoner(t *testing.T) {
@@ -311,44 +311,130 @@ func TestIRSLoner(t *testing.T) {
 	// gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	reader := strings.NewReader("hel<lo WORLD")
-	ordering := ResolveParagraph(reader, TestMode(true))
-	fmt.Printf("resulting levels = %s\n", ordering)
-	if len(ordering.scraps) != 4 || ordering.scraps[1].bidiclz != bidi.L {
-		t.Errorf("expected ordering to be L + R, is '%v'", ordering.scraps)
+	levels := ResolveParagraph(reader, TestMode(true))
+	fmt.Printf("resulting levels = %s\n", levels)
+	if len(levels.scraps) != 4 || levels.scraps[1].bidiclz != bidi.L {
+		t.Errorf("expected levels to be L + R, is '%v'", levels.scraps)
 	}
 }
-func TestResolveCar3(t *testing.T) {
-	// gtrace.CoreTracer = gotestingadapter.New()
-	// teardown := gotestingadapter.RedirectTracing(t)
-	// defer teardown()
-	// gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
-	//gtrace.CoreTracer.SetTraceLevel(tracing.LevelInfo)
+
+// ===========================================================================
+// Examples from the UAX#9 paper, section 3.4 "Reordering Resolved Levels", L2.
+// ===========================================================================
+
+// First try to resolve level runs for all the examples.
+
+func TestResolveCar1(t *testing.T) {
+	gtrace.CoreTracer = gotestingadapter.New()
+	teardown := gotestingadapter.RedirectTracing(t)
+	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelInfo)
 	//
-	gtrace.CoreTracer = gologadapter.New()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	input := "car means CAR."
+	t.Logf("input of length %d is '%s'", len(input), input)
+	reader := strings.NewReader(input)
+	levels := ResolveParagraph(reader, TestMode(true))
+	t.Logf("resulting levels     = %v\n", levels)
+	if len(levels.scraps) != 5 {
+		t.Fatalf("expected 5 level runs, have %d", len(levels.scraps))
+	}
+	if levels.scraps[1].len() != 10 {
+		t.Errorf("expected L run to be of length 10, is %v", levels.scraps[1])
+	}
+}
+
+func TestResolveCar2(t *testing.T) {
+	gtrace.CoreTracer = gotestingadapter.New()
+	teardown := gotestingadapter.RedirectTracing(t)
+	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelInfo)
+	//
+	input := "<car MEANS CAR.="
+	reader := strings.NewReader(input)
+	levels := ResolveParagraph(reader, TestMode(true))
+	// [0-LRI-0] [0-L-16] [16-PDI-16]
+	// sub: [[[0.RLI] [1-L-4] [4-R-15] [15.PDI]]]
+	t.Logf("resulting levels     = %v\n", levels)
+	if len(levels.scraps) != 3 {
+		t.Fatalf("expected 3 level runs, have %d", len(levels.scraps))
+	}
+	t.Logf("resulting sub-levels = %v\n", levels.scraps[1].children)
+	if len(levels.scraps[1].children) != 1 {
+		t.Fatalf("expected 1 sub level run, have %d", len(levels.scraps[1].children))
+	}
+	if levels.scraps[1].children[0][1].len() != 3 {
+		t.Errorf("expected L-level for 'car' to be of length 3, have car=%v",
+			levels.scraps[1].children[0][1])
+	}
+}
+
+func TestResolveCar3(t *testing.T) {
+	gtrace.CoreTracer = gotestingadapter.New()
+	teardown := gotestingadapter.RedirectTracing(t)
+	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelInfo)
 	//
 	input := "he said “<car MEANS CAR=.” “<IT DOES=,” she agreed."
-	//input := "he said “<car MEANS CAR=.” "
 	t.Logf("input with len=%d : '%v'", len(input), input)
 	reader := strings.NewReader(input)
 	levels := ResolveParagraph(reader, TestMode(true))
 	t.Logf("resulting levels     = %v\n", levels)
 	if len(levels.scraps) != 3 {
-		t.Errorf("expected to get 3 level runs, got %d", len(levels.scraps))
+		t.Fatalf("expected to get 3 level runs, got %d", len(levels.scraps))
 	}
 	t.Logf("      sub levels     = %v\n", levels.scraps[1].children)
 	// [0-LRI-0] [0-L-59] [59-PDI-59]
 	// [[[11.RLI] [12-L-15] [15-R-25] [25.PDI]] [[34.RLI] [35-R-42] [42.PDI]]]
-	t.Fail()
+	if len(levels.scraps[1].children) != 2 {
+		t.Errorf("expected top level to have 2 child runs, has %d", len(levels.scraps[1].children))
+	}
+	if levels.scraps[1].children[0][1].bidiclz != bidi.L {
+		t.Errorf("expected 1st sub-level to have L-run at pos.2, hasn't: %s",
+			levels.scraps[1].children[0][1])
+	}
 }
 
-func TestCAR1(t *testing.T) {
+func TestResolveCar4(t *testing.T) {
 	gtrace.CoreTracer = gotestingadapter.New()
 	teardown := gotestingadapter.RedirectTracing(t)
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelInfo)
 	//
-	reader := strings.NewReader("car means CAR.")
+	input := "DID YOU SAY ’>he said “<car MEANS CAR=”=‘?"
+	t.Logf("input with len=%d : '%v'", len(input), input)
+	reader := strings.NewReader(input)
+	levels := ResolveParagraph(reader, TestMode(true), DefaultDirection(RightToLeft))
+	t.Logf("resulting levels     = %v\n", levels)
+	if len(levels.scraps) != 3 {
+		t.Fatalf("expected to get 3 level runs, got %d", len(levels.scraps))
+	}
+	t.Logf("      sub levels     = %v\n", levels.scraps[1].children)
+	//     top: [0-RLI-0] [0-R-50] [50-PDI-50]
+	//     sub: [[[15.LRI] [16-L-45] [45.PDI]]]
+	// sub-sub: [[[27.RLI] [28-L-31] [31-R-41] [41.PDI]]]
+	if len(levels.scraps[1].children) != 1 {
+		t.Errorf("expected top level to have 1 child run, has %d", len(levels.scraps[1].children))
+	}
+	t.Logf("  sub sub levels     = %v\n", levels.scraps[1].children[0][1].children)
+	if len(levels.scraps[1].children[0][1].children[0]) != 4 {
+		t.Fatalf("expected 2nd sub-level to have 4 level runs, got %d",
+			len(levels.scraps[1].children[0][1].children[0]))
+	}
+	if levels.scraps[1].children[0][1].children[0][1].bidiclz != bidi.L {
+		t.Errorf("expected 2nd sub-level to have L-run at pos.2, hasn't: %s",
+			levels.scraps[1].children[0][1].children[0][1])
+	}
+}
+
+func TestOrderCar1(t *testing.T) {
+	gtrace.CoreTracer = gotestingadapter.New()
+	teardown := gotestingadapter.RedirectTracing(t)
+	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelInfo)
+	//
+	input := "car means CAR."
+	t.Logf("input of length %d is '%s'", len(input), input)
+	reader := strings.NewReader(input)
 	levels := ResolveParagraph(reader, TestMode(true))
 	fmt.Printf("resulting levels     = %v\n", levels)
 	runs := levels.Reorder()
@@ -360,19 +446,24 @@ func TestCAR1(t *testing.T) {
 	if runs.Runs[0].Length != 10 {
 		t.Errorf("expected L2R-run to end at 10, doesn't: %v", runs.Runs[0])
 	}
+	out := applyOrder([]byte(input), runs)
+	disp := display(out)
+	fmt.Printf("display              = \"%s\"\n", disp)
+	target := "car means RAC."
+	if disp != target {
+		t.Errorf("expected display output \"%s\", is \"%s\"", target, disp)
+	}
 }
 
-func TestCAR2(t *testing.T) {
+func TestOrderCar2(t *testing.T) {
 	gtrace.CoreTracer = gotestingadapter.New()
 	teardown := gotestingadapter.RedirectTracing(t)
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelInfo)
 	//
 	input := "<car MEANS CAR.="
 	reader := strings.NewReader(input)
 	levels := ResolveParagraph(reader, TestMode(true))
-	fmt.Printf("resulting levels     = %v\n", levels)
-	fmt.Printf("resulting sub-levels = %v\n", levels.scraps[1].children)
 	runs := levels.Reorder()
 	fmt.Printf("resulting runs       = %v\n", runs.Runs)
 	if len(runs.Runs) != 3 {
@@ -383,40 +474,43 @@ func TestCAR2(t *testing.T) {
 		t.Errorf("expected L2R-run of length 3, is: %v", runs.Runs[1])
 	}
 	out := applyOrder([]byte(input), runs)
-	t.Logf("out = '%s'", display(out))
-	t.Fail()
+	disp := display(out)
+	fmt.Printf("display              = \"%s\"\n", disp)
+	target := ".RAC SNAEM car"
+	if disp != target {
+		t.Errorf("expected display output \"%s\", is \"%s\"", target, disp)
+	}
 }
 
-func TestCAR3(t *testing.T) {
+func TestOrderCar3(t *testing.T) {
 	gtrace.CoreTracer = gotestingadapter.New()
 	teardown := gotestingadapter.RedirectTracing(t)
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelInfo)
 	//
-	//input := "he said “<car MEANS CAR=.” “<IT DOES=,” she agreed."
-	input := "he said “<car MEANS CAR=.” "
+	input := "he said “<car MEANS CAR=.” “<IT DOES=,” she agreed."
+	t.Logf("input = '%s'", input)
 	reader := strings.NewReader(input)
 	levels := ResolveParagraph(reader, TestMode(true))
-	fmt.Printf("resulting levels     = %v\n", levels)
-	//fmt.Printf("resulting sub-levels = %v\n", levels.scraps[1].children)
-	runs := levels.Reorder()
-	fmt.Printf("resulting runs       = %v\n", runs.Runs)
-	if len(runs.Runs) != 3 {
-		t.Errorf("expected 4 resulting runs, but have %d", len(runs.Runs))
-	}
-	if runs.Runs[1].Length != 3 {
-		t.Errorf("expected L2R-run of length 3, is: %v", runs.Runs[1])
-	}
-	// [(L2R 11 0…11|L) (R2L 1 11…12|RLI) (L2R 3 12…15|L) (R2L 16 15…31|R)
-	//  (L2R 4294967276 31…11|L) (R2L 1 11…12|RLI) (L2R 3 12…15|L) (R2L 16 15…31|R)]
 	//
-	// [(L2R 11 0…11|L) (R2L 1 11…12|RLI) (L2R 3 12…15|L) (R2L 19 15…35|R)
-	//  (L2R 4294967265 42…11|L) (R2L 1 11…12|RLI) (L2R 3 12…15|L) (R2L 19 15…35|R)
-	//  (L2R 4294967288 42…34|L) (R2L 14 34…35|RLI 44…48|R 43…44|CS 42…43|PDI 35…42|R)
-	//  (L2R 16 42…58|L) (R2L 1 58…59|R)]
+	runs := levels.Reorder()
+	t.Logf("resulting runs       = %v\n", runs.Runs)
+	if len(runs.Runs) != 7 {
+		t.Errorf("expected 7 resulting bidi runs, but have %d", len(runs.Runs))
+	}
+	if runs.Runs[1].Length != 11 {
+		t.Errorf("expected R2L-run of length 11, is: %v", runs.Runs[1])
+	}
+	// [(L2R 11 0…11|L) (R2L 11 11…12|RLI 15…25|R) (L2R 3 12…15|L) (R2L 1 25…26|PDI)
+	//  (L2R 8 26…34|L) (R2L 9 34…43|RLI) (L2R 16 43…59|L)]
 	out := applyOrder([]byte(input), runs)
-	t.Logf("out = '%s'", display(out))
-	t.Fail()
+	disp := display(out)
+	t.Logf("display              = \"%s\"\n", disp)
+	target := "he said “RAC SNAEM car.” “SEOD TI,” she agreed."
+	if disp != target {
+		t.Logf("expected display output \"%s\"", target)
+		t.Errorf("is \"%s\"", disp)
+	}
 }
 
 func NoTestUAXFile(t *testing.T) {
@@ -438,6 +532,14 @@ func NoTestUAXFile(t *testing.T) {
 	readBidiTests("./uaxbiditest/BidiCharacterTest.txt")
 }
 
+func TestTest(t *testing.T) {
+	input := "he said “<car MEANS CAR=.” “<IT DOES=,” she agreed."
+	s := []byte(input[:11])
+	t.Logf("s = '%s'", s)
+	t.Logf("reversing '%s' = '%s'", s, reverseString(s))
+	t.Fail()
+}
+
 // ---------------------------------------------------------------------------
 
 func applyOrder(text []byte, order *Ordering) []byte {
@@ -446,7 +548,7 @@ func applyOrder(text []byte, order *Ordering) []byte {
 		for _, s := range run.scraps {
 			b := text[s.l:s.r]
 			if run.Dir == RightToLeft {
-				reverseString(b)
+				b = reverseString(b)
 			}
 			r = append(r, b...)
 		}
@@ -454,15 +556,19 @@ func applyOrder(text []byte, order *Ordering) []byte {
 	return r
 }
 
-func reverseString(s []byte) {
+func reverseString(b []byte) []byte {
+	str := string(b)
+	s := []rune(str)
 	for i, j := 0, len(s)-1; i < j; i, j = i+1, j-1 {
 		s[i], s[j] = s[j], s[i]
 	}
+	return []byte(string(s))
 }
 
 func display(b []byte) string {
+	str := []rune(string(b))
 	s := ""
-	for _, c := range b {
+	for _, c := range str {
 		if c == '<' || c == '>' || c == '=' {
 			continue
 		}

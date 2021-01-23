@@ -105,7 +105,7 @@ func makeScrap(r rune, clz bidi.Class, pos charpos, length int) scrap {
 //
 func (sc *bidiScanner) Scan(pipe chan<- scrap) {
 	var lookahead scrap
-	current := sc.initialOuterScrap()
+	current := sc.initialOuterScrap(false)
 	var lastAL charpos // position of last AL character-run in input
 	for {
 		r, length, bidiclz, ok := sc.nextRune() // read the next input rune
@@ -173,13 +173,21 @@ func (sc *bidiScanner) stop(pipe chan<- scrap) {
 	close(pipe)
 }
 
-func (sc *bidiScanner) initialOuterScrap() scrap {
+func (sc *bidiScanner) initialOuterScrap(setIRS bool) scrap {
 	var current scrap
 	current.bidiclz = cNULL
 	if sc.hasMode(optionOuterR2L) {
+		T().Infof("resolving paragraph with R2L embedding context")
 		current.context.SetEmbedding(bidi.RightToLeft)
+		if setIRS {
+			current.bidiclz = bidi.RLI
+		}
 	} else {
+		T().Infof("resolving paragraph with L2R embedding context")
 		current.context.SetEmbedding(bidi.LeftToRight)
+		if setIRS {
+			current.bidiclz = bidi.LRI
+		}
 	}
 	return current
 }
@@ -250,13 +258,13 @@ func inheritStrongTypes(dest, src scrap, lastAL charpos) scrap {
 		dest.context.SetStrongType(bidi.AL, lastAL)
 		switch src.bidiclz {
 		case bidi.L, bidi.LRI:
-			dest.context = dest.context.SetStrongType(bidi.L, src.l)
+			dest.context.SetStrongType(bidi.L, src.l)
 			T().Debugf("la has L context=%v from %v", dest.context, src.context)
 		case bidi.R, bidi.RLI:
-			dest.context = dest.context.SetStrongType(bidi.R, src.l)
+			dest.context.SetStrongType(bidi.R, src.l)
 			T().Debugf("la has R context=%v from %v", dest.context, src.context)
 		case bidi.AL:
-			dest.context = dest.context.SetStrongType(bidi.AL, src.l)
+			dest.context.SetStrongType(bidi.AL, src.l)
 			T().Debugf("la has AL context=%v from %v", dest.context, src.context)
 		}
 	}

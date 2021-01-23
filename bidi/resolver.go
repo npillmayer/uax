@@ -94,14 +94,9 @@ func newParser(sc *bidiScanner) (*parser, error) {
 // ResolveLevels starts the parse and returns resolved levels for the input-text.
 func (p *parser) ResolveLevels() *ResolvedLevels {
 	p.pipe = make(chan scrap, 0)
-	go p.sc.Scan(p.pipe)                // start the scanner which will process input characters
-	initial := p.sc.initialOuterScrap() // initial pseudo-IRS delimiter
-	if initial.Context() == bidi.R {
-		initial.bidiclz = bidi.RLI // paragraph context is right-to-left
-	} else {
-		initial.bidiclz = bidi.LRI // paragraph context is left-to-right
-	}
-	//initial.r = initial.l // is default; IRS delimiters usually have size 0
+	go p.sc.Scan(p.pipe)                    // start the scanner which will process input characters
+	initial := p.sc.initialOuterScrap(true) // initial pseudo-IRS delimiter
+	T().Infof("bidi resolver: initial run starts with %v, context = %v", initial, initial.context)
 	p.stack = append(p.stack, initial) // start outer-most stack with syntetic IRS delimiter
 	runs, _, _, _ := p.parseIRS(0)     // parse paragraph as outer isolating run sequence
 	end := runs[len(runs)-1].r         // we append a PDI at the end of the result

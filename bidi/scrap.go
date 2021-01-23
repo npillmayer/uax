@@ -171,7 +171,7 @@ type dirContext struct {
 	matchPos     charpos    // most recent position matching the embedding dir
 }
 
-func (dc dirContext) Print() string {
+func (dc dirContext) String() string {
 	return fmt.Sprintf("«e:%s %s»", classString(dc.embeddingDir), classString((dc.strong)))
 }
 
@@ -201,9 +201,9 @@ func (dc dirContext) EmbeddingDir() bidi.Class {
 
 // Set position of recent strong type. If it matches the embedding direction
 // and at > the previous matching position, the matching position is updated.
-func (dc dirContext) SetStrongType(c bidi.Class, at charpos) dirContext {
+func (dc *dirContext) SetStrongType(c bidi.Class, at charpos) dirContext {
 	if c != bidi.L && c != bidi.R && c != bidi.AL && c != cNI {
-		return dc
+		return *dc
 	}
 	dc.strong = c
 	if c == dc.embeddingDir && at > dc.matchPos {
@@ -217,7 +217,7 @@ func (dc dirContext) SetStrongType(c bidi.Class, at charpos) dirContext {
 		dc.odist = uint16(d)
 	}
 	//T().Debugf("setting strong type %s at pos=%d, context=%v", classString(c), at, dc)
-	return dc
+	return *dc
 }
 
 // Has the currently last strong type been an AL?
@@ -225,12 +225,11 @@ func (dc dirContext) IsAL() bool {
 	return dc.strong == bidi.AL
 }
 
-func (dc dirContext) SetEmbedding(dir bidi.Direction) dirContext {
+func (dc *dirContext) SetEmbedding(dir bidi.Direction) dirContext {
 	if dir == bidi.LeftToRight {
 		dc.embeddingDir = bidi.L
 	} else if dir == bidi.RightToLeft {
 		dc.embeddingDir = bidi.R
-		//panic("R")
 	}
-	return dc
+	return *dc
 }
