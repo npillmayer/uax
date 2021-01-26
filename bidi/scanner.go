@@ -28,6 +28,8 @@ type bidiScanner struct {
 	mode        uint8                           // scanner modes, set by scanner options
 	runeScanner *bufio.Scanner                  // we're using an embedded rune reader
 	bd16        *bracketPairHandler             // support type for handling bracket pairings
+	markup      OutOfLineBidiMarkup             // markup for isolating run sequence delimiting
+	lastMarkup  int64                           // last position of out-of-line markup
 	IRS         map[charpos]*bracketPairHandler // isolating run sequences and their pair handlers
 	IRSStack    []charpos                       // start positions of IRSs
 	ctxstack    []dirContext                    // context stack for IRSs
@@ -39,10 +41,12 @@ type bidiScanner struct {
 // Clients will provide a Reader and zero or more scanner options. Runes will be
 // read from the reader and possibly concatenated to chunks of text with
 // identical BiDi class (see NextToken).
-func newScanner(input io.Reader, opts ...Option) *bidiScanner {
+func newScanner(input io.Reader, markup OutOfLineBidiMarkup, opts ...Option) *bidiScanner {
 	sc := &bidiScanner{}
 	sc.runeScanner = bufio.NewScanner(input)
 	sc.runeScanner.Split(bufio.ScanRunes)
+	sc.markup = markup
+	sc.lastMarkup = -1
 	sc.bd16 = makeBracketPairHandler(0, nil)
 	sc.IRS = make(map[charpos]*bracketPairHandler)
 	sc.IRS[0] = sc.bd16
@@ -59,7 +63,17 @@ func newScanner(input io.Reader, opts ...Option) *bidiScanner {
 // nextRune reads the next rune from the input reader.
 // Returns the rune, its byte length, bidi class and a flag indicating
 // a valid input (false for EOF).
-func (sc *bidiScanner) nextRune() (rune, int, bidi.Class, bool) {
+func (sc *bidiScanner) nextRune(pos charpos) (rune, int, bidi.Class, bool) {
+	if sc.markup != nil && sc.lastMarkup < int64(pos) {
+		T().Debugf("bidi scanner: checking for markup at position %d", pos)
+		if d := sc.markup(uint64(pos)); int(d) > 0 {
+			switch d {
+			case bidi.LRI, bidi.RLI, bidi.FSI, bidi.PDI:
+				sc.lastMarkup = int64(pos)
+				return 0, 0, d, true
+			}
+		}
+	}
 	if ok := sc.runeScanner.Scan(); !ok {
 		return 0, 0, cNULL, false
 	}
@@ -108,8 +122,8 @@ func (sc *bidiScanner) Scan(pipe chan<- scrap) {
 	current := sc.initialOuterScrap(false)
 	var lastAL charpos // position of last AL character-run in input
 	for {
-		r, length, bidiclz, ok := sc.nextRune() // read the next input rune
-		if !ok {                                // if EOF, drain lookahead and quit
+		r, length, bidiclz, ok := sc.nextRune(current.r) // read the next input rune
+		if !ok {                                         // if EOF, drain lookahead and quit
 			if isisolate(current) { // if last character is PDI
 				sc.handleIsolatingRunSwitch(current)
 			}
@@ -246,7 +260,7 @@ func (sc *bidiScanner) prepareRuleBD16(r rune, s scrap) scrap {
 
 // isAL is true if dest has been of bidi class AL (before UAX#9 rule W3 changed it)
 func inheritStrongTypes(dest, src scrap, lastAL charpos) scrap {
-	T().Debugf("inherit %s => %s     %v", src, dest, src.context)
+	T().Debugf("bidi scanner: inherit %s => %s     %v", src, dest, src.context)
 	dest.context = src.context
 	switch dest.bidiclz {
 	case bidi.LRI:
@@ -259,10 +273,10 @@ func inheritStrongTypes(dest, src scrap, lastAL charpos) scrap {
 		switch src.bidiclz {
 		case bidi.L, bidi.LRI:
 			dest.context.SetStrongType(bidi.L, src.l)
-			T().Debugf("la has L context=%v from %v", dest.context, src.context)
+			T().Debugf("bidi scanner LA has L context=%v from %v", dest.context, src.context)
 		case bidi.R, bidi.RLI:
 			dest.context.SetStrongType(bidi.R, src.l)
-			T().Debugf("la has R context=%v from %v", dest.context, src.context)
+			T().Debugf("bidi scanner LA has R context=%v from %v", dest.context, src.context)
 		case bidi.AL:
 			dest.context.SetStrongType(bidi.AL, src.l)
 			T().Debugf("la has AL context=%v from %v", dest.context, src.context)
@@ -295,7 +309,7 @@ func (sc *bidiScanner) handleIsolatingRunSwitch(s scrap) {
 		T().Debugf("bidi scanner read PDI, switch back to outer IRS at %d", sc.bd16.firstpos)
 		return
 	}
-	T().Debugf("handleIsolatingRunSwitch(%v | %v)", s, s.context)
+	T().Debugf("bidi scanner handleIsolatingRunSwitch(%v | %v)", s, s.context)
 	// establish new BD16 handler
 	irs := sc.IRS[0]
 	for irs.next != nil { // find most rightward isolating run sequence
@@ -337,6 +351,15 @@ func setTestingIRSDelimiter(r rune, clz bidi.Class) bidi.Class {
 	}
 	return clz
 }
+
+// --- Out-of-line markup ----------------------------------------------------
+
+// OutOfLineBidiMarkup is queried during read of input text for out-of-line
+// Bidi delimiters (LRI, RLI, PDI). Such markup may result, e.g., from HTML attributes
+// or CSS styles. It receives a text position and—if appropriate—returns a
+// Bidi class to be inserted. It will be treated by the resolver as a Bidi delimiter
+// of byte-length zero.
+type OutOfLineBidiMarkup func(uint64) bidi.Class
 
 // --- Bidi_Classes ----------------------------------------------------------
 

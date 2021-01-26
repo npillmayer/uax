@@ -52,8 +52,11 @@ import (
 // and this package contains functions to support that phase, but will not help
 // in line-breaking.
 //
-func ResolveParagraph(inp io.Reader, opts ...Option) *ResolvedLevels {
-	sc := newScanner(inp, opts...)
+// markup may be provided to inform the resolver about out-of-line Bidi delimiter
+// locations; can be nil.
+//
+func ResolveParagraph(inp io.Reader, markup OutOfLineBidiMarkup, opts ...Option) *ResolvedLevels {
+	sc := newScanner(inp, markup, opts...)
 	p, err := newParser(sc) // TODO create a global one and re-use it
 	if err != nil {
 		panic(fmt.Sprintf("something went wrong creating a parser: %s", err.Error()))
