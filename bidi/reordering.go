@@ -427,3 +427,13 @@ func (rl *ResolvedLevels) Reorder() *Ordering {
 	r := flatten(rscr, rl.embedding)
 	return &Ordering{Runs: r}
 }
+
+// DirectionAt returns the text direction at byte position pos.
+func (rl *ResolvedLevels) DirectionAt(pos uint64) Direction {
+	for _, s := range rl.scraps {
+		if uint64(s.l) <= pos && pos < uint64(s.r) {
+			return directionFromBidiClass(s, LeftToRight)
+		}
+	}
+	return LeftToRight
+}
