@@ -25,14 +25,15 @@ import (
 // bidiScanner will read runs of text as a unit, as long as all runes therein have the
 // same Bidi class.
 type bidiScanner struct {
-	mode        uint8                           // scanner modes, set by scanner options
-	runeScanner *bufio.Scanner                  // we're using an embedded rune reader
-	bd16        *bracketPairHandler             // support type for handling bracket pairings
-	markup      OutOfLineBidiMarkup             // markup for isolating run sequence delimiting
-	lastMarkup  int64                           // last position of out-of-line markup
-	IRS         map[charpos]*bracketPairHandler // isolating run sequences and their pair handlers
-	IRSStack    []charpos                       // start positions of IRSs
-	ctxstack    []dirContext                    // context stack for IRSs
+	mode          uint8                           // scanner modes, set by scanner options
+	runeScanner   *bufio.Scanner                  // we're using an embedded rune reader
+	bd16          *bracketPairHandler             // support type for handling bracket pairings
+	markup        OutOfLineBidiMarkup             // markup for isolating run sequence delimiting
+	lastMarkupPos int64                           // last position of out-of-line markup
+	lastMarkup    int                             // last / remaining markup
+	IRS           map[charpos]*bracketPairHandler // isolating run sequences and their pair handlers
+	IRSStack      []charpos                       // start positions of IRSs
+	ctxstack      []dirContext                    // context stack for IRSs
 }
 
 // NewScanner creates a scanner for bidi formatting. It will read runs of text
@@ -60,18 +61,37 @@ func newScanner(input io.Reader, markup OutOfLineBidiMarkup, opts ...Option) *bi
 	return sc
 }
 
+func markupToBidi(m int) bidi.Class {
+	switch m {
+	case MarkupLRI, MarkupPDILRI:
+		return bidi.LRI
+	case MarkupRLI, MarkupPDIRLI:
+		return bidi.RLI
+	case MarkupPDI:
+		return bidi.PDI
+	}
+	return 0
+}
+
 // nextRune reads the next rune from the input reader.
 // Returns the rune, its byte length, bidi class and a flag indicating
 // a valid input (false for EOF).
 func (sc *bidiScanner) nextRune(pos charpos) (rune, int, bidi.Class, bool) {
-	if sc.markup != nil && sc.lastMarkup < int64(pos) {
+	if sc.markup != nil && sc.lastMarkup > 0 { // we have a left-over markup to handle
+		sc.lastMarkupPos = int64(pos)
+		last := sc.lastMarkup
+		sc.lastMarkup = 0
+		return 0, 0, markupToBidi(last), true
+	} else if sc.markup != nil && sc.lastMarkupPos < int64(pos) {
 		T().Debugf("bidi scanner: checking for markup at position %d", pos)
 		if d := sc.markup(uint64(pos)); int(d) > 0 {
-			switch bidi.Class(d) {
-			case bidi.LRI, bidi.RLI, bidi.FSI, bidi.PDI:
-				sc.lastMarkup = int64(pos)
-				return 0, 0, bidi.Class(d), true
+			sc.lastMarkupPos = int64(pos)
+			if d&MarkupPDI > 0 { // always handle PDI first
+				sc.lastMarkup = d - MarkupPDI // put other markup half on shelf, if any
+				return 0, 0, bidi.PDI, true
 			}
+			sc.lastMarkup = 0
+			return 0, 0, markupToBidi(d), true
 		}
 	}
 	if ok := sc.runeScanner.Scan(); !ok {
@@ -84,6 +104,12 @@ func (sc *bidiScanner) nextRune(pos charpos) (rune, int, bidi.Class, bool) {
 		panic("bidi package differs in rune interpretation from scanner package")
 	}
 	bidiclz := props.Class()
+	if bidiclz == bidi.B { // paragraph separator read
+		if !sc.hasMode(optionIgnoreParSep) {
+			return 0, 0, cNULL, false // treat is as EOF
+		}
+		bidiclz = bidi.WS // convert it to whitespace
+	}
 	if props.IsBracket() {
 		if props.IsOpeningBracket() {
 			bidiclz = cBRACKO
@@ -157,8 +183,7 @@ func (sc *bidiScanner) Scan(pipe chan<- scrap) {
 			// proceed ahead, making lookahead the current scrap
 			if isisolate(lookahead) && lookahead.bidiclz != bidi.PDI {
 				sc.ctxstack = append(sc.ctxstack, current.context)
-			} else if current.bidiclz == bidi.PDI {
-				// TODO check for stack empty
+			} else if current.bidiclz == bidi.PDI && len(sc.ctxstack) > 0 {
 				current.context = sc.ctxstack[len(sc.ctxstack)-1]
 				sc.ctxstack = sc.ctxstack[:len(sc.ctxstack)-1]
 			}
@@ -304,8 +329,10 @@ func (sc *bidiScanner) handleIsolatingRunSwitch(s scrap) {
 		}
 		sc.bd16.lastpos = s.l
 		sc.IRSStack = sc.IRSStack[:len(sc.IRSStack)-1] // pop current IRS level
-		tos := sc.IRSStack[len(sc.IRSStack)-1]
-		sc.bd16 = sc.IRS[tos]
+		if len(sc.IRSStack) > 0 {
+			tos := sc.IRSStack[len(sc.IRSStack)-1]
+			sc.bd16 = sc.IRS[tos]
+		}
 		T().Debugf("bidi scanner read PDI, switch back to outer IRS at %d", sc.bd16.firstpos)
 		return
 	}
@@ -363,9 +390,11 @@ type OutOfLineBidiMarkup func(uint64) int
 
 // Constants to use by clients as OutOfLineBidiMarkup return values.
 const (
-	MarkupLRI = int(bidi.LRI)
-	MarkupRLI = int(bidi.RLI)
-	MarkupPDI = int(bidi.PDI)
+	MarkupLRI    int = int(bidi.LRI) << 8
+	MarkupRLI    int = int(bidi.RLI) << 8
+	MarkupPDI    int = int(bidi.PDI)
+	MarkupPDILRI int = MarkupPDI | MarkupLRI
+	MarkupPDIRLI int = MarkupPDI | MarkupRLI
 )
 
 // --- Bidi_Classes ----------------------------------------------------------
@@ -416,6 +445,7 @@ const (
 	optionRecognizeLegacy uint8 = 1 << 1 // recognize LRM, RLM, ALM, LRE, RLE, LRO, RLO, PDF
 	optionOuterR2L        uint8 = 1 << 2 // set outer direction as RtoL
 	optionTesting         uint8 = 1 << 3 // test mode: recognize uppercase as class R
+	optionIgnoreParSep    uint8 = 1 << 4 // interpret paragraph separators as whitespace
 )
 
 // RecognizeLegacy is not yet implemented. It was indented to make the
@@ -461,6 +491,20 @@ func TestMode(b bool) Option {
 		if !sc.hasMode(optionTesting) && b ||
 			sc.hasMode(optionTesting) && !b {
 			sc.mode |= optionTesting
+		}
+	}
+}
+
+// IgnoreParagraphSeparators determines wether paragraph separators (i.e., newlines
+// at al.) are to be ignored and interpretet as whitespace instead.
+// The default value for this option is `false`, resulting in effectively
+// interpreting any paragraph separator as `end of input`. In this case the
+// paragraph separator is cut off of the input.
+func IgnoreParagraphSeparators(b bool) Option {
+	return func(sc *bidiScanner) {
+		if !sc.hasMode(optionIgnoreParSep) && b ||
+			sc.hasMode(optionIgnoreParSep) && !b {
+			sc.mode |= optionIgnoreParSep
 		}
 	}
 }

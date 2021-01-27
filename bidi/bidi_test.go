@@ -44,15 +44,18 @@ func TestClasses(t *testing.T) {
 func TestScannerMarkup(t *testing.T) {
 	teardown := testconfig.QuickConfig(t)
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelInfo)
 	//
 	input := strings.NewReader("the fox")
 	markup := func(pos uint64) int {
 		if pos == 4 {
-			return MarkupLRI
+			return MarkupPDILRI
 		}
 		return 0
 	}
+	t.Logf("markup PDI LRI = %d", MarkupPDILRI)
+	t.Logf("markup PDI     = %d", MarkupPDI)
+	t.Logf("markup LRI     = %d", MarkupLRI)
 	scnr := newScanner(input, markup, TestMode(true))
 	pipe := make(chan scrap, 0)
 	go scnr.Scan(pipe)
@@ -67,6 +70,7 @@ func TestScannerMarkup(t *testing.T) {
 		n++
 	}
 	t.Logf(scraps)
+	t.Fail()
 }
 
 func TestScannerScraps(t *testing.T) {
