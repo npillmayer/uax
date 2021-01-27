@@ -67,10 +67,10 @@ func (sc *bidiScanner) nextRune(pos charpos) (rune, int, bidi.Class, bool) {
 	if sc.markup != nil && sc.lastMarkup < int64(pos) {
 		T().Debugf("bidi scanner: checking for markup at position %d", pos)
 		if d := sc.markup(uint64(pos)); int(d) > 0 {
-			switch d {
+			switch bidi.Class(d) {
 			case bidi.LRI, bidi.RLI, bidi.FSI, bidi.PDI:
 				sc.lastMarkup = int64(pos)
-				return 0, 0, d, true
+				return 0, 0, bidi.Class(d), true
 			}
 		}
 	}
@@ -359,7 +359,14 @@ func setTestingIRSDelimiter(r rune, clz bidi.Class) bidi.Class {
 // or CSS styles. It receives a text position and—if appropriate—returns a
 // Bidi class to be inserted. It will be treated by the resolver as a Bidi delimiter
 // of byte-length zero.
-type OutOfLineBidiMarkup func(uint64) bidi.Class
+type OutOfLineBidiMarkup func(uint64) int
+
+// Constants to use by clients as OutOfLineBidiMarkup return values.
+const (
+	MarkupLRI = int(bidi.LRI)
+	MarkupRLI = int(bidi.RLI)
+	MarkupPDI = int(bidi.PDI)
+)
 
 // --- Bidi_Classes ----------------------------------------------------------
 

@@ -47,9 +47,9 @@ func TestScannerMarkup(t *testing.T) {
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	input := strings.NewReader("the fox")
-	markup := func(pos uint64) bidi.Class {
+	markup := func(pos uint64) int {
 		if pos == 4 {
-			return bidi.LRI
+			return MarkupLRI
 		}
 		return 0
 	}
@@ -67,7 +67,6 @@ func TestScannerMarkup(t *testing.T) {
 		n++
 	}
 	t.Logf(scraps)
-	t.Fail()
 }
 
 func TestScannerScraps(t *testing.T) {
