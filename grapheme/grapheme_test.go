@@ -39,6 +39,8 @@ func TestGraphemeClasses(t *testing.T) {
 func TestGraphemes1(t *testing.T) {
 	teardown := gotestingadapter.RedirectTracing(t)
 	defer teardown()
+	SetupGraphemeClasses()
+	//
 	onGraphemes := NewBreaker()
 	input := bytes.NewReader([]byte("Hello\tWorld"))
 	seg := segment.NewSegmenter(onGraphemes)
@@ -53,6 +55,8 @@ func TestGraphemes1(t *testing.T) {
 func TestGraphemes2(t *testing.T) {
 	teardown := gotestingadapter.RedirectTracing(t)
 	defer teardown()
+	SetupGraphemeClasses()
+	//
 	onGraphemes := NewBreaker()
 	input := bytes.NewReader([]byte("Hello\tWorld"))
 	seg := segment.NewSegmenter(onGraphemes)
@@ -69,6 +73,8 @@ func TestGraphemesTestFile(t *testing.T) {
 	teardown := gotestingadapter.RedirectTracing(t)
 	defer teardown()
 	TC().SetTraceLevel(tracing.LevelError)
+	SetupGraphemeClasses()
+	//
 	SetupGraphemeClasses()
 	onGraphemes := NewBreaker()
 	seg := segment.NewSegmenter(onGraphemes)

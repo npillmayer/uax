@@ -10,4 +10,5 @@ require (
 	github.com/npillmayer/gorgo v0.0.0-20201204221716-78b66f4dacf6
 	github.com/npillmayer/schuko v0.0.0-20201204201146-2476b260d9a6
 	golang.org/x/text v0.3.2
+	google.golang.org/api v0.13.0
 )

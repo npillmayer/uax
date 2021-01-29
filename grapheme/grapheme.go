@@ -1,6 +1,6 @@
-/*
-Package grapheme implements Unicode Annex #29 grapheme breaking.
+package grapheme
 
+/*
 BSD License
 
 Copyright (c) 2017–20, Norbert Pillmayer
@@ -33,57 +33,15 @@ THEORY OF LIABILITY, WHETHER IN CONTRATC, STRITC LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-Content
-
-UAX#29 is the Unicode Annex for breaking text into graphemes, words
-and sentences.
-It defines code-point classes and sets of rules
-for how to place break points and break inhibitors.
-This file is about grapheme breaking.
-
-Typical Usage
-
-Clients instantiate a grapheme object and use it as the
-breaking engine for a segmenter.
-
-  onGraphemes := grapheme.NewBreaker()
-  segmenter := uax.NewSegmenter(onGraphemes)
-  segmenter.Init(...)
-  for segmenter.Next() ...
-
-Attention
-
-Before using grapheme breakers, clients will have to initialize the
-classes and rules.
-
-  SetupGraphemeClasses()
-
-This initializes all the code-point range tables. Initialization is
-not done beforehand, as it consumes quite some memory.
-As grapheme breaking involves knowledge of emoji classes, a call to
-SetupGraphemeClasses() will in turn call
-
-  SetupEmojisClasses()
-
-This UnicodeBreaker successfully passes all 672 tests for grapheme
-breaking of UAX#29 (GraphemeBreakTest.txt). */
-package grapheme
+*/
 
 import (
 	"sync"
 	"unicode"
 
-	"github.com/npillmayer/schuko/gtrace"
-
-	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/uax"
 	"github.com/npillmayer/uax/emoji"
 )
-
-// TC traces to the core-tracer.
-func TC() tracing.Trace {
-	return gtrace.CoreTracer
-}
 
 // ClassForRune is the top-level client function.
 // It gets the line grapheme class for a Unicode code-point.
@@ -102,7 +60,7 @@ func ClassForRune(r rune) GraphemeClass {
 
 var setupOnce sync.Once
 
-// SetupGraphemeClasses it th top-level preparation function:
+// SetupGraphemeClasses is the top-level preparation function:
 // Create code-point classes for grapheme breaking.
 // Will in turn set up emoji classes as well.
 // (Concurrency-safe).
@@ -125,7 +83,7 @@ type Breaker struct {
 	blocked      map[GraphemeClass]bool
 }
 
-// NewBreaker creates a new UAX#14 line breaker.
+// NewBreaker creates a new UAX#29 line breaker.
 //
 // Usage:
 //
