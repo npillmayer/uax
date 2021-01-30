@@ -28,3 +28,16 @@ func TestWidth(t *testing.T) {
 		}
 	}
 }
+
+func TestEnvLocale(t *testing.T) {
+	teardown := testconfig.QuickConfig(t)
+	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	ctx := ContextFromEnvironment()
+	if ctx == nil {
+		t.Fatalf("context from environment is nil, should not")
+	}
+	t.Logf("user environment has locale '%s'", ctx.Locale)
+	t.Fail()
+}

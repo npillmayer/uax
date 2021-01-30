@@ -1,0 +1,44 @@
+0	Bopomofo	bopomofo	LTR	alph	ESA	U	 
+0	Dai	daï	LTR	syll	ESA	 	 
+0	Han ideographs	idéographes Han	LTR	ideo	ESA	FGHINU	o
+0	Hangul	hangul	LTR	syll	ESA	FGHNU	o
+0	Hiragana	hiragana	LTR	syll	ESA	FGHINU	o
+0	Katakana	katakana	LTR	syll	ESA	FGHINU	o
+0	Tai Lue (Chiang Mai)	taï lue (tchiang maï)	LTR	syll	ESA	NU	 
+0	Tai Nua (Tai Mau)	taï nua (taï mau)	LTR	syll	ESA	NU	 
+1	Khitan (Ch'i-tan, Liao)	khitan (ch'i-tan, liao)	 	ideo	ESA	GHN	*?
+1	Naxi (Nahsi, Nasi, Moso) ideograms	idéogrammes naxi (nahsi, nasi, moso)	LTR	ideo	ESA	GHNU	*
+1	Naxi (Nahsi, Nasi, Moso) phonetic	phonetisme naxi (nahsi, nasi, moso)	LTR	ideo	ESA	NU	 
+1	Nuchen (Yu-Chen)	nuchen (yu-tchen)	TTB	syll	ESA	GHN	*
+1	Pollard Phonetic (Miao)	phonétique de Pollard (miao)	LTR	syll	ESA	GN	o
+1	Tungut (Xixia) ideograms	idéogrammes tungut (xixia)	TTB	mixt	ESA	GHN	*
+x	Jiagu	jiagu	TTB	ideo	ESA	GHN	 
+x	Yao	yao	TTB	ideo	ESA	GH	*
+x	Yunnan	yunnan	LTR	mixt	ESA	G	o 
+- - - ---------------------------------------------------------------------
+0	Batak	batak	LTR	syll	SEA	FGHNU	o
+0	Bengali	bengali	LTR	syll	SEA	FGHNU	o
+0	Buginese	bugi	LTR	syll	SEA	FGHINU	o
+0	Burmese	birman	LTR	syll	SEA	FGHINU	o
+0	Cham	cham	LTR	syll	SEA	GIN	 
+0	Javanese (U. unif. Balinese)	javanais	LTR	syll	SEA	FGHINU	o
+0	Khmer	mon-kmer	LTR	syll	SEA	FGHINU	o
+0	Lao	laotien	LTR	syll	SEA	FGHINU	o
+0	Lisu	lissou	LTR	alph	SEA	G	o
+0	Meitei (Manipuri)	meitei (manipuri)	LTR	syll	SEA	HNU	 
+0	Thai	thaï	LTR	syll	SEA	FGHINU	o
+0	Yi	yi	LTR	syll	SEA	U	 
+1	Balinese (U unif. Javanese)	balinais	LTR	syll	SEA	GU	o
+1	Kharoshthi	kharostrî	RTL	syll	SEA	GHIN	 
+1	Pyu (Tircul)	pyou (tircoul)	LTR	syll	SEA	NU	 
+1	Rejang	rédjang	LTR	syll	SEA	FGHN	 
+1	Rongorongo	rongo-rongo	BOU	ideo?	SEA	GHN	*
+1	Tagalog, Bisaya (Philippines)	tagalog, bisaya (Philippines)	LTR	syll	SEA	FGHNU	o
+1	Woleai	woléai	LTR	syll	SEA	G	 
+x	Buhid (Philippines) (U unif. Tagalog)	buhid (Philippines)	LTR	syll	SEA	GNU	o
+x	Kavi	kavî	LTR	syll	SEA	G	 
+x	Lampong	lampong	LTR	syll	SEA	FGH	o
+x	Mangyan (Philippines) (U. unif. Tagalog)	manguien (Philippines)	LTR	syll	SEA	NU	 
+x	Old Peguan	ancien pégüan	LTR	syll	SEA	H	 
+x	Pali (Kyoktsa & Painted)	pali (kyoktsa & peinté)	LTR	syll	SEA	FH	 
+x	Tagbanwa, Belarmino (Philippines) (U. unif. Tagalog)	tagbanu, bélarmino (Philippines)	LTR	syll	SEA	GNU	o

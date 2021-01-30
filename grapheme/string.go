@@ -6,6 +6,7 @@ import (
 	"math"
 	"unicode/utf8"
 
+	"github.com/npillmayer/uax"
 	"github.com/npillmayer/uax/segment"
 )
 
@@ -153,28 +154,12 @@ func (gstr *midString) Len() int {
 
 func prepareBreaking(s string) *segment.Segmenter {
 	breaker := makeGraphemeBreaker()
-	start, _ := positionOfFirstLegalRune(s)
+	start, _ := uax.PositionOfFirstLegalRune(s)
 	if start < 0 {
 		TC().Errorf("cannot create grapheme string from invalid rune input")
 	}
 	breaker.Init(&rr{input: s[start:], pos: 0})
 	return breaker
-}
-
-// return legal start position and cut-off prefix, if any
-func positionOfFirstLegalRune(s string) (int, []byte) {
-	i, l, start := 0, len(s), -1
-	for i < l {
-		if utf8.RuneStart(s[i]) {
-			r, _ := utf8.DecodeRuneInString(s[i:])
-			if r != utf8.RuneError {
-				start = i
-			}
-			break
-		}
-	}
-	TC().Debugf("start index = %d", start)
-	return start, []byte(s[:i])
 }
 
 func makeGraphemeBreaker() *segment.Segmenter {
