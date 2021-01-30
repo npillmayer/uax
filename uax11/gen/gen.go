@@ -15,7 +15,6 @@ import (
 )
 
 var rangeTables map[string]*rangeTable // one for each N, Na, A, …
-var switched32 bool                    // should be local as well, some day...
 
 func main() {
 	buf := new(bytes.Buffer)
@@ -28,35 +27,20 @@ func main() {
 	}
 	printPreamble(buf)
 
-	// var lo, hi rune          // low and high bound of current range
-	// var cat string           // East Asian Width char category
-	// var cnt, latinOffset int // range count and unicode.RangeTable.LatinOffset
-	var cnt int
+	// parse UCD file and collect ranges
 	ucd.Parse(resp.Body, func(p *ucd.Parser) {
-		if cnt < 50 {
-			l, r := p.Range(0) // char range in field 0
-			t := p.String(1)   // EAW char category as string in field 1
-			if t == "" {
-				return
-			}
-			rangeTables[t].append(l, r)
-			// if t != cat { // new category => output current range
-			// 	cnt, latinOffset = printRange(buf, lo, hi, cat, cnt, latinOffset)
-			// 	lo, hi, cat = l, r, t
-			// } else if l == hi+1 { // range extends previous range
-			// 	hi = r
-			// } else {
-			// 	cnt, latinOffset = printRange(buf, lo, hi, cat, cnt, latinOffset)
-			// 	lo, hi, cat = l, r, t
-			// }
+		l, r := p.Range(0) // char range in field 0
+		t := p.String(1)   // EAW char category as string in field 1
+		if t == "" {
+			return
 		}
+		rangeTables[t].append(l, r)
 	}, ucd.OptionKeepRanges())
-	//
+
+	// output range information per category
 	for _, rt := range rangeTables {
 		rt.output(buf)
 	}
-	//printRange(buf, lo, hi, cat, cnt, latinOffset)
-	//printPostamble(buf, latinOffset)
 	_, err = format.Source(buf.Bytes())
 	if err != nil {
 		log.Printf(err.Error())
@@ -78,7 +62,8 @@ import "unicode"
 }
 
 func printRangePreamble(buf *bytes.Buffer, t *rangeTable) {
-	fmt.Fprintf(buf, "var _EAW_%s = &unicode.RangeTable{", t.cat)
+	fmt.Fprintf(buf, "var _EAW_%s = &unicode.RangeTable{ ", t.cat)
+	fmt.Fprintf(buf, "// %d entries", t.cnt)
 	fmt.Fprintf(buf, `
 	R16: []unicode.Range16{
 `)
@@ -86,35 +71,20 @@ func printRangePreamble(buf *bytes.Buffer, t *rangeTable) {
 
 func printRangePostamble(buf *bytes.Buffer, t *rangeTable) {
 	if t.latinOffset > 0 {
-		fmt.Fprintf(buf, "\t},\n\tLatinOffset: %d,\n}\n", t.latinOffset)
+		fmt.Fprintf(buf, "\t},\n\tLatinOffset: %d,\n}\n\n", t.latinOffset)
 	} else {
-		fmt.Fprintf(buf, "\t},\n}\n")
+		fmt.Fprintf(buf, "\t},\n}\n\n")
 	}
-}
-
-func printRange(buf *bytes.Buffer, lo, hi rune, cat string, rangeCnt int, latinOffset int) (int, int) {
-	if cat == "" {
-		return rangeCnt, latinOffset
-	}
-	if latinOffset == 0 && hi > unicode.MaxLatin1 {
-		latinOffset = rangeCnt
-	}
-	if !switched32 && (lo > (1<<16) || hi > (1<<16)) {
-		// switch to range32
-		fmt.Fprintf(buf, "},\n\tR32: []unicode.Range32{\n")
-		switched32 = true
-	}
-	fmt.Fprintf(buf, "\t\t{%#04x, %#04x, %s},\n", lo, hi, cat)
-	return rangeCnt + 1, latinOffset
 }
 
 // ---------------------------------------------------------------------------
 
 type rangeTable struct {
-	cat                        string
-	cnt, latinOffset, switch32 int
-	ranges                     [][2]rune
-	lo, hi                     rune
+	cat              string // East Asian Width char category
+	cnt, latinOffset int    // range count and unicode.RangeTable.LatinOffset
+	switch32         int    // range item where to switch to int32 size
+	ranges           [][2]rune
+	lo, hi           rune // low and high bound of current range
 }
 
 func (rt *rangeTable) append(l, r rune) {
@@ -128,18 +98,22 @@ func (rt *rangeTable) append(l, r rune) {
 	}
 	if rt.switch32 == 0 && (rt.lo > (1<<16) || rt.hi > (1<<16)) {
 		// switch to range32
-		//fmt.Fprintf(buf, "},\n\tR32: []unicode.Range32{\n")
 		rt.switch32 = rt.cnt
 	}
 	// append current range lo…hi to ranges
 	rt.ranges = append(rt.ranges, [2]rune{rt.lo, rt.hi})
+	rt.cnt++
 	rt.lo, rt.hi = l, r
-	//fmt.Fprintf(buf, "\t\t{%#04x, %#04x, %s},\n", lo, hi, cat)
-	//return rangeCnt + 1, latinOffset
 }
 
 func (rt *rangeTable) output(buf *bytes.Buffer) {
 	printRangePreamble(buf, rt)
+	for i, r := range rt.ranges {
+		if rt.switch32 > 0 && i == rt.switch32 {
+			fmt.Fprintf(buf, "\t},\n\tR32: []unicode.Range32{\n")
+		}
+		fmt.Fprintf(buf, "\t\t{%#04x, %#04x, 1},\n", r[0], r[1])
+	}
 	printRangePostamble(buf, rt)
 }
 
