@@ -3,6 +3,7 @@ module github.com/npillmayer/uax
 go 1.14
 
 replace github.com/npillmayer/gorgo => /Users/npi/prg/go/gorgo
+replace github.com/npillmayer/schuko => /Users/npi/prg/go/schuko
 
 require (
 	github.com/emirpasic/gods v1.12.0

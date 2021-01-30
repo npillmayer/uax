@@ -11,7 +11,8 @@
 //
 // Copyright 2014 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
-// license that can be found in the licenses directory.
+// license that can be found in the LICENSE file in directory uax.
+//
 package ucd
 
 import (
@@ -29,10 +30,13 @@ import (
 // the reader upon return. It will call log.Fatal if any error occurred.
 //
 // This implements the most common usage pattern of using Parser.
-func Parse(r io.ReadCloser, f func(p *Parser)) {
+func Parse(r io.ReadCloser, f func(p *Parser), options ...Option) {
 	defer r.Close()
 
 	p := NewUCDParser(r)
+	for _, o := range options {
+		o(p)
+	}
 	for p.Next() {
 		f(p)
 	}
@@ -83,7 +87,7 @@ func (p *Parser) Err() error {
 	return p.err
 }
 
-// New returns a Parser for the given Reader.
+// NewUCDParser returns a Parser for the given Reader.
 func NewUCDParser(r io.Reader) *Parser {
 	p := &Parser{
 		scanner: bufio.NewScanner(r),
@@ -250,4 +254,14 @@ func (p *Parser) getRange(i int) (first, last rune) {
 // String parses and returns field i as a string value.
 func (p *Parser) String(i int) string {
 	return string(p.getField(i))
+}
+
+// ---------------------------------------------------------------------------
+
+type Option func(p *Parser)
+
+func OptionKeepRanges() func(*Parser) {
+	return func(p *Parser) {
+		p.keepRanges = true
+	}
 }
