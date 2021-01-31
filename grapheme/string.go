@@ -21,6 +21,7 @@ import (
 type String interface {
 	Nth(int) string // return nth grapheme
 	Len() int       // length of string in units of user perceived characters
+	String() string // return the underlying Go string
 }
 
 // MaxByteLen is the maximum byte count a grapheme string may consist of.
@@ -107,6 +108,10 @@ func (gstr *shortString) Len() int {
 	return len(gstr.breaks) - 1
 }
 
+func (gstr *shortString) String() string {
+	return gstr.content
+}
+
 // --- Mid version -----------------------------------------------------------
 
 type midString struct {
@@ -148,6 +153,10 @@ func (gstr *midString) Len() int {
 		return 0
 	}
 	return len(gstr.breaks) - 1
+}
+
+func (gstr *midString) String() string {
+	return gstr.content
 }
 
 // ---------------------------------------------------------------------------
