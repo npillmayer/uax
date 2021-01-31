@@ -8,6 +8,7 @@ import (
 	"github.com/npillmayer/schuko/testconfig"
 	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/uax/emoji"
+	"github.com/npillmayer/uax/grapheme"
 )
 
 func TestTables(t *testing.T) {
@@ -71,4 +72,37 @@ func TestWidth(t *testing.T) {
 	if ww != 7 {
 		t.Errorf("expected accumalted width of 5 runes to be 7, is %d", ww)
 	}
+}
+
+func TestContext(t *testing.T) {
+	teardown := testconfig.QuickConfig(t)
+	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	grapheme.SetupGraphemeClasses()
+	//context := &Context{Locale: "zh-uig"}
+	context := &Context{Locale: "zh-HK"}
+	_ = Width([]byte("世"), context)
+	t.Logf("%v", context.Script)
+	t.Fail()
+}
+
+func TestString(t *testing.T) {
+	teardown := testconfig.QuickConfig(t)
+	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelError)
+	//
+	grapheme.SetupGraphemeClasses()
+	input := "A (世). "
+	buf := make([]byte, 10)
+	len := utf8.EncodeRune(buf, 0x1f600)
+	input = input + string(buf[:len])
+	t.Logf("input string = '%v'", input)
+	ctx := EastAsianContext
+	s := grapheme.StringFromString(input)
+	w := StringWidth(s, ctx)
+	if w != 10 {
+		t.Errorf("expected fixed width length of string to be 10, is %d", w)
+	}
+	t.Fail()
 }

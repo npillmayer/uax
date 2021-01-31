@@ -1,3 +1,4 @@
+https://github.com/lukes/ISO-3166-Countries-with-Regional-Codes/blob/master/all/all.csv
 https://www.evertype.com/standards/iso9/document/n02.html
 
 Pl.	name	nom	dir.	type	loc.	source	?

@@ -45,7 +45,7 @@ func Width(grphm []byte, context *Context) int {
 	}
 	start, _ := uax.PositionOfFirstLegalRune(string(grphm))
 	if start != 0 { // grapheme starts with illegal code points
-		//T().Errorf("start = %d, rest = %v", start, rest)
+		//T().Debugf("start = %d, rest = %v", start, rest)
 		return 0
 	}
 	if context == nil {
@@ -60,6 +60,10 @@ func Width(grphm []byte, context *Context) int {
 // `en`s, where 1en stands for 1/2em, i.e. half a full width character.
 //
 // If an empty context is given, LatinContext is assumed.
+//
+//     s := grapheme.StringFromString("A (世). 😀")
+//     w := uax11.StringWidth(s, uax11.LatinContext)
+//     fmt.Printf("string has fixed-width display length of %d en", w)     ⇒  10
 //
 func StringWidth(s grapheme.String, context *Context) int {
 	l := s.Len()
@@ -84,12 +88,12 @@ func graphemeWidth(grphm []byte, context *Context) int {
 	r, _ := utf8.DecodeRune(grphm)
 	//T().Debugf("grapheme '%v' => rune %#U", grphm, r)
 	if emoji.EmojisClassForRune(r) >= 0 {
-		//T().Errorf("%#U is emoji", r)
+		//T().Debugf("%#U is emoji", r)
 		return 2
 	}
 	cat1 := consultEAWTables(r)
 	cat := context.resolve(grphm, cat1)
-	//T().Errorf("cat(%#U) = %d  =>  %d", r, cat1, cat)
+	//T().Debugf("cat(%#U) = %d  =>  %d", r, cat1, cat)
 	if cat == W {
 		return 2
 	}
@@ -116,6 +120,18 @@ func WidthCategory(r rune) Category {
 // The term context as used here includes extra information such as explicit
 // markup, knowledge of the source code page, font information, or language and
 // script identification
+//
+// Clients may fill a context paritially and hand it over to uax11. The functions
+// in this package will try to derive a meaningful context from a partially filled one.
+// This package relies on https://pkg.go.dev/golang.org/x/text/language/ for this
+// to work.
+//
+//    context := &Context{Locale: "zh"}   // unspecified Chinese
+//    _ = Width([]byte("世"), context)
+//    fmt.Printf("%v", context.Script)    ⇒    “Hans”  (simplified Chinese script)
+//
+// Alternatively, clients may use one of the pre-defined contexts or use
+// `ContextFromEnvironment` to get a client-machine dependent one.
 //
 type Context struct {
 	ForceEastAsian bool            // force East Asian context
@@ -176,13 +192,17 @@ func evaluateContext(ctx *Context) *Context {
 		ctx.resolve = resolveToWide
 	} else {
 		lang := language.Make(ctx.Locale)
-		ctx.resolve = findResolver(ctx.Script, lang)
+		ctx = findResolver(lang, ctx)
 	}
 	return ctx
 }
 
-func findResolver(script language.Script, lang language.Tag) resolver {
-	scrcode := script.String()
+func findResolver(lang language.Tag, ctx *Context) *Context {
+	scrcode := ctx.Script.String()
+	if scrcode == "Zzzz" {
+		ctx.Script, _ = lang.Script()
+		scrcode = ctx.Script.String()
+	}
 	switch scrcode {
 	case
 		// East Asian
@@ -196,13 +216,16 @@ func findResolver(script language.Script, lang language.Tag) resolver {
 		"Lisu", "Mtei", "Thai", "Yiii",
 		"Bali", "Khar", "Rjng", "Roro",
 		"Tglg", "Wole", "Buhd", "Tagb":
-		return resolveToWide
+		ctx.resolve = resolveToWide
+		return ctx
 	}
 	_, _, confidence := eaMatch.Match(lang)
 	if confidence == language.No {
-		return resolveToNarrow
+		ctx.resolve = resolveToNarrow
+	} else {
+		ctx.resolve = resolveToWide
 	}
-	return resolveToWide
+	return ctx
 }
 
 // A matcher for CJK and some other East Asian languages.
@@ -220,6 +243,7 @@ var eaMatch = language.NewMatcher([]language.Tag{
 // ContextFromEnvironment creates a Context from the operating system environment,
 // i.e. either from environment variables on *nix sytems of from a kernel call
 // on Windows systems.
+// (We rely on http://github.com/cloudfoundry/jibber_jabber for this).
 //
 func ContextFromEnvironment() *Context {
 	userLocale, err := jj.DetectIETF()
@@ -233,10 +257,10 @@ func ContextFromEnvironment() *Context {
 	lang := language.Make(userLocale)
 	script, _ := lang.Script()
 	ctx := &Context{
-		Script:  script,
-		Locale:  userLocale,
-		resolve: findResolver(script, lang),
+		Script: script,
+		Locale: userLocale,
 	}
+	ctx = findResolver(lang, ctx)
 	return ctx
 }
 

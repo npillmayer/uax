@@ -26,6 +26,13 @@ property East_Asian_Width provides a default classification of characters, which
 an implementation can use to decide at runtime whether to treat a character as narrow
 or wide.
 
+Caveats
+
+Determining the legacy fixed-width display length is not an exact science.
+Much depends on the properties of output devices, on fonts used, on a device's
+interpretation of display rules, etc. Clients should treat results of UAX#11
+as heuristics. Using proportional fonts is almost always a better solution.
+
 ___________________________________________________________________________
 
 BSD License
