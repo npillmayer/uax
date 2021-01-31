@@ -2,8 +2,12 @@ package uax11
 
 import (
 	"unicode"
+	"unicode/utf8"
 
 	jj "github.com/cloudfoundry/jibber_jabber"
+	"github.com/npillmayer/uax"
+	"github.com/npillmayer/uax/emoji"
+	"github.com/npillmayer/uax/grapheme"
 	"golang.org/x/text/language"
 )
 
@@ -25,6 +29,73 @@ var RangeTables = [...]*unicode.RangeTable{
 	_EAW_N, _EAW_A, _EAW_W, _EAW_Na, _EAW_H, _EAW_F,
 }
 
+// --- API -------------------------------------------------------------------
+
+// Width returns the width of a grapheme, given as a byte slice, in terms of
+// `en`s, where 1en stands for 1/2em, i.e. half a full width character.
+// If grphm is invalid or just a zero width rune, a width of 0 is returned.
+//
+// If an empty context is given, LatinContext is assumed.
+//
+// Returns either 0, 1 (narrow character) or 2 (wide character).
+//
+func Width(grphm []byte, context *Context) int {
+	if len(grphm) == 0 {
+		return 0
+	}
+	start, _ := uax.PositionOfFirstLegalRune(string(grphm))
+	if start != 0 { // grapheme starts with illegal code points
+		//T().Errorf("start = %d, rest = %v", start, rest)
+		return 0
+	}
+	if context == nil {
+		context = makeLatinContext()
+	} else if context.resolve == nil {
+		context = evaluateContext(context)
+	}
+	return graphemeWidth(grphm, context)
+}
+
+// StringWidth calculates the width of a grapheme.String in terms of
+// `en`s, where 1en stands for 1/2em, i.e. half a full width character.
+//
+// If an empty context is given, LatinContext is assumed.
+//
+func StringWidth(s grapheme.String, context *Context) int {
+	l := s.Len()
+	if l == 0 {
+		return 0
+	}
+	if context == nil {
+		context = makeLatinContext()
+	} else if context.resolve == nil {
+		context = evaluateContext(context)
+	}
+	w := 0
+	for i := 0; i < l; i++ {
+		nth := []byte(s.Nth(i))
+		w += graphemeWidth(nth, context)
+	}
+	return w
+}
+
+// width of a single grapheme in context
+func graphemeWidth(grphm []byte, context *Context) int {
+	r, _ := utf8.DecodeRune(grphm)
+	//T().Debugf("grapheme '%v' => rune %#U", grphm, r)
+	if emoji.EmojisClassForRune(r) >= 0 {
+		//T().Errorf("%#U is emoji", r)
+		return 2
+	}
+	cat1 := consultEAWTables(r)
+	cat := context.resolve(grphm, cat1)
+	//T().Errorf("cat(%#U) = %d  =>  %d", r, cat1, cat)
+	if cat == W {
+		return 2
+	}
+	return 1
+}
+
 // WidthCategory returns the width category of a single rune as proposed by the UAX#11
 // standard. Please note that this is most probably not what clients will want to use in
 // full-grown international applications, as it is preferable to work on graphemes
@@ -34,9 +105,10 @@ var RangeTables = [...]*unicode.RangeTable{
 // Returns one of N, A, Na, W, H, F.
 //
 func WidthCategory(r rune) Category {
-	cat := consultEAWTables(r)
-	return cat
+	return consultEAWTables(r)
 }
+
+// --- Context ---------------------------------------------------------------
 
 // Context represents information about the typesetting environment.
 //
@@ -78,18 +150,35 @@ func makeLatinContext() *Context {
 	return ctx
 }
 
-type resolver func([]byte, Category, *Context) Category
+// A resolver is used for resolving categories N and A to either Na or W.
+type resolver func([]byte, Category) Category
 
-func resolveToNarrow(grphm []byte, cat Category, ctx *Context) Category {
-	return 0
+func resolveToNarrow(grphm []byte, cat Category) Category {
+	switch cat {
+	case W, F:
+		return W
+	}
+	return Na
 }
 
-func resolveToWide(grphm []byte, cat Category, ctx *Context) Category {
-	return 0
+func resolveToWide(grphm []byte, cat Category) Category {
+	switch cat {
+	case N, A, W, F:
+		return W
+	}
+	return Na
 }
 
-func evaluateContext(grphm []byte, cat Category, ctx *Context) Category {
-	return 0
+// evaluateContext checks the 'input-fields' of a context and sets a
+// resolver accordingly.
+func evaluateContext(ctx *Context) *Context {
+	if ctx.ForceEastAsian {
+		ctx.resolve = resolveToWide
+	} else {
+		lang := language.Make(ctx.Locale)
+		ctx.resolve = findResolver(ctx.Script, lang)
+	}
+	return ctx
 }
 
 func findResolver(script language.Script, lang language.Tag) resolver {
@@ -116,6 +205,7 @@ func findResolver(script language.Script, lang language.Tag) resolver {
 	return resolveToWide
 }
 
+// A matcher for CJK and some other East Asian languages.
 var eaMatch = language.NewMatcher([]language.Tag{
 	language.Chinese, // The first language is used as fallback.
 	language.Japanese,
@@ -127,6 +217,10 @@ var eaMatch = language.NewMatcher([]language.Tag{
 	language.Khmer,
 })
 
+// ContextFromEnvironment creates a Context from the operating system environment,
+// i.e. either from environment variables on *nix sytems of from a kernel call
+// on Windows systems.
+//
 func ContextFromEnvironment() *Context {
 	userLocale, err := jj.DetectIETF()
 	if err != nil {
@@ -146,21 +240,7 @@ func ContextFromEnvironment() *Context {
 	return ctx
 }
 
-// Width returns the width of a grapheme, given as a byte slice, in terms of
-// `en`s, where 1en stands for 1/2em, i.e. half a full width character.
-// If grphm is invalid or just a zero width rune, a width of 0 is returned.
-//
-// If an empty context is given, LatinContext is assumed.
-//
-// Returns either 0, 1 (narrow character) or 2 (wide character).
-func Width(grphm []byte, context *Context) int {
-	if len(grphm) == 0 {
-		return 0
-	}
-	return 0
-}
-
-// ---------------------------------------------------------------------------
+// --- Range table consulting ------------------------------------------------
 
 // UAX#11:
 //  - The unassigned code points in the following blocks default to "W":

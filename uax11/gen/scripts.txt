@@ -1,3 +1,5 @@
+https://www.evertype.com/standards/iso9/document/n02.html
+
 Pl.	name	nom	dir.	type	loc.	source	?
 0	Arabic	arabe	RTL	cons	WSA	FGHINU	o
 0	Arabic (Karmatic variant)	arabe (variant karmatique)	RTL	cons	WSA	FIU	 
