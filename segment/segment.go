@@ -258,6 +258,8 @@ func (s *Segmenter) Next() bool {
 // that occurred during scanning, except for io.EOF.
 // For the latter case Err() will return nil.
 //
+// See also method `Next`.
+//
 func (s *Segmenter) BoundedNext(bound int64) bool {
 	return s.next(bound)
 }
