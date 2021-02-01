@@ -102,7 +102,7 @@ therefore utilize the helper types from package uax.
 
 We perform segmenting Unicode text based on rules, which are short
 regular expressions, i.e. finite state automata. This corresponds well with
-the formal UAX description of rules (expect for the bidi rules).
+the formal UAX description of rules (except for the bidi rules).
 Every step within a
 rule is performed by executing a function. This function recognizes a single
 code-point class and returns another function. The returned function
@@ -110,8 +110,7 @@ represents the expectation for the next code-point(-class).
 These kind of matching by function is continued until a rule is accepted
 or aborted.
 
-An example for a UAX rule is rule WB13b "Do not break from extenders"
-from UAX#29:
+An example let's consider rule WB13b “Do not break from extenders” from UAX#29:
 
    ExtendNumLet x (ALetter | Hebrew_Letter| Numeric | Katakana)
 
@@ -123,9 +122,9 @@ classes for code-points. Matching them will call two functions in sequence:
 
 The final return value will either signal an accept or abort.
 
-The uax helper type to perform this kind of matching is called Recognizer.
+The uax helper to perform this kind of matching is called Recognizer.
 A set of Recognizers comprises an NFA and will match break opportunities
-for a UAX rule-set. Recognizers receive rune events and therefore implement
+for a given UAX rule-set. Recognizers receive rune events and therefore implement
 interface RuneSubscriber.
 
 Rune Events
@@ -144,8 +143,9 @@ subscribers which have ended their life-cycle (i.e., either accepted or
 aborted). Dead subscribers are flagging this with Done()==true and get
 unsubscribed.
 
-UnicodePublishers are used by the types implementing UAX breaking logic.
-There's interface UnicodeBreaker, representing breaking algorithms.
+Breaking algorithms are performed by `UnicodeBreaker`s (an interface type).
+The UnicodeBreakers in sub-packages of this package utilize UnicodePublishers
+as described above.
 The segment-driver needs one or more UnicodeBreakers to perform breaking logic.
 
 Penalties
@@ -157,6 +157,7 @@ representing the desirability of the break. Negative values denote a
 negative penalty, i.e. a merit. High enough penalties signal the complete
 suppression of a break opportunity, causing the segmenter to not report
 this break.
+
 The UnicodeBreakers in this package (including sub-packages)
 will apply the following logic:
 
@@ -165,6 +166,10 @@ will apply the following logic:
 (2) Inhibited breaks will have penalty >= 1000 (uax.InfiniteMerits)
 
 (3) Neutral breaks will have a penalty of 0.
+
+The segmenter will aggregate penalties from its breakers and output aggregated
+penalties to the client. Segmenters may use different aggregation strategies,
+formalized by type PenaltyAggregator.
 */
 package uax
 

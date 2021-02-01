@@ -84,7 +84,7 @@ func TestContext(t *testing.T) {
 	context := &Context{Locale: "zh-HK"}
 	_ = Width([]byte("世"), context)
 	t.Logf("%v", context.Script)
-	t.Fail()
+	//t.Fail()
 }
 
 func TestString(t *testing.T) {

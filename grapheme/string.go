@@ -78,7 +78,7 @@ func makeShortString(s string) String {
 	if breaker == nil {
 		return gstr
 	}
-	gstr.breaks = make([]uint8, 1, len(s)/4)
+	gstr.breaks = make([]uint8, 1, len(s)/4+1)
 	gstr.breaks[0] = 0
 	br := 0
 	for breaker.Next() {

@@ -24,8 +24,8 @@ type UnicodeBreaker interface {
 // Rune (code-point) classes are described in various Unicode standards
 // and annexes. One such annex, UAX#29, describes classes to help
 // splitting up text into graphemes or words. An example class may be
-// a class of western language alphabetic characters "AL", of which runes
-// 'A' and 'é' would be part of.
+// a class of western language alphabetic characters “AL”, of which runes
+// ‘X’ and ‘é’ would be part of.
 //
 // The first argument is a Recognizer (see the definition of
 // type Recognizer in this package), which carries this state function.
