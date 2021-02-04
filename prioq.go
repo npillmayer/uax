@@ -16,10 +16,10 @@ import "fmt"
 //
 // A DefaultRunePublisher implements RunePublisher.
 type DefaultRunePublisher struct {
-	q              []RuneSubscriber  // queue is slice of subscribers
-	gap            int               // index of first subscriber which is Done(), may be out of range
-	aggregate      PenaltyAggregator // see declaration of RunePublisher
-	penaltiesTotal []int             // set of penalties collected from subscribers
+	q   []RuneSubscriber // queue is slice of subscribers
+	gap int              // index of first subscriber which is Done(), may be out of range
+	//aggregate      PenaltyAggregator // see declaration of RunePublisher
+	penaltiesTotal []int // set of penalties collected from subscribers
 }
 
 // Len returns the number of subscribers held.

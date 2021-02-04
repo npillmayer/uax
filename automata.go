@@ -170,7 +170,7 @@ func DoAbort(rec *Recognizer) NfaStateFn {
 }
 
 // DoAccept returns a state function which signals accept, together with break
-// penalties for matches runes (in reverse sequence).
+// penalties for matched runes (in reverse sequence).
 func DoAccept(rec *Recognizer, penalties ...int) NfaStateFn {
 	rec.MatchLen++
 	rec.penalties = penalties
@@ -205,13 +205,13 @@ type RuneSubscriber interface {
 type RunePublisher interface {
 	SubscribeMe(RuneSubscriber) RunePublisher // subscribe an additional rune subscriber
 	PublishRuneEvent(r rune, codePointClass int) (longestDistance int, penalties []int)
-	SetPenaltyAggregator(pa PenaltyAggregator) // function to aggregate break penalties
+	//SetPenaltyAggregator(pa PenaltyAggregator) // function to aggregate break penalties
 }
 
 // NewRunePublisher creates a new default RunePublisher.
 func NewRunePublisher() *DefaultRunePublisher {
 	rpub := &DefaultRunePublisher{}
-	rpub.aggregate = AddPenalties
+	//rpub.aggregate = AddPenalties
 	return rpub
 }
 
@@ -238,15 +238,17 @@ func (rpub *DefaultRunePublisher) PublishRuneEvent(r rune, codePointClass int) (
 	for i := rpub.Len() - 1; i >= 0; i-- {
 		subscr := rpub.at(i)
 		penalties := subscr.RuneEvent(r, codePointClass)
-		//CT.Infof("    publish():       penalites = %v", penalties)
+		//CT().Infof("    publish():       penalites = %v", penalties)
 		for j, p := range penalties { // aggregate all penalties
 			if j >= len(rpub.penaltiesTotal) {
 				rpub.penaltiesTotal = append(rpub.penaltiesTotal, p)
 			} else {
-				rpub.penaltiesTotal[j] = rpub.aggregate(rpub.penaltiesTotal[j], p)
+				//rpub.aggregate.Aggregate(p)
+				//rpub.penaltiesTotal[j] = rpub.aggregate(rpub.penaltiesTotal[j], p)
+				rpub.penaltiesTotal[j] += p
 			}
 		}
-		//CT.Infof("    publish(): total penalites = %v", rpub.penaltiesTotal)
+		//CT().Infof("    publish(): total penalites = %v", rpub.penaltiesTotal)
 		if !subscr.Done() { // compare against longest active match
 			if d := subscr.MatchLength(); d > longest {
 				longest = d
@@ -262,48 +264,100 @@ func (rpub *DefaultRunePublisher) PublishRuneEvent(r rune, codePointClass int) (
 	return longest, rpub.penaltiesTotal
 }
 
-// PenaltyAggregator is a
-// function type for methods of penalty-aggregation. Aggregates all the
-// break penalties each a break-point to a single penalty value at that point.
-type PenaltyAggregator func(int, int) int
+// --- Penalty aggregators ---------------------------------------------------
+
+// PenaltyAggregator is a type for methods of penalty-aggregation. Aggregates all the
+// break penalties at a break-point to a single penalty value at that point.
+// type PenaltyAggregator interface {
+// 	Aggregate(int)
+// 	HasValue() bool
+// 	Value() int
+// }
 
 // SetPenaltyAggregator sets a PenaltyAggregator for a rune publisher.
 // A PenaltyAggregator aggregates all the
-// break penalties each a break-point to a single penalty value at that point.
+// break penalties at a break-point to a single penalty value at that point.
 //
 // Part of interface RunePublisher.
-func (rpub *DefaultRunePublisher) SetPenaltyAggregator(pa PenaltyAggregator) {
-	if pa == nil {
-		rpub.aggregate = AddPenalties
-	} else {
-		rpub.aggregate = pa
-	}
-}
+// func (rpub *DefaultRunePublisher) SetPenaltyAggregator(pa PenaltyAggregator) {
+// 	if pa == nil {
+// 		rpub.aggregate = &AddPenalties{}
+// 	} else {
+// 		rpub.aggregate = pa
+// 	}
+// }
 
-// AddPenalties is the default function to aggregate break-penalties.
+// AddPenalties is the default aggregator for break-penalties.
 // Simply adds up all penalties at each break position, respectively.
-func AddPenalties(total int, p int) int {
-	return total + p
-}
+//
+// The zero value is 0, thus AddPenalties calculates a monoid fold
+// of 0+n1=n, n+n2=n, …;  i.e., n1+n2+…
+//
+// type AddPenalties struct {
+// 	sum      int
+// 	modified bool
+// }
+
+// func (a *AddPenalties) Aggregate(n int) {
+// 	a.modified = true
+// 	a.sum += n
+// }
+
+// func (a *AddPenalties) HasValue() bool {
+// 	return a.modified
+// }
+
+// func (a *AddPenalties) Value() int {
+// 	return a.sum
+// }
 
 // MaxPenalties is an alternative function to aggregate break-penalties.
 // Returns maximum of all penalties at each break position.
-func MaxPenalties(total int, p int) int {
-	return max(total, p)
-}
+//
+// The zero value is InfinitePenalty, thus MaxMerits calculates a semi-group fold
+// of min(∞,n1)=n, min(n,n2)=n, …  (remember, mertits are negative penalties)
+//
+
+// type MaxMerits struct {
+// 	m        int
+// 	modified bool
+// }
+
+// func (a *MaxMerits) Aggregate(n int) {
+// 	if !a.modified {
+// 		a.m = InfinitePenalty
+// 	}
+// 	a.modified = true
+// 	a.m = min(a.m, n)
+// }
+
+// func (a *MaxMerits) HasValue() bool {
+// 	return a.modified
+// }
+
+// func (a *MaxMerits) Value() int {
+// 	return a.m
+// }
 
 // SubscribeMe lets a client subscribe to a RunePublisher.
 //
 // Part of interface RunePublisher.
 func (rpub *DefaultRunePublisher) SubscribeMe(rsub RuneSubscriber) RunePublisher {
-	if rpub.aggregate == nil { // this is necessary as we allow uninitialzed DefaultRunePublishers
-		rpub.aggregate = AddPenalties
-	}
+	// if rpub.aggregate == nil { // this is necessary as we allow uninitialzed DefaultRunePublishers
+	// 	rpub.aggregate = &AddPenalties{}
+	// }
 	rpub.Push(rsub)
 	return rpub
 }
 
 // ----------------------------------------------------------------------
+
+func min(a int, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
 
 func max(a int, b int) int {
 	if a > b {

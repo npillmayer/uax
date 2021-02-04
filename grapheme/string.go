@@ -172,7 +172,7 @@ func prepareBreaking(s string) *segment.Segmenter {
 }
 
 func makeGraphemeBreaker() *segment.Segmenter {
-	onGraphemes := NewBreaker()
+	onGraphemes := NewBreaker(1)
 	segm := segment.NewSegmenter(onGraphemes)
 	return segm
 }

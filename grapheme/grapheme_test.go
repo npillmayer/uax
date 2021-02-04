@@ -9,6 +9,8 @@ import (
 	"testing"
 	"unicode"
 
+	"github.com/npillmayer/schuko/gtrace"
+	"github.com/npillmayer/schuko/testconfig"
 	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 	"github.com/npillmayer/uax/segment"
@@ -41,7 +43,7 @@ func TestGraphemes1(t *testing.T) {
 	defer teardown()
 	SetupGraphemeClasses()
 	//
-	onGraphemes := NewBreaker()
+	onGraphemes := NewBreaker(1)
 	input := bytes.NewReader([]byte("Hello\tWorld"))
 	seg := segment.NewSegmenter(onGraphemes)
 	seg.Init(input)
@@ -53,37 +55,50 @@ func TestGraphemes1(t *testing.T) {
 }
 
 func TestGraphemes2(t *testing.T) {
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := testconfig.QuickConfig(t)
 	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelInfo)
+	//
 	SetupGraphemeClasses()
 	//
-	onGraphemes := NewBreaker()
+	onGraphemes := NewBreaker(1)
 	input := bytes.NewReader([]byte("Hello\tWorld"))
 	seg := segment.NewSegmenter(onGraphemes)
+	seg.BreakOnZero(true, false)
 	seg.Init(input)
+	output := ""
 	for seg.Next() {
 		t.Logf("Next() = %s\n", seg.Text())
+		output += "_" + seg.Text()
 	}
 	if seg.Err() != nil {
 		t.Errorf("segmenter.Next() failed with error: %s", seg.Err())
 	}
+	if output != "_H_e_l_l_o_\t_W_o_r_l_d!" {
+		t.Errorf("expected grapheme for every char pos, have %s", output)
+	}
 }
 
 func TestGraphemesTestFile(t *testing.T) {
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := testconfig.QuickConfig(t)
 	defer teardown()
-	TC().SetTraceLevel(tracing.LevelError)
-	SetupGraphemeClasses()
+	TC().SetTraceLevel(tracing.LevelInfo)
 	//
 	SetupGraphemeClasses()
-	onGraphemes := NewBreaker()
+	//
+	onGraphemes := NewBreaker(5)
 	seg := segment.NewSegmenter(onGraphemes)
-	gopath := os.Getenv("GOPATH")
-	f, err := os.Open(gopath + "/etc/GraphemeBreakTest.txt")
+	seg.BreakOnZero(true, false)
+	//gopath := os.Getenv("GOPATH")
+	//f, err := os.Open(gopath + "/etc/GraphemeBreakTest.txt")
+	//f, err := os.Open(gopath + "/etc/GraphemeBreakTest.txt")
+	f, err := os.Open("./testfile/GraphemeBreakTest.txt")
 	if err != nil {
-		t.Errorf("ERROR loading " + gopath + "/etc/GraphemeBreakTest.txt\n")
+		//t.Errorf("ERROR loading " + gopath + "/etc/GraphemeBreakTest.txt\n")
+		t.Errorf("ERROR loading ./testfile/GraphemeBreakTest.txt\n")
 	}
 	defer f.Close()
+	//failcnt, i, from, to := 0, 0, 1, 1000
 	failcnt, i, from, to := 0, 0, 1, 1000
 	scan := bufio.NewScanner(f)
 	for scan.Scan() {
@@ -96,10 +111,12 @@ func TestGraphemesTestFile(t *testing.T) {
 		if i >= from {
 			parts := strings.Split(line, "#")
 			testInput, comment := parts[0], parts[1]
+			//TC().Infof("#######################################################")
 			TC().Infof(comment)
 			in, out := breakTestInput(testInput)
 			if !executeSingleTest(t, seg, i, in, out) {
 				failcnt++
+				//t.Fatal("Test case failed")
 			}
 		}
 		if i >= to {
@@ -107,7 +124,7 @@ func TestGraphemesTestFile(t *testing.T) {
 		}
 	}
 	if err := scan.Err(); err != nil {
-		TC().Errorf("reading input:", err)
+		TC().Infof("reading input:", err)
 	}
 	t.Logf("%d TEST CASES OUT of %d FAILED", failcnt, i-from+1)
 }
@@ -116,7 +133,7 @@ func breakTestInput(ti string) (string, []string) {
 	//fmt.Printf("breaking up %s\n", ti)
 	sc := bufio.NewScanner(strings.NewReader(ti))
 	sc.Split(bufio.ScanWords)
-	out := make([]string, 0, 5)
+	out := make([]string, 0, 10)
 	inp := bytes.NewBuffer(make([]byte, 0, 20))
 	run := bytes.NewBuffer(make([]byte, 0, 20))
 	for sc.Scan() {
@@ -140,15 +157,34 @@ func breakTestInput(ti string) (string, []string) {
 }
 
 func executeSingleTest(t *testing.T, seg *segment.Segmenter, tno int, in string, out []string) bool {
+	TC().Infof("expecting %v", ost(out))
 	seg.Init(strings.NewReader(in))
 	i := 0
 	ok := true
 	for seg.Next() {
-		if out[i] != seg.Text() {
+		if i >= len(out) {
+			t.Errorf("broken lexemes longer than expected output")
+		} else if out[i] != seg.Text() {
+			p0, p1 := seg.Penalties()
+			t.Errorf("test #%d: penalties = %d|%d", tno, p0, p1)
 			t.Errorf("test #%d: '%+q' should be '%+q'", tno, seg.Bytes(), out[i])
 			ok = false
 		}
 		i++
 	}
 	return ok
+}
+
+func ost(out []string) string {
+	s := ""
+	first := true
+	for _, o := range out {
+		if first {
+			first = false
+		} else {
+			s += "-"
+		}
+		s += "[" + o + "]"
+	}
+	return s
 }

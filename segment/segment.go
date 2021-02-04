@@ -84,7 +84,6 @@ import (
 	"math"
 	"strconv"
 	"strings"
-	"unicode"
 
 	"github.com/npillmayer/schuko/gtrace"
 
@@ -105,16 +104,17 @@ func CT() tracing.Trace {
 // using whitespace as boundaries. For more sophisticated breakers see
 // sub-packages of package uax.
 type Segmenter struct {
-	deque                      *deque               // where we collect runes and penalties
-	reader                     io.RuneReader        // where we get the next runes from
-	breakers                   []uax.UnicodeBreaker // our work horses
-	activeSegment              []byte               // the most recent segment to build
-	buffer                     *bytes.Buffer        // wrapper around activeSegment
-	lastPenalties              [2]int               // penalties at last break opportunity
-	maxSegmentLen              int                  // maximum length allowed for segments
-	pos                        int64                // current position in text
-	primaryAgg, secondaryAgg   uax.PenaltyAggregator
-	primarySeed, secondarySeed int
+	deque         *deque               // where we collect runes and penalties
+	reader        io.RuneReader        // where we get the next runes from
+	breakers      []uax.UnicodeBreaker // our work horses
+	activeSegment []byte               // the most recent segment to build
+	buffer        *bytes.Buffer        // wrapper around activeSegment
+	lastPenalties [2]int               // penalties at last break opportunity
+	maxSegmentLen int                  // maximum length allowed for segments
+	pos           int64                // current position in text
+	breakOnZero   [2]bool              // treat zero value as a valid breakpoint?
+	//primaryAgg, secondaryAgg   uax.PenaltyAggregator
+	//primarySeed, secondarySeed int
 	longestActiveMatch         int
 	positionOfBreakOpportunity int
 	err                        error
@@ -148,8 +148,8 @@ func NewSegmenter(breakers ...uax.UnicodeBreaker) *Segmenter {
 		breakers = []uax.UnicodeBreaker{NewSimpleWordBreaker()}
 	}
 	s.breakers = breakers
-	s.primaryAgg = uax.AddPenalties
-	s.secondaryAgg = uax.AddPenalties
+	// s.primaryAgg = uax.AddPenalties
+	// s.secondaryAgg = uax.AddPenalties
 	return s
 }
 
@@ -171,8 +171,7 @@ func (s *Segmenter) Init(reader io.RuneReader) {
 		s.atEOF = false
 		s.buffer.Reset()
 		s.inUse = false
-		s.lastPenalties[0] = 0
-		s.lastPenalties[1] = 0
+		s.lastPenalties[0], s.lastPenalties[1] = 0, 0
 		s.pos = 0
 	}
 	s.positionOfBreakOpportunity = -1
@@ -205,6 +204,11 @@ func (s *Segmenter) Err() error {
 	return s.err
 }
 
+func (s *Segmenter) BreakOnZero(forP1, forP2 bool) {
+	s.breakOnZero[0] = forP1
+	s.breakOnZero[1] = forP2
+}
+
 // Set the null-value for penalties. Penalties equal to this value will
 // be treated as if no penalty occured (possibly resulting in the
 // suppression of a break opportunity).
@@ -231,8 +235,14 @@ func (s *Segmenter) SetNullPenalty(bInx int, isNull func(int) bool) {
 */
 
 // Penalties >= InfinitePenalty are considered too bad for being a break opportunity.
-func tooBad(p int) bool {
-	return p >= uax.InfinitePenalty
+func isPossibleBreak(p int, breakOnZero bool) bool {
+	if p >= uax.InfinitePenalty {
+		return false
+	}
+	if !breakOnZero && p == 0 {
+		return false
+	}
+	return true
 }
 
 // Next gets the next segment, together with the accumulated penalty for this break.
@@ -261,9 +271,14 @@ func (s *Segmenter) Next() bool {
 // See also method `Next`.
 //
 func (s *Segmenter) BoundedNext(bound int64) bool {
+	if s.pos >= bound {
+		return false
+	}
 	return s.next(bound)
 }
 
+// next advances the input pointer until a possible break point has been
+// found or alternatively the bound has been reached while trying.
 func (s *Segmenter) next(bound int64) bool {
 	if s.reader == nil {
 		s.setErr(ErrNotInitialized)
@@ -277,17 +292,25 @@ func (s *Segmenter) next(bound int64) bool {
 			return false
 		}
 	}
+	CT().Debugf("----- have read enough input ----")
 	if s.positionOfBreakOpportunity < 0 { // didn't find a break opportunity
+		if false && s.pos >= bound { // TODO no opportunity, but reached bound => return segment
+			l := s.copySegment(s.buffer)
+			s.activeSegment = s.buffer.Bytes()
+			CT().P("length", strconv.Itoa(l)).Debugf("BNext()|= \"%v\"", string(s.activeSegment))
+			return true
+		}
+		// otherwise do not return anything
 		s.activeSegment = nil
 		return false
 	}
 	l := s.getFrontSegment(s.buffer)
 	s.activeSegment = s.buffer.Bytes()
 	CT().P("length", strconv.Itoa(l)).Debugf("Next() = \"%v\"", string(s.activeSegment))
-	if s.pos >= bound {
-		CT().Debugf("=================================")
-		return false
-	}
+	// if s.pos >= bound {
+	// 	CT().Debugf("=================================")
+	// 	return false
+	// }
 	return true
 }
 
@@ -325,12 +348,12 @@ func (s *Segmenter) setErr(err error) {
 // aggregators which are semi-groups (i.e., have not neutral element), a seed
 // is required to give a starting
 // point for aggregation.
-func (s *Segmenter) SetPenaltyAggregator(pa uax.PenaltyAggregator, seed int) {
-	if pa != nil {
-		s.primaryAgg = pa
-		s.primarySeed = seed
-	}
-}
+// func (s *Segmenter) SetPenaltyAggregator(pa uax.PenaltyAggregator, seed int) {
+// 	if pa != nil {
+// 		s.primaryAgg = pa
+// 		s.primarySeed = seed
+// 	}
+// }
 
 // SetSecondaryPenaltyAggregator sets an aggregate function for penalties
 // from all the secondary breaks.
@@ -338,12 +361,12 @@ func (s *Segmenter) SetPenaltyAggregator(pa uax.PenaltyAggregator, seed int) {
 // aggregators which are semi-groups (i.e., have not neutral element), a seed
 // is required to give a starting
 // point for aggregation.
-func (s *Segmenter) SetSecondaryPenaltyAggregator(pa uax.PenaltyAggregator, seed int) {
-	if pa != nil {
-		s.secondaryAgg = pa
-		s.secondarySeed = seed
-	}
-}
+// func (s *Segmenter) SetSecondaryPenaltyAggregator(pa uax.PenaltyAggregator, seed int) {
+// 	if pa != nil {
+// 		s.secondaryAgg = pa
+// 		s.secondarySeed = seed
+// 	}
+// }
 
 func (s *Segmenter) readRune() error {
 	if s.atEOF {
@@ -353,7 +376,8 @@ func (s *Segmenter) readRune() error {
 	s.pos += int64(sz)
 	CT().P("rune", fmt.Sprintf("%#U", r)).Debugf("--------------------------------------")
 	if err == nil {
-		s.deque.PushBack(r, s.primarySeed, s.secondarySeed)
+		//s.deque.PushBack(r, s.primarySeed, s.secondarySeed)
+		s.deque.PushBack(r, 0, 0)
 	} else if err == io.EOF {
 		s.deque.PushBack(eotAtom.r, eotAtom.penalty0, eotAtom.penalty1)
 		s.atEOF = true
@@ -365,17 +389,25 @@ func (s *Segmenter) readRune() error {
 	return err
 }
 
+var errBoundReached = errors.New("bound reached")
+
 func (s *Segmenter) readEnoughInput(bound int64) (err error) {
 	for s.positionOfBreakOpportunity < 0 && s.pos < bound {
 		l := s.deque.Len()
+		if s.pos-int64(s.longestActiveMatch) >= bound {
+			CT().Errorf("===> BOUND REACHED")
+		}
 		err = s.readRune()
 		if err != nil {
 			break
 		}
-		if s.deque.Len() == l { // is this necessary ?
-			panic("code-point deque did not grow") // TODO remove this after extensive testing
+		if s.deque.Len() == l {
+			panic("segmenter: code-point deque did not grow") // TODO remove this after extensive testing
 		}
-		from := max(0, l-1-s.longestActiveMatch) // old longest match limit
+		from := max(0, l-1-s.longestActiveMatch) // current longest match limit, now old
+		// TODO if from >= bound: exit loop
+		// avoid to read rune on re-enter of this loop
+		//
 		l = s.deque.Len()
 		s.longestActiveMatch = 0
 		r, _, _ := s.deque.Back()
@@ -389,7 +421,8 @@ func (s *Segmenter) readEnoughInput(bound int64) (err error) {
 			s.insertPenalties(s.inxForBreaker(breaker), breaker.Penalties())
 		}
 		s.positionOfBreakOpportunity = s.findBreakOpportunity(from, l-1-s.longestActiveMatch)
-		CT().Debugf("distance = %d, active match = %d", s.positionOfBreakOpportunity, s.longestActiveMatch)
+		//s.positionOfBreakOpportunity = s.findBreakOpportunity(from, l-s.longestActiveMatch)
+		CT().Debugf("segmenter: breakpos = %d, active match = %d", s.positionOfBreakOpportunity, s.longestActiveMatch)
 		s.printQ()
 	}
 	return err
@@ -397,15 +430,16 @@ func (s *Segmenter) readEnoughInput(bound int64) (err error) {
 
 func (s *Segmenter) findBreakOpportunity(from int, to int) int {
 	pos := -1
-	CT().Debugf("searching for break opportunity from %d to %d: ", from, to-1)
+	CT().Debugf("segmenter: searching for break opportunity from %d to %d: ", from, to-1)
 	for i := 0; i < to; i++ {
-		_, p0, p1 := s.deque.At(i)
-		if !tooBad(p0) || (len(s.breakers) > 1 && !tooBad(p1)) {
+		j, p0, p1 := s.deque.At(i)
+		CT().Debugf("segmenter: penalties[%#U] = %d|%d", j, p0, p1)
+		if isPossibleBreak(p0, s.breakOnZero[0]) || (len(s.breakers) > 1 && isPossibleBreak(p1, s.breakOnZero[1])) {
 			pos = i
 			break
 		}
 	}
-	CT().Debugf("break opportunity at %d", pos)
+	CT().Debugf("segmenter: break opportunity at %d", pos)
 	return pos
 }
 
@@ -417,17 +451,21 @@ func (s *Segmenter) inxForBreaker(b uax.UnicodeBreaker) int {
 	return 1
 }
 
-func (s *Segmenter) insertPenalties(bInx int, penalties []int) {
+func (s *Segmenter) insertPenalties(selector int, penalties []int) {
 	l := s.deque.Len()
 	if len(penalties) > l {
 		penalties = penalties[0:l] // drop excessive penalties
 	}
 	for i, p := range penalties {
 		r, total0, total1 := s.deque.At(l - 1 - i)
-		if bInx == 0 {
-			total0 = s.primaryAgg(total0, p)
+		if selector == 0 {
+			// total0 = s.primaryAgg(total0, p)
+			//total0 += p
+			total0 = bounded(total0 + p)
 		} else {
-			total1 = s.secondaryAgg(total1, p)
+			// total1 = s.secondaryAgg(total1, p)
+			//total1 += p
+			total1 = bounded(total1 + p)
 		}
 		s.deque.SetAt(l-1-i, r, total0, total1)
 	}
@@ -466,6 +504,34 @@ func (s *Segmenter) getFrontSegment(buf *bytes.Buffer) int {
 	return seglen
 }
 
+func (s *Segmenter) copySegment(buf *bytes.Buffer) int {
+	buf.Reset()
+	l := s.deque.Len() - 1
+	if l > buf.Len() {
+		if l > s.maxSegmentLen {
+			s.setErr(ErrTooLong)
+			return 0
+		}
+		newSize := max(buf.Len()+startBufSize, l+1)
+		if newSize > s.maxSegmentLen {
+			newSize = s.maxSegmentLen
+		}
+		buf.Grow(newSize)
+	}
+	seglen, cnt := 0, 0
+	for i := 0; i <= l; i++ {
+		r, p0, p1 := s.deque.At(i)
+		written, _ := buf.WriteRune(r)
+		seglen += written
+		cnt++
+		s.lastPenalties[0] = p0
+		s.lastPenalties[1] = p1
+	}
+	return seglen
+}
+
+// ----------------------------------------------------------------------
+
 // Debugging helper. Print the content of the current queue to the debug log.
 func (s *Segmenter) printQ() {
 	if CT().GetTraceLevel() <= tracing.LevelDebug {
@@ -482,102 +548,7 @@ func (s *Segmenter) printQ() {
 	CT().Debugf(sb.String())
 }
 
-// ----------------------------------------------------------------------
-
-// SimpleWordBreaker is a UnicodeBreaker which breaks at whitespace.
-// Whitespace is determined by unicode.IsSpace(r) for any rune.
-type SimpleWordBreaker struct {
-	penaltiesSlice []int
-	penalties      []int
-	matchLen       int
-}
-
-// SimpleWordBreaker will assign the following penalties:
-//
-// (1) Before a sequence of whitespace runes, the penalty will be 100.
-//
-// (2) After a sequence of whitespace runes, the penalty will be -100 (a merit).
-//
-// (3) Before an EOT marker, the penalty will be -1000 (mandatory break).
-const (
-	PenaltyBeforeWhitespace int = 100
-	PenaltyAfterWhitespace  int = -100
-	PenaltyBeforeEOT        int = -10000
-)
-
-// NewSimpleWordBreaker creates
-// a new SimpleWordBreaker. Does nothing special – usually it is
-// sufficient to use an empty SimpleWordBreaker struct.
-func NewSimpleWordBreaker() *SimpleWordBreaker {
-	swb := &SimpleWordBreaker{}
-	return swb
-}
-
-// CodePointClassFor is a very simple implementation to return code point
-// classes, which will return 1 for whitespace and 0 otherwise.
-// (Interface UnicodeBreaker)
-func (swb *SimpleWordBreaker) CodePointClassFor(r rune) int {
-	if unicode.IsSpace(r) {
-		return 1
-	}
-	return 0
-}
-
-// StartRulesFor is part of interface UnicodeBreaker
-func (swb *SimpleWordBreaker) StartRulesFor(rune, int) {
-}
-
-var immediateBreakBefore = []int{0, -2000}
-var inhibitBreakBefore = []int{1000, 0}
-
-// ProceedWithRune is part of interface UnicodeBreaker
-func (swb *SimpleWordBreaker) ProceedWithRune(r rune, cpClass int) {
-	if r == 0 {
-		if swb.matchLen > 0 { // previous rune(s) is/were whitespace
-			// close a match of length matchLen (= count of whitespace runes)
-			swb.penalties = swb.penaltiesSlice[:0]       // re-set penalties
-			swb.penalties = append(swb.penalties, 1000)  // inhibit break before WS span
-			swb.penalties = append(swb.penalties, -2000) // break point
-			for i := 2; i <= swb.matchLen; i++ {         // inhibit break between WS runes
-				swb.penalties = append(swb.penalties, 1000)
-			}
-			swb.penalties = append(swb.penalties, -900) // break before end of text
-			swb.matchLen = 0
-		} else {
-			swb.penalties = immediateBreakBefore // break before end of text
-		}
-	} else if cpClass == 1 { // rune is whitespace
-		swb.matchLen++
-		swb.penalties = nil
-	} else { // non-whitespace
-		if swb.matchLen > 0 { // previous rune(s) is/were whitespace
-			// close a match of length matchLen (= count of whitespace runes)
-			swb.penalties = swb.penaltiesSlice[:0]      // re-set penalties
-			swb.penalties = append(swb.penalties, 1000) // inhibit break before WS span
-			swb.penalties = append(swb.penalties, -100) // break point
-			for i := 2; i <= swb.matchLen; i++ {        // inhibit break between WS runes
-				swb.penalties = append(swb.penalties, 1000)
-			}
-			swb.penalties = append(swb.penalties, -900) // break point
-			swb.matchLen = 0
-		} else {
-			swb.penalties = inhibitBreakBefore // do not break between non-whitespace
-		}
-	}
-}
-
-// LongestActiveMatch is part of interface UnicodeBreaker
-func (swb *SimpleWordBreaker) LongestActiveMatch() int {
-	return swb.matchLen
-}
-
-// Penalties is part of interface UnicodeBreaker
-func (swb *SimpleWordBreaker) Penalties() []int {
-	//fmt.Printf("emitting %v\n", swb.penalties)
-	return swb.penalties
-}
-
-// ----------------------------------------------------------------------
+// --- Helpers ----------------------------------------------------------
 
 func min(a int, b int) int {
 	if a < b {
@@ -591,4 +562,13 @@ func max(a int, b int) int {
 		return a
 	}
 	return b
+}
+
+func bounded(p int) int {
+	if p > uax.InfinitePenalty {
+		p = uax.InfinitePenalty
+	} else if p < uax.InfiniteMerits {
+		p = uax.InfiniteMerits
+	}
+	return p
 }

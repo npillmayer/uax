@@ -11,6 +11,8 @@ import "fmt"
 // frequent allocation/dealloation of small objects. I could have used
 // a pool, but it's more efficient to rely on the smart memory
 // allocation strategy of Deque. Many thanks to gammazero for the great work!
+// As soon as Go has generics and the original code gets parametrized, I
+// will switch back to gammazero's version.
 //
 // Deque represents a single instance of the deque data structure.
 type deque struct {

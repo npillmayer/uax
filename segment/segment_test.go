@@ -7,6 +7,7 @@ import (
 
 	"github.com/npillmayer/schuko/gtrace"
 	"github.com/npillmayer/schuko/testconfig"
+	"github.com/npillmayer/schuko/tracing"
 
 	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 )
@@ -70,33 +71,15 @@ func TestSimpleSegmenter2(t *testing.T) {
 	}
 }
 
-func TestSimpleSegmenter3(t *testing.T) {
-	gtrace.CoreTracer = gotestingadapter.New()
-	teardown := gotestingadapter.RedirectTracing(t)
-	defer teardown()
-	seg := NewSegmenter() // will use a SimpleWordBreaker
-	seg.Init(strings.NewReader("Hello World, how are you?"))
-	n := 0
-	for seg.Next() {
-		p1, p2 := seg.Penalties()
-		t.Logf("segment: penalty = %5d|%d for breaking after '%s'\n",
-			p1, p2, seg.Text())
-		n++
-	}
-	if n != 9 {
-		t.Errorf("Expected 9 segments, have %d", n)
-	}
-}
-
 func TestBounded(t *testing.T) {
 	teardown := testconfig.QuickConfig(t)
 	defer teardown()
 	//gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
-	seg := NewSegmenter() // will use a SimpleWordBreaker
+	seg := NewSegmenter(NewSimpleWordBreaker())
 	seg.Init(strings.NewReader("Hello World, how are you?"))
 	n := 0
-	for seg.BoundedNext(15) {
+	for seg.BoundedNext(13) {
 		p1, p2 := seg.Penalties()
 		t.Logf("segment: penalty = %5d|%d for breaking after '%s'\n",
 			p1, p2, seg.Text())
@@ -104,6 +87,34 @@ func TestBounded(t *testing.T) {
 	}
 	if n != 4 {
 		t.Errorf("Expected 4 segments, have %d", n)
+	}
+	for seg.Next() {
+		p1, p2 := seg.Penalties()
+		t.Logf("segment: penalty = %5d|%d for breaking after '%s'\n",
+			p1, p2, seg.Text())
+		n++
+	}
+	if n != 11 {
+		t.Errorf("Expected 10 segments, have %d", n)
+	}
+}
+
+func TestSimpleSegnew(t *testing.T) {
+	teardown := testconfig.QuickConfig(t)
+	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelInfo)
+	//
+	seg := NewSegmenter(NewSimpleWordBreaker())
+	seg.Init(strings.NewReader("Hello World, how are you?"))
+	n := 0
+	for seg.Next() {
+		p1, p2 := seg.Penalties()
+		t.Logf("********* segment: penalty = %5d|%d for breaking after '%s'\n",
+			p1, p2, seg.Text())
+		n++
+	}
+	if n != 9 {
+		t.Errorf("Expected 9 segments, have %d", n)
 	}
 }
 
@@ -118,5 +129,5 @@ func ExampleSegmenter() {
 	// Output:
 	// segment: penalty =   100|0 for breaking after 'Hello'
 	// segment: penalty =  -100|0 for breaking after ' '
-	// segment: penalty = -1000|0 for breaking after 'World!'
+	// segment: penalty =   100|0 for breaking after 'World!'
 }

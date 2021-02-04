@@ -186,6 +186,6 @@ func CT() tracing.Trace {
 // We define constants for flagging break points as infinitely bad and
 // infinitely good, respectively.
 const (
-	InfinitePenalty = 1000
-	InfiniteMerits  = -1000
+	InfinitePenalty = 10000
+	InfiniteMerits  = -10000
 )

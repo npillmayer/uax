@@ -95,3 +95,6 @@ import (
 func TC() tracing.Trace {
 	return gtrace.CoreTracer
 }
+
+// Version is the Unicode version this package conforms to.
+const Version = "11.0.0"
