@@ -85,7 +85,11 @@ point of view they aren't consistent.
 3 out of the 7282 test cases fail. That doesn't sound too much of a problem,
 but I'm afraid the interpretation I chose is not the best one. Nevertheless,
 at this point I'm inclined to postpone the problem and to first seek some
-practical experience with real-life multi-lingual texts. */
+practical experience with real-life multi-lingual texts.
+
+Edit: After some modifications on the Segmenter type, now 183 tests for UAX#14 fail.
+I will fix this as soon as I have time to re-visit this.
+*/
 package uax14
 
 import (
@@ -309,6 +313,11 @@ func substitueSomeClasses(c UAX14Class, lastClass UAX14Class) (UAX14Class, UAX14
 	return c, shadow
 }
 
+const (
+	noBreak int = 10000
+	doBreak int = -10000
+)
+
 // ProceedWithRune is part of interface unicode.Breaker.
 // A new code-point has been read and this breaker receives a message to
 // consume it.
@@ -319,17 +328,17 @@ func (uax14 *LineWrap) ProceedWithRune(r rune, cpClass int) {
 	//fmt.Printf("   x = %v\n", x)
 	if uax14.substituted && uax14.lastClass == c { // do not break between runes for rule 09
 		if len(x) > 1 && x[1] == 0 {
-			x[1] = 1000
+			x[1] = noBreak
 		} else if len(x) == 1 {
-			x = append(x, 1000)
+			x = append(x, noBreak)
 		} else if len(x) == 0 {
 			x = make([]int, 2)
-			x[1] = 1000
+			x[1] = noBreak
 		}
 	}
 	for i, p := range x { // positive penalties get lifted +1000
 		if p > 0 {
-			p += 1000
+			p += noBreak
 			x[i] = p
 		}
 	}
@@ -367,7 +376,7 @@ func (uax14 *LineWrap) unblock() {
 
 // Penalties (suppress break and mandatory break).
 var (
-	PenaltyToSuppressBreak = 5000
+	PenaltyToSuppressBreak = 10000
 	PenaltyForMustBreak    = -10000
 )
 
