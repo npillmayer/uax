@@ -121,6 +121,7 @@ type WordBreaker struct {
 	penalties    []int             // returned to the segmenter: penalties to insert
 	rules        map[UAX29Class][]uax.NfaStateFn
 	blockedRI    bool // are rules for Regional_Indicator currently blocked?
+	weight       int  // will multiply penalties by this factor
 }
 
 // NewWordBreaker creates a a new UAX#29 word breaker.
@@ -132,8 +133,11 @@ type WordBreaker struct {
 //   segmenter.Init(...)
 //   for segmenter.Next() ...
 //
-func NewWordBreaker() *WordBreaker {
-	gb := &WordBreaker{}
+// weight is a multilying factor for penalties. It must be 0…w…5 and will
+// be capped for values outside this range.
+//
+func NewWordBreaker(weight int) *WordBreaker {
+	gb := &WordBreaker{weight: capw(weight)}
 	gb.publisher = uax.NewRunePublisher()
 	gb.rules = map[UAX29Class][]uax.NfaStateFn{
 		CRClass:                 {rule_NewLine},
@@ -232,7 +236,7 @@ func (gb *WordBreaker) Penalties() []int {
 // Penalties (inter-word optional break, suppress break and mandatory break).
 var (
 	PenaltyForBreak        = 50
-	PenaltyToSuppressBreak = 5000
+	PenaltyToSuppressBreak = 10000
 	PenaltyForMustBreak    = -10000
 )
 
@@ -574,4 +578,16 @@ func rule_WB4(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 		return uax.DoAccept(rec, 0, PenaltyToSuppressBreak)
 	}
 	return uax.DoAbort(rec)
+}
+
+// ---------------------------------------------------------------------------
+
+func capw(w int) int {
+	if w < 0 {
+		return w
+	}
+	if w > 5 {
+		return 5
+	}
+	return w
 }

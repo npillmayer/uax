@@ -6,16 +6,17 @@ import (
 	"testing"
 
 	"github.com/npillmayer/schuko/gtrace"
+	"github.com/npillmayer/schuko/testconfig"
 	"github.com/npillmayer/schuko/tracing"
-	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 	"github.com/npillmayer/uax/segment"
 	"github.com/npillmayer/uax/uax29"
 	"github.com/npillmayer/uax/ucd"
 )
 
 func ExampleWordBreaker() {
-	onWords := uax29.NewWordBreaker()
+	onWords := uax29.NewWordBreaker(1)
 	segmenter := segment.NewSegmenter(onWords)
+	segmenter.BreakOnZero(true, false)
 	segmenter.Init(strings.NewReader("Hello World🇩🇪!"))
 	for segmenter.Next() {
 		fmt.Printf("'%s'\n", segmenter.Text())
@@ -28,8 +29,13 @@ func ExampleWordBreaker() {
 }
 
 func TestWordBreaks1(t *testing.T) {
-	onWords := uax29.NewWordBreaker()
+	teardown := testconfig.QuickConfig(t)
+	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	onWords := uax29.NewWordBreaker(1)
 	segmenter := segment.NewSegmenter(onWords)
+	segmenter.BreakOnZero(true, false)
 	segmenter.Init(strings.NewReader("Hello World "))
 	n := 0
 	for segmenter.Next() {
@@ -42,8 +48,13 @@ func TestWordBreaks1(t *testing.T) {
 }
 
 func TestWordBreaks2(t *testing.T) {
-	onWords := uax29.NewWordBreaker()
+	teardown := testconfig.QuickConfig(t)
+	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	onWords := uax29.NewWordBreaker(1)
 	segmenter := segment.NewSegmenter(onWords)
+	segmenter.BreakOnZero(true, false)
 	segmenter.Init(strings.NewReader("lime-tree"))
 	n := 0
 	for segmenter.Next() {
@@ -57,21 +68,24 @@ func TestWordBreaks2(t *testing.T) {
 }
 
 func TestWordBreakTestFile(t *testing.T) {
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := testconfig.QuickConfig(t)
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelError)
-	onWordBreak := uax29.NewWordBreaker()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	onWordBreak := uax29.NewWordBreaker(1)
 	seg := segment.NewSegmenter(onWordBreak)
+	seg.BreakOnZero(true, false)
 	tf := ucd.OpenTestFile("./WordBreakTest.txt", t)
 	defer tf.Close()
 	failcnt, i, from, to := 0, 0, 1, 1900
 	for tf.Scan() {
 		i++
 		if i >= from {
-			//t.Logf(tf.Comment())
+			t.Logf(tf.Comment())
 			in, out := ucd.BreakTestInput(tf.Text())
 			if !executeSingleTest(t, seg, i, in, out) {
 				failcnt++
+				//t.Fatalf("test failed")
 			}
 		}
 		if i >= to {
