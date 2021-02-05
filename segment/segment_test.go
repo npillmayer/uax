@@ -74,28 +74,35 @@ func TestSimpleSegmenter2(t *testing.T) {
 func TestBounded(t *testing.T) {
 	teardown := testconfig.QuickConfig(t)
 	defer teardown()
-	//gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelInfo)
 	//
 	seg := NewSegmenter(NewSimpleWordBreaker())
 	seg.Init(strings.NewReader("Hello World, how are you?"))
 	n := 0
+	output := ""
 	for seg.BoundedNext(13) {
 		p1, p2 := seg.Penalties()
 		t.Logf("segment: penalty = %5d|%d for breaking after '%s'\n",
 			p1, p2, seg.Text())
+		output += " [" + seg.Text() + "]"
 		n++
 	}
 	if n != 4 {
-		t.Errorf("Expected 4 segments, have %d", n)
+		t.Fatalf("Expected 4 segments, have %d", n)
 	}
+	t.Logf("seg.Err() = %v", seg.Err())
+	t.Logf("bounded: passed 1st test ")
+	t.Logf("bounded: output = %v", output)
 	for seg.Next() {
 		p1, p2 := seg.Penalties()
 		t.Logf("segment: penalty = %5d|%d for breaking after '%s'\n",
 			p1, p2, seg.Text())
+		output += " [" + seg.Text() + "]"
 		n++
 	}
-	if n != 11 {
-		t.Errorf("Expected 10 segments, have %d", n)
+	t.Logf("output = %v", output)
+	if n != 9 {
+		t.Errorf("Expected 9 segments, have %d", n)
 	}
 }
 

@@ -96,6 +96,11 @@ func CT() tracing.Trace {
 	return gtrace.CoreTracer
 }
 
+// ErrBoundReached is returned from BoundedNext() if the reason for returning false
+// (and therefore stopping to iterato over the input text) is, that the bound given
+// by the client has been reached.
+var ErrBoundReached = errors.New("bound reached")
+
 // A Segmenter receives a sequence of code-points from an io.RuneReader and
 // segments it into smaller parts, called segments.
 //
@@ -271,9 +276,9 @@ func (s *Segmenter) Next() bool {
 // See also method `Next`.
 //
 func (s *Segmenter) BoundedNext(bound int64) bool {
-	if s.pos >= bound {
-		return false
-	}
+	// if s.pos >= bound {
+	// 	return false
+	// }
 	return s.next(bound)
 }
 
@@ -389,13 +394,12 @@ func (s *Segmenter) readRune() error {
 	return err
 }
 
-var errBoundReached = errors.New("bound reached")
-
 func (s *Segmenter) readEnoughInput(bound int64) (err error) {
-	for s.positionOfBreakOpportunity < 0 && s.pos < bound {
+	for s.positionOfBreakOpportunity < 0 {
 		l := s.deque.Len()
 		if s.pos-int64(s.longestActiveMatch) >= bound {
-			CT().Errorf("===> BOUND REACHED")
+			CT().Infof("segmenter: bound reached")
+			return ErrBoundReached
 		}
 		err = s.readRune()
 		if err != nil {
@@ -404,10 +408,8 @@ func (s *Segmenter) readEnoughInput(bound int64) (err error) {
 		if s.deque.Len() == l {
 			panic("segmenter: code-point deque did not grow") // TODO remove this after extensive testing
 		}
-		from := max(0, l-1-s.longestActiveMatch) // current longest match limit, now old
-		// TODO if from >= bound: exit loop
-		// avoid to read rune on re-enter of this loop
 		//
+		from := max(0, l-1-s.longestActiveMatch) // current longest match limit, now old
 		l = s.deque.Len()
 		s.longestActiveMatch = 0
 		r, _, _ := s.deque.Back()
@@ -420,8 +422,8 @@ func (s *Segmenter) readEnoughInput(bound int64) (err error) {
 			}
 			s.insertPenalties(s.inxForBreaker(breaker), breaker.Penalties())
 		}
-		s.positionOfBreakOpportunity = s.findBreakOpportunity(from, l-1-s.longestActiveMatch)
-		//s.positionOfBreakOpportunity = s.findBreakOpportunity(from, l-s.longestActiveMatch)
+		//s.positionOfBreakOpportunity = s.findBreakOpportunity(from, l-1-s.longestActiveMatch)
+		s.positionOfBreakOpportunity = s.findBreakOpportunity(from, l-s.longestActiveMatch)
 		CT().Debugf("segmenter: breakpos = %d, active match = %d", s.positionOfBreakOpportunity, s.longestActiveMatch)
 		s.printQ()
 	}
