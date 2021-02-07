@@ -9,6 +9,7 @@ import (
 	"github.com/npillmayer/schuko/testconfig"
 	"github.com/npillmayer/schuko/tracing"
 
+	"github.com/npillmayer/schuko/tracing/gologadapter"
 	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 )
 
@@ -72,27 +73,29 @@ func TestSimpleSegmenter2(t *testing.T) {
 }
 
 func TestBounded(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
-	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelInfo)
+	// teardown := testconfig.QuickConfig(t)
+	// defer teardown()
+	gtrace.CoreTracer = gologadapter.New()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	seg := NewSegmenter(NewSimpleWordBreaker())
 	seg.Init(strings.NewReader("Hello World, how are you?"))
 	n := 0
 	output := ""
-	for seg.BoundedNext(13) {
+	for seg.BoundedNext(14) {
 		p1, p2 := seg.Penalties()
 		t.Logf("segment: penalty = %5d|%d for breaking after '%s'\n",
 			p1, p2, seg.Text())
 		output += " [" + seg.Text() + "]"
 		n++
 	}
-	if n != 4 {
-		t.Fatalf("Expected 4 segments, have %d", n)
-	}
 	t.Logf("seg.Err() = %v", seg.Err())
-	t.Logf("bounded: passed 1st test ")
 	t.Logf("bounded: output = %v", output)
+	if n != 5 {
+		t.Fatalf("Expected 5 segments, have %d", n)
+	}
+	t.Logf("bounded: passed 1st test ")
+	CT().Infof("======= rest =======")
 	for seg.Next() {
 		p1, p2 := seg.Penalties()
 		t.Logf("segment: penalty = %5d|%d for breaking after '%s'\n",
@@ -104,6 +107,7 @@ func TestBounded(t *testing.T) {
 	if n != 9 {
 		t.Errorf("Expected 9 segments, have %d", n)
 	}
+	t.Fail()
 }
 
 func TestSimpleSegnew(t *testing.T) {

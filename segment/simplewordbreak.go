@@ -17,7 +17,6 @@ type SimpleWordBreaker struct {
 //
 // (2) After a sequence of whitespace runes, the penalty will be -100 (a merit).
 //
-// (3) Before an EOT marker, the penalty will be -1000 (mandatory break).
 const (
 	PenaltyBeforeWhitespace int = 100
 	PenaltyAfterWhitespace  int = -100

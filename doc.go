@@ -78,8 +78,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 Contents
 
 Implementations of specific UAX algorithms is done in the various
-sub-packages of uax. The driver type sits in sub-package segment and will
-use breaking algorithms from the other sub-packages.
+sub-packages of uax. The driver type for some of the breaking-algorithms
+sits in sub-package segment and will
+use algorithms from other sub-packages.
 
 Base package uax provides some of the necessary
 means to implement UAX breaking algorithms. Please note that it is
@@ -97,13 +98,13 @@ efficiency and readability. The helper classes of uax allow implementors to
 transform UAX-rules into fairly readable small functions. From a maintenance
 point-of-view this is preferrable to huge and complex cascades of if-statements,
 which may sometimes provide better performance, but
-are hard to understand. All the breaking algorithms within sub-packages of uax
+are hard to understand. Most of the breaking algorithms within sub-packages of uax
 therefore utilize the helper types from package uax.
 
 We perform segmenting Unicode text based on rules, which are short
 regular expressions, i.e. finite state automata. This corresponds well with
-the formal UAX description of rules (except for the bidi rules).
-Every step within a
+the formal UAX description of rules (except for the Bidi-rules, which are
+are better understood as rules for a context-sensitive grammar). Every step within a
 rule is performed by executing a function. This function recognizes a single
 code-point class and returns another function. The returned function
 represents the expectation for the next code-point(-class).
@@ -152,24 +153,24 @@ Penalties
 
 Algorithms in this package will signal break opportunities for Unicode text.
 However, breaks are not signalled with true/false, but rather with a
-weighted "penalty". Every break is connoted with an integer value,
+weighted “penalty.” Every break is connoted with an integer value,
 representing the desirability of the break. Negative values denote a
-negative penalty, i.e. a merit. High enough penalties signal the complete
+negative penalty, i.e., a merit. High enough penalties signal the complete
 suppression of a break opportunity, causing the segmenter to not report
 this break.
 
 The UnicodeBreakers in this package (including sub-packages)
 will apply the following logic:
 
-(1) Mandatory breaks will have a penalty/merit of -1000 (uax.InfinitePenalty)
+(1) Mandatory breaks will have a penalty/merit of -10000 (uax.InfinitePenalty).
 
-(2) Inhibited breaks will have penalty >= 1000 (uax.InfiniteMerits)
+(2) Inhibited breaks will have penalty >= 10000 (uax.InfiniteMerits).
 
-(3) Neutral breaks will have a penalty of 0.
+(3) Neutral breaks will have a penalty of 0. The segmenter can be configured
+to reagard the zero value as breakable or not.
 
 The segmenter will aggregate penalties from its breakers and output aggregated
-penalties to the client. Segmenters may use different aggregation strategies,
-formalized by type PenaltyAggregator.
+penalties to the client.
 */
 package uax
 
