@@ -1,6 +1,10 @@
 package segment
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/npillmayer/uax"
+)
 
 // This is an adaption of an elegant queue data structure by
 // Andrew J. Gillis (gammazero). The original is found under
@@ -29,7 +33,8 @@ type atom struct {
 	penalty1 int // penalty for all secondary breakers
 }
 
-var eotAtom = atom{rune(0), 0, 0} // the atom denoting End of Text
+// the atom denoting End of Text
+var eotAtom = atom{rune(0), uax.InfinitePenalty, uax.InfinitePenalty}
 
 func (a *atom) String() string {
 	return fmt.Sprintf("[%+q p=%d|%d]", a.r, a.penalty0, a.penalty1)

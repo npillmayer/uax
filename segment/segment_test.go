@@ -90,6 +90,7 @@ func TestBounded(t *testing.T) {
 		n++
 	}
 	t.Logf("seg.Err() = %v", seg.Err())
+	t.Logf("seg.Text() = '%s'", seg.Text())
 	t.Logf("bounded: output = %v", output)
 	if n != 5 {
 		t.Fatalf("Expected 5 segments, have %d", n)

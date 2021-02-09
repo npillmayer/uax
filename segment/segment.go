@@ -295,13 +295,17 @@ func (s *Segmenter) Next() bool {
 // that occurred during scanning, except for io.EOF.
 // For the latter case Err() will return nil.
 //
+// BoundedNext will return the last fragment of text before the bound, even in case
+// of infinite penalties. If the client does not want this break, it is up to the
+// client to merge this fragment with the next one, if any.
+//
 // See also method `Next`.
 //
 func (s *Segmenter) BoundedNext(bound int64) bool {
-	CT().Infof("BoundedNext(%d) return with ", bound)
-	CT().Infof("pos=%d, active=%d, break=%d", s.pos, s.longestActiveMatch, s.positionOfBreakOpportunity)
-	s.printQ()
-	return s.next(bound)
+	// CT().Infof("BoundedNext(%d) return with ", bound)
+	// CT().Infof("pos=%d, active=%d, break=%d", s.pos, s.longestActiveMatch, s.positionOfBreakOpportunity)
+	// s.printQ()
+	return s.next(bound - 1) // semantics in `next` is including, API is excluding bound
 }
 
 // setErr() records the first error encountered.
@@ -383,11 +387,7 @@ func (s *Segmenter) next(bound int64) bool {
 	if s.reader == nil {
 		s.setErr(ErrNotInitialized)
 	}
-	// if bound > 20 {
-	// 	// TODO REMOVE THIS TEST
-	// 	CT().Infof("re-enter")
-	// 	s.printQ()
-	// }
+	//
 	s.inUse = true
 	if !s.atEOF {
 		err := s.readEnoughInputAndFindBreak(bound)
@@ -396,16 +396,12 @@ func (s *Segmenter) next(bound int64) bool {
 			s.activeSegment = nil
 			return false
 		}
-		if s.pos-int64(s.deque.Len()) >= bound {
+		if s.pos-int64(s.deque.Len()) > bound {
+			CT().Debugf("exiting because of bound reached: %d-%d>%d", s.pos, s.deque.Len(), bound)
 			return false
 		}
 	}
-	// if bound > 20 {
-	// 	CT().Infof("after re-enter and read input")
-	// 	s.printQ()
-	// 	CT().Infof("pos=%d, active=%d, break=%d", s.pos, s.longestActiveMatch, s.positionOfBreakOpportunity)
-	// }
-	// CT().Debugf("----- have read enough input ----")
+	//
 	if s.positionOfBreakOpportunity < 0 { // didn't find a break opportunity
 		s.activeSegment = nil
 		return false
@@ -413,6 +409,7 @@ func (s *Segmenter) next(bound int64) bool {
 	l, _ := s.getFrontSegment(s.buffer, bound)
 	//CT().Debugf("CUT=%v", cut)
 	s.activeSegment = s.buffer.Bytes()
+	//CT().Debugf("s.positionOfBreakOpp=%d", s.positionOfBreakOpportunity)
 	CT().P("length", strconv.Itoa(l)).Debugf("Next() = \"%v\"", string(s.activeSegment))
 	return true
 }
@@ -459,47 +456,67 @@ func (s *Segmenter) readRune() error {
 // We return ErrBoundReached in this case.
 //
 func (s *Segmenter) readEnoughInputAndFindBreak(bound int64) (err error) {
+	// if Q consists just of 0 rune (EOT), do nothing and return false
+	CT().Debugf("segmenter: read enough input, EOF=%v, |Q|=%d", s.atEOF, s.deque.Len())
+	// if s.atEOF && s.deque.Len() == 1 {
+	// 	front, _, _ := s.deque.Front()
+	// 	if front == rune(0) {
+	// 		s.lastPenalties[0], s.lastPenalties[1] = 0, 0
+	// 		return io.EOF
+	// 	}
+	// }
 	for s.positionOfBreakOpportunity < 0 {
-		if s.pos-int64(s.longestActiveMatch) >= bound {
+		if s.pos-int64(s.longestActiveMatch) > bound {
 			CT().Infof("segmenter: bound reached")
 			return ErrBoundReached
 		}
 		// CT().Debugf("pos=%d - %d = %d --> %d", s.pos, s.longestActiveMatch,
 		// 	s.pos-int64(s.longestActiveMatch), bound)
 		qlen := s.deque.Len()
-		if err = s.readRune(); err != nil {
-			break
-		}
-		if s.deque.Len() == qlen {
-			panic("segmenter: code-point deque did not grow") // TODO remove this after extensive testing
-		}
-		// Now we've got read in a new rune and are ready to fire up the breakers for it.
-		// We then harvest the new-found penalties from every breaker and insert the
-		// aggregates at the atoms in the Q.
 		from := max(0, qlen-1-s.longestActiveMatch) // current longest match limit, now old
-		if from != 0 {
-			CT().Errorf("active match is too short")
-			CT().Errorf("seems that the previous iteration did not deliver all breakpoints")
-			panic("`from` should be 0 !?")
-		}
-		qlen = s.deque.Len()
-		s.longestActiveMatch = 0
-		r, _, _ := s.deque.Back()
-		for _, breaker := range s.breakers {
-			cpClass := breaker.CodePointClassFor(r)
-			breaker.StartRulesFor(r, cpClass)
-			breaker.ProceedWithRune(r, cpClass)
-			if breaker.LongestActiveMatch() > s.longestActiveMatch {
-				s.longestActiveMatch = breaker.LongestActiveMatch()
+		skipRead := false
+		if from > 0 {
+			// this may happen if the previous iteration hit a bound
+			// or if a run of no-breaks was inserted by the breaker(s)
+			CT().Debugf("active match is short; previous iteration did not deliver (all) breakpoints")
+			if s.positionOfBreakOpportunity >= 0 {
+				skipRead = true // we need not read in a rune if we had a breakpoint at bound
 			}
-			s.insertPenalties(s.inxForBreaker(breaker), breaker.Penalties())
+		}
+		if !skipRead { // read a rune and find new break opportunities
+			if err = s.readRune(); err != nil {
+				break
+			}
+			if s.deque.Len() == qlen {
+				panic("segmenter: code-point deque did not grow") // TODO remove this after extensive testing
+			}
+			// Now we've got read in a new rune and are ready to fire up the breakers for it.
+			// We then harvest the new-found penalties from every breaker and insert the
+			// aggregates at the atoms in the Q.
+			qlen = s.deque.Len()
+			s.longestActiveMatch = 0
+			r, _, _ := s.deque.Back()
+			for _, breaker := range s.breakers {
+				cpClass := breaker.CodePointClassFor(r)
+				breaker.StartRulesFor(r, cpClass)
+				breaker.ProceedWithRune(r, cpClass)
+				if breaker.LongestActiveMatch() > s.longestActiveMatch {
+					s.longestActiveMatch = breaker.LongestActiveMatch()
+				}
+				s.insertPenalties(s.inxForBreaker(breaker), breaker.Penalties())
+			}
+			s.printQ()
+			CT().Debugf("-- all breakers done --")
 		}
 		// The Q is updated. The longest active match may have been changed and
-		// we have to scan the interval start at the previous active match (`from`) to
-		// the new position of active match. If we find a breaking opportunity, we stop.
-		s.positionOfBreakOpportunity = s.findBreakOpportunity(qlen - s.longestActiveMatch)
-		//s.positionOfBreakOpportunity = s.findBreakOpportunity(from, l-1-s.longestActiveMatch)
-		CT().Debugf("segmenter: breakpos = %d, active match = %d", s.positionOfBreakOpportunity, s.longestActiveMatch)
+		// we have to scan from the start of the Q to the new position of active match.
+		// If we find a breaking opportunity, we're done.
+		boundDist := int(bound) - int(s.pos) + s.deque.Len()
+		s.positionOfBreakOpportunity = s.findBreakOpportunity(qlen-s.longestActiveMatch,
+			boundDist)
+		//s.positionOfBreakOpportunity = s.findBreakOpportunity(qlen - 1 - s.longestActiveMatch)
+		CT().Debugf("segmenter: breakpos=%d, Q-len=%d, active match=%d",
+			s.positionOfBreakOpportunity, s.deque.Len(), s.longestActiveMatch)
 		s.printQ()
 	}
 	return err
@@ -516,20 +533,36 @@ func (s *Segmenter) readEnoughInputAndFindBreak(bound int64) (err error) {
 // breakable. In this case we find a break opportunity of pos=2 (if standard
 // segmenter parameters are active).
 //
+// A breaking opportunity will also occur at a given bound, if any, even in the case
+// of infinite penalties at the break. Parameter `boundDist` is not an absolute position,
+// but rather the distance (in runes) to the bound position.
+//
 // Returns the Q-position to break or -1.
-func (s *Segmenter) findBreakOpportunity(to int) int {
-	pos := -1
-	CT().Debugf("segmenter: searching for break opportunity from 0 to %d: ", to-1)
-	for i := 0; i < to; i++ {
+func (s *Segmenter) findBreakOpportunity(to, boundDist int) int {
+	if to-1 < 0 || boundDist < 0 {
+		return -1
+	}
+	CT().Debugf("segmenter: searching for break opportunity from 0 to %d|%d: ", to-1, boundDist)
+	breakopp := -1
+	i := 0
+	for ; i < to && i <= boundDist; i++ {
 		j, p0, p1 := s.deque.At(i)
-		CT().Debugf("segmenter: penalties[%#U] = %d|%d", j, p0, p1)
 		if isPossibleBreak(p0, s.breakOnZero[0]) || (len(s.breakers) > 1 && isPossibleBreak(p1, s.breakOnZero[1])) {
-			pos = i
+			breakopp = i
+			CT().Debugf("segmenter: penalties[%#U] = %d|%d   --- 8< ---", j, p0, p1)
 			break
 		}
+		CT().Debugf("segmenter: penalties[%#U] = %d|%d", j, p0, p1)
 	}
-	CT().Debugf("segmenter: break opportunity at %d", pos)
-	return pos
+	if breakopp >= 0 {
+		CT().Debugf("segmenter: break opportunity at %d", breakopp)
+	} else if i == boundDist+1 {
+		breakopp = boundDist
+		CT().Debugf("segmenter: break at bound position %d", breakopp)
+	} else {
+		CT().Debugf("segmenter: no break opportunity")
+	}
+	return breakopp
 }
 
 // find out if the UnicodeBreaker b is the primary breaker. If yes, return index 0,
@@ -574,19 +607,21 @@ func (s *Segmenter) getFrontSegment(buf *bytes.Buffer, bound int64) (int, bool) 
 	s.lastPenalties[0], s.lastPenalties[1] = 0, 0
 	buf.Reset()
 	l := min(s.deque.Len()-1, s.positionOfBreakOpportunity)
+	if l < 0 {
+		panic("l < 0")
+		//return 0, true
+	}
 	// CT().Debugf("pos=%d, break=%d", s.pos, s.positionOfBreakOpportunity)
 	// CT().Debugf("at %d, l=%d", int(s.pos)-int(s.longestActiveMatch)+l, l)
 	var isCutOff bool
 	start := s.pos - int64(s.deque.Len())
-	if start+int64(l) >= bound {
+	if start+int64(l) >= bound { // front segment would extend bound
 		CT().Debugf("segmenter: bound reached")
-		isCutOff = true
-		l = int(bound) - int(s.pos) + s.deque.Len()
+		isCutOff = true // we truncate l to Q-start---->|bound
+		if l = int(bound) - int(s.pos) + s.deque.Len(); l < 0 {
+			return 0, true
+		}
 	}
-	if l < 0 {
-		return 0, true
-	}
-	CT().Debugf("cutting front segment of length 0..%d", l)
 	if l > buf.Len() {
 		if l > s.maxSegmentLen {
 			s.setErr(ErrTooLong)
@@ -606,11 +641,15 @@ func (s *Segmenter) getFrontSegment(buf *bytes.Buffer, bound int64) (int, bool) 
 		cnt++
 		s.lastPenalties[0], s.lastPenalties[1] = p0, p1
 	}
-	//CT().Debugf("front segment is of length %d/%d", seglen, cnt)
-	// There may be further break opportunities between this break and the start
-	// of the current longest match. Enter recursion to find them.
-	s.positionOfBreakOpportunity = s.findBreakOpportunity(s.deque.Len() - s.longestActiveMatch)
+	CT().Debugf("cutting front segment of length 0..%d: '%v'", l, buf)
+	// There may be further break opportunities between this break and the start of the
+	// current longest match. Advance the pointer to the next break opportunity, if any.
+	CT().Debugf(">>> --------------")
+	boundDist := int(bound) - int(s.pos) + s.deque.Len()
+	s.positionOfBreakOpportunity = s.findBreakOpportunity(s.deque.Len()-s.longestActiveMatch,
+		boundDist)
 	s.printQ()
+	CT().Debugf("<<< --------------")
 	return seglen, isCutOff
 }
 
@@ -648,14 +687,14 @@ func (s *Segmenter) printQ() {
 		return
 	}
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("Q #%d: ", s.deque.Len()))
+	sb.WriteString(fmt.Sprintf("Q : "))
 	for i := 0; i < s.deque.Len(); i++ {
 		var a atom
 		a.r, a.penalty0, a.penalty1 = s.deque.At(i)
 		sb.WriteString(fmt.Sprintf(" <- %s", a.String()))
 	}
 	sb.WriteString(" .")
-	CT().Debugf(sb.String())
+	CT().P("UAX |Q|=", s.deque.Len()).Debugf(sb.String())
 }
 
 // --- Helpers ----------------------------------------------------------

@@ -8,6 +8,7 @@ import (
 	"github.com/npillmayer/schuko/gtrace"
 	"github.com/npillmayer/schuko/testconfig"
 	"github.com/npillmayer/schuko/tracing"
+	"github.com/npillmayer/schuko/tracing/gologadapter"
 	"github.com/npillmayer/uax/segment"
 	"github.com/npillmayer/uax/uax29"
 	"github.com/npillmayer/uax/ucd"
@@ -31,19 +32,21 @@ func ExampleWordBreaker() {
 func TestWordBreaks1(t *testing.T) {
 	teardown := testconfig.QuickConfig(t)
 	defer teardown()
+	// gtrace.CoreTracer = gologadapter.New()
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	onWords := uax29.NewWordBreaker(1)
 	segmenter := segment.NewSegmenter(onWords)
 	segmenter.BreakOnZero(true, false)
-	segmenter.Init(strings.NewReader("Hello World "))
+	//segmenter.Init(strings.NewReader("Hello World "))
+	segmenter.Init(strings.NewReader("Hello World🇩🇪!"))
 	n := 0
 	for segmenter.Next() {
 		t.Logf("'%s'\n", segmenter.Text())
 		n++
 	}
-	if n != 4 {
-		t.Errorf("Expected # of segments to be 4, is %d", n)
+	if n != 5 {
+		t.Errorf("Expected # of segments to be 5, is %d", n)
 	}
 }
 
@@ -54,7 +57,7 @@ func TestWordBreaks2(t *testing.T) {
 	//
 	onWords := uax29.NewWordBreaker(1)
 	segmenter := segment.NewSegmenter(onWords)
-	segmenter.BreakOnZero(true, false)
+	//segmenter.BreakOnZero(true, false)
 	segmenter.Init(strings.NewReader("lime-tree"))
 	n := 0
 	for segmenter.Next() {
@@ -65,27 +68,30 @@ func TestWordBreaks2(t *testing.T) {
 	if n != 3 {
 		t.Errorf("Expected # of segments to be 3, is %d", n)
 	}
+	//t.Fail()
 }
 
 func TestWordBreakTestFile(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
-	defer teardown()
+	// teardown := testconfig.QuickConfig(t)
+	// defer teardown()
+	gtrace.CoreTracer = gologadapter.New()
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	onWordBreak := uax29.NewWordBreaker(1)
 	seg := segment.NewSegmenter(onWordBreak)
-	seg.BreakOnZero(true, false)
+	//seg.BreakOnZero(true, false)
 	tf := ucd.OpenTestFile("./WordBreakTest.txt", t)
 	defer tf.Close()
-	failcnt, i, from, to := 0, 0, 1, 1900
+	//failcnt, i, from, to := 0, 0, 1, 1900
+	failcnt, i, from, to := 0, 0, 1528, 1528
 	for tf.Scan() {
 		i++
 		if i >= from {
-			t.Logf(tf.Comment())
+			gtrace.CoreTracer.Infof(tf.Comment())
 			in, out := ucd.BreakTestInput(tf.Text())
 			if !executeSingleTest(t, seg, i, in, out) {
 				failcnt++
-				//t.Fatalf("test failed")
+				t.Fatalf("test failed")
 			}
 		}
 		if i >= to {
