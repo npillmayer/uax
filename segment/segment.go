@@ -511,7 +511,10 @@ func (s *Segmenter) readEnoughInputAndFindBreak(bound int64) (err error) {
 		// The Q is updated. The longest active match may have been changed and
 		// we have to scan from the start of the Q to the new position of active match.
 		// If we find a breaking opportunity, we're done.
-		boundDist := int(bound) - int(s.pos) + s.deque.Len()
+		boundDist := bound
+		if bound < math.MaxInt64 {
+			boundDist = bound - s.pos + int64(s.deque.Len())
+		}
 		s.positionOfBreakOpportunity = s.findBreakOpportunity(qlen-s.longestActiveMatch,
 			boundDist)
 		//s.positionOfBreakOpportunity = s.findBreakOpportunity(qlen - 1 - s.longestActiveMatch)
@@ -538,14 +541,14 @@ func (s *Segmenter) readEnoughInputAndFindBreak(bound int64) (err error) {
 // but rather the distance (in runes) to the bound position.
 //
 // Returns the Q-position to break or -1.
-func (s *Segmenter) findBreakOpportunity(to, boundDist int) int {
+func (s *Segmenter) findBreakOpportunity(to int, boundDist int64) int {
 	if to-1 < 0 || boundDist < 0 {
 		return -1
 	}
 	CT().Debugf("segmenter: searching for break opportunity from 0 to %d|%d: ", to-1, boundDist)
 	breakopp := -1
 	i := 0
-	for ; i < to && i <= boundDist; i++ {
+	for ; i < to && int64(i) <= boundDist; i++ {
 		j, p0, p1 := s.deque.At(i)
 		if isPossibleBreak(p0, s.breakOnZero[0]) || (len(s.breakers) > 1 && isPossibleBreak(p1, s.breakOnZero[1])) {
 			breakopp = i
@@ -556,8 +559,8 @@ func (s *Segmenter) findBreakOpportunity(to, boundDist int) int {
 	}
 	if breakopp >= 0 {
 		CT().Debugf("segmenter: break opportunity at %d", breakopp)
-	} else if i == boundDist+1 {
-		breakopp = boundDist
+	} else if int64(i) == boundDist+1 {
+		breakopp = int(boundDist)
 		CT().Debugf("segmenter: break at bound position %d", breakopp)
 	} else {
 		CT().Debugf("segmenter: no break opportunity")
@@ -644,12 +647,13 @@ func (s *Segmenter) getFrontSegment(buf *bytes.Buffer, bound int64) (int, bool) 
 	CT().Debugf("cutting front segment of length 0..%d: '%v'", l, buf)
 	// There may be further break opportunities between this break and the start of the
 	// current longest match. Advance the pointer to the next break opportunity, if any.
-	CT().Debugf(">>> --------------")
-	boundDist := int(bound) - int(s.pos) + s.deque.Len()
+	boundDist := bound
+	if bound < math.MaxInt64 {
+		boundDist = bound - s.pos + int64(s.deque.Len())
+	}
 	s.positionOfBreakOpportunity = s.findBreakOpportunity(s.deque.Len()-s.longestActiveMatch,
 		boundDist)
 	s.printQ()
-	CT().Debugf("<<< --------------")
 	return seglen, isCutOff
 }
 

@@ -121,9 +121,7 @@ type WordBreaker struct {
 	penalties     []int                           // returned to the segmenter: penalties to insert
 	weight        int                             // will multiply penalties by this factor
 	previousClass UAX29Class                      // class of previously read rune
-	saveClass     UAX29Class                      // for WB4 we need to save a previous class
 	blockedRI     bool                            // are rules for Regional_Indicator currently blocked?
-	apply999      bool                            // will insert a rule 999 break
 }
 
 // NewWordBreaker creates a a new UAX#29 word breaker.
@@ -145,10 +143,10 @@ func NewWordBreaker(weight int) *WordBreaker {
 		CRClass:                 {rule_NewLine},
 		LFClass:                 {rule_NewLine},
 		NewlineClass:            {rule_NewLine},
-		ZWJClass:                {rule_WB3c}, //, rule_WB4, rule_WB4_x},
+		ZWJClass:                {rule_WB3c, rule_WB4},
 		WSegSpaceClass:          {rule_WB3d},
-		ExtendClass:             {rule_WB4, rule_WB4_x},
-		FormatClass:             {rule_WB4, rule_WB4_x},
+		ExtendClass:             {rule_WB4},
+		FormatClass:             {rule_WB4},
 		ALetterClass:            {rule_WB5, rule_WB6_7, rule_WB9, rule_WB13a},
 		Hebrew_LetterClass:      {rule_WB5, rule_WB6_7, rule_WB7a, rule_WB7bc, rule_WB9, rule_WB13a},
 		NumericClass:            {rule_WB8, rule_WB10, rule_WB11, rule_WB13a},
@@ -184,24 +182,6 @@ func (gb *WordBreaker) CodePointClassFor(r rune) int {
 // (Interface uax.UnicodeBreaker)
 func (gb *WordBreaker) StartRulesFor(r rune, cpClass int) {
 	c := UAX29Class(cpClass)
-	if extendFormatZWJ(c) {
-		gb.longestMatch++
-		if !extendFormatZWJ(gb.previousClass) {
-			gb.saveClass = gb.previousClass
-		}
-		if c != ZWJClass { // ZWJ may start rule WB3c
-			return
-		}
-	} else if extendFormatZWJ(gb.previousClass) {
-		// end of rule WB4
-		// X (Extend | Format | ZWJ)* 	→ 	X
-		gb.previousClass = gb.saveClass
-	}
-	//if gb.longestMatch == 0 && gb.penalties[0] == 0 {
-	// if gb.longestMatch == 0 {
-	// }
-	TC().Debugf("will apply penalty 999")
-	gb.apply999 = true
 	if c == Regional_IndicatorClass && gb.blockedRI {
 		TC().Debugf("regional indicators blocked")
 		return
@@ -211,19 +191,22 @@ func (gb *WordBreaker) StartRulesFor(r rune, cpClass int) {
 		for _, rule := range rules {
 			rec := uax.NewPooledRecognizer(cpClass, rule)
 			rec.UserData = gb
+			rec.Expect = gb.longestMatch // we “mis-use” expect field
 			gb.publisher.SubscribeMe(rec)
-			//TC.Debugf(" - %s / %v", rec, rec)
 		}
 	}
 }
 
 // Helper: do not start any recognizers for this word class, until
-// unblocked again.
+// unblocked again. For now, just consider regional indicators.
+// We will find out if other needs arise.
 func (gb *WordBreaker) block(c UAX29Class) {
 	gb.blockedRI = true
 }
 
 // Helper: stop blocking new recognizers for this word class.
+// For now, just consider regional indicators.
+// We will find out if other needs arise.
 func (gb *WordBreaker) unblock(c UAX29Class) {
 	gb.blockedRI = false
 }
@@ -234,20 +217,12 @@ func (gb *WordBreaker) unblock(c UAX29Class) {
 // (Interface uax.UnicodeBreaker)
 func (gb *WordBreaker) ProceedWithRune(r rune, cpClass int) {
 	c := UAX29Class(cpClass)
-	if extendFormat(c) {
-		gb.penalties = gb.penalties[:0]
-		return
-	}
 	TC().P("class", c).Debugf("proceeding with rune %#U ...", r)
 	gb.longestMatch, gb.penalties = gb.publisher.PublishRuneEvent(r, int(c))
 	TC().P("class", c).Debugf("...done with |match|=%d and p=%v", gb.longestMatch, gb.penalties)
 	gb.previousClass = c
-	if gb.apply999 {
-		TC().Debugf("applying penalty 999")
-		setPenalty1(gb, penalty999) //gb.penalties[1] = penalty999, if empty
-		TC().Debugf("penalites now = %v", gb.penalties)
-		gb.apply999 = false
-	}
+	setPenalty1(gb, penalty999) //gb.penalties[1] = penalty999, if empty
+	//TC().Debugf("penalites now = %v", gb.penalties)
 }
 
 // LongestActiveMatch collects
@@ -279,10 +254,10 @@ var (
 func rule_NewLine(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 	c := UAX29Class(cpClass)
 	if c == LFClass || c == NewlineClass {
-		TC().Infof("ACCEPT of Rule for Newline")
+		//TC().Debugf("ACCEPT of Rule for Newline")
 		return uax.DoAccept(rec, PenaltyForMustBreak, PenaltyForMustBreak)
 	} else if c == CRClass {
-		TC().Infof("shift CR")
+		//TC().Debugf("shift CR")
 		rec.MatchLen++
 		return rule_CRLF
 	}
@@ -292,10 +267,10 @@ func rule_NewLine(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 func rule_CRLF(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 	c := UAX29Class(cpClass)
 	if c == LFClass {
-		TC().Infof("ACCEPT of Rule for CRLF")
+		//TC().Debugf("ACCEPT of Rule for CRLF")
 		return uax.DoAccept(rec, PenaltyForMustBreak, 3*PenaltyToSuppressBreak) // accept CR+LF
 	}
-	TC().Infof("ACCEPT of Rule for CR")
+	//TC().Debugf("ACCEPT of Rule for CR")
 	return uax.DoAccept(rec, 0, PenaltyForMustBreak, PenaltyForMustBreak) // accept CR
 }
 
@@ -307,23 +282,23 @@ func rule_WB3c(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 func rule_Pictography(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 	c := UAX29Class(cpClass)
 	if c == emojiPictographic {
-		//TC.Infof("ACCEPT of Rule for Emoji")
+		//TC().Debugf("ACCEPT of Rule for Emoji")
 		return uax.DoAccept(rec, 0, PenaltyToSuppressBreak)
 	}
 	return uax.DoAbort(rec)
 }
 
 func rule_WB3d(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
-	//TC.Debug("start WB 3d")
+	//TC().Debug("start WB 3d")
 	rec.MatchLen++
 	return finish_WB3d
 }
 
 func finish_WB3d(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
-	//TC.Debug("WB3d cont")
+	//TC().Debug("WB3d cont")
 	c := UAX29Class(cpClass)
 	if c == WSegSpaceClass {
-		//TC.Infof("ACCEPT of Rule WB 3d")
+		//TC().Debugf("ACCEPT of Rule WB 3d")
 		return uax.DoAccept(rec, 0, PenaltyToSuppressBreak)
 	}
 	return uax.DoAbort(rec)
@@ -339,7 +314,7 @@ func checkIgnoredCharacters(rec *uax.Recognizer, c UAX29Class) bool {
 
 // start AHLetter x AHLetter
 func rule_WB5(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
-	//TC.Debug("start WB 5")
+	//TC().Debug("start WB 5")
 	rec.MatchLen++
 	return finish_WB5_10
 }
@@ -351,7 +326,7 @@ func finish_WB5_10(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 		return finish_WB5_10
 	}
 	if c == ALetterClass || c == Hebrew_LetterClass {
-		//TC.Infof("ACCEPT of Rule WB 5/10")
+		//TC().Debugf("ACCEPT of Rule WB 5/10")
 		return uax.DoAccept(rec, 0, PenaltyToSuppressBreak)
 	}
 	return uax.DoAbort(rec)
@@ -359,7 +334,7 @@ func finish_WB5_10(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 
 // start AHLetter x (MidLetter | MidNumLet | Single_Quote) x AHLetter
 func rule_WB6_7(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
-	//TC.Debug("start WB 6/7")
+	//TC().Debugf("start WB 6/7")
 	rec.MatchLen++
 	return cont_WB6_7
 }
@@ -371,7 +346,7 @@ func cont_WB6_7(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 		return cont_WB6_7
 	}
 	if c == MidLetterClass || c == MidNumLetClass || c == Single_QuoteClass {
-		//TC.Info("MID LETTER IN RULE 6/7 cont 1")
+		//TC().Debugf("MID LETTER IN RULE 6/7 cont 1")
 		rec.MatchLen++
 		rec.Expect = rec.MatchLen // misuse of expect field: mark position of single quote
 		return finish_WB6_7
@@ -386,11 +361,10 @@ func finish_WB6_7(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 		return finish_WB6_7
 	}
 	if c == ALetterClass || c == Hebrew_LetterClass {
-		//TC.Infof("ACCEPT of Rule WB 6/7")
+		//TC().Debugf("ACCEPT of Rule WB 6/7")
 		p := make([]int, rec.MatchLen-rec.Expect+1+2)
 		p[len(p)-1] = PenaltyToSuppressBreak
 		p[1] = PenaltyToSuppressBreak
-		//return uax.DoAccept(rec, 0, PenaltyToSuppressBreak, PenaltyToSuppressBreak)
 		return uax.DoAccept(rec, p...)
 	}
 	return uax.DoAbort(rec)
@@ -398,7 +372,7 @@ func finish_WB6_7(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 
 // start Hebrew_Letter x Single_Quote
 func rule_WB7a(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
-	//TC.Debug("start WB 7a")
+	//TC().Debugf("start WB 7a")
 	rec.MatchLen++
 	return finish_WB7a
 }
@@ -410,7 +384,7 @@ func finish_WB7a(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 		return finish_WB7a
 	}
 	if c == Single_QuoteClass {
-		//TC.Infof("ACCEPT of Rule WB 7 a")
+		//TC().Debugf("ACCEPT of Rule WB 7 a")
 		return uax.DoAccept(rec, 0, PenaltyToSuppressBreak)
 	}
 	return uax.DoAbort(rec)
@@ -418,7 +392,7 @@ func finish_WB7a(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 
 // start Hebrew_Letter x Double_Quote x Hebrew_Letter
 func rule_WB7bc(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
-	//TC.Debug("start WB 7c")
+	//TC().Debugf("start WB 7c")
 	rec.MatchLen++
 	return cont_WB7bc
 }
@@ -441,7 +415,7 @@ func finish_WB7bc(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 		return finish_WB7bc
 	}
 	if c == Hebrew_LetterClass {
-		//TC.Infof("ACCEPT of Rule WB 7b,c")
+		//TC().Debugf("ACCEPT of Rule WB 7b,c")
 		return uax.DoAccept(rec, 0, PenaltyToSuppressBreak, PenaltyToSuppressBreak)
 	}
 	return uax.DoAbort(rec)
@@ -449,14 +423,14 @@ func finish_WB7bc(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 
 // start Numeric x Numeric
 func rule_WB8(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
-	//TC.Debug("start WB 8")
+	//TC().Debug("start WB 8")
 	rec.MatchLen++
 	return finish_WB8_9
 }
 
 // start (ALetter | Hebrew_Letter) x Numeric
 func rule_WB9(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
-	//TC.Debug("start WB 9")
+	//TC().Debug("start WB 9")
 	rec.MatchLen++
 	return finish_WB8_9
 }
@@ -468,7 +442,7 @@ func finish_WB8_9(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 		return finish_WB8_9
 	}
 	if c == NumericClass {
-		//TC.Infof("ACCEPT of Rule WB 8/9")
+		//TC().Debugf("ACCEPT of Rule WB 8/9")
 		return uax.DoAccept(rec, 0, PenaltyToSuppressBreak)
 	}
 	return uax.DoAbort(rec)
@@ -476,14 +450,14 @@ func finish_WB8_9(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 
 // start Numeric x AHLetter
 func rule_WB10(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
-	//TC.Debug("start WB 10")
+	//TC().Debug("start WB 10")
 	rec.MatchLen++
 	return finish_WB5_10
 }
 
 // start Numeric x (MidNum | MidNumLet | Single_Quote) x Numeric
 func rule_WB11(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
-	TC().Debugf("start WB 11")
+	//TC().Debugf("start WB 11")
 	rec.MatchLen++
 	return cont_WB11
 }
@@ -491,13 +465,13 @@ func rule_WB11(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 // ... x (MidNum | MidNumLet | Single_Quote) x Numeric
 func cont_WB11(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 	c := UAX29Class(cpClass)
-	// if checkIgnoredCharacters(rec, c) {
-	// 	return cont_WB11
-	// }
+	if checkIgnoredCharacters(rec, c) {
+		return cont_WB11
+	}
 	if c == MidNumClass || c == MidNumLetClass || c == Single_QuoteClass {
 		rec.MatchLen++
 		rec.Expect = rec.MatchLen // misuse of expect field: mark position of middle character
-		TC().Debugf("continue WB 11")
+		//TC().Debugf("continue WB 11")
 		return finish_WB11
 	}
 	return uax.DoAbort(rec)
@@ -506,15 +480,14 @@ func cont_WB11(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 // ... x ... x Numeric
 func finish_WB11(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 	c := UAX29Class(cpClass)
-	// if checkIgnoredCharacters(rec, c) {
-	// 	return finish_WB11
-	// }
+	if checkIgnoredCharacters(rec, c) {
+		return finish_WB11
+	}
 	if c == NumericClass {
-		TC().Infof("ACCEPT of Rule WB 11")
+		//TC().Debugf("ACCEPT of Rule WB 11")
 		p := make([]int, rec.MatchLen-rec.Expect+1+2)
 		p[len(p)-1] = PenaltyToSuppressBreak
 		p[1] = PenaltyToSuppressBreak
-		//return uax.DoAccept(rec, 0, PenaltyToSuppressBreak, PenaltyToSuppressBreak)
 		return uax.DoAccept(rec, p...)
 		//return uax.DoAccept(rec, 0, PenaltyToSuppressBreak, PenaltyToSuppressBreak)
 	}
@@ -523,7 +496,7 @@ func finish_WB11(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 
 // start Katakana x Katakana
 func rule_WB13(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
-	//TC.Debug("start WB 13")
+	//TC().Debug("start WB 13")
 	rec.MatchLen++
 	return finish_WB13
 }
@@ -535,7 +508,7 @@ func finish_WB13(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 		return finish_WB13
 	}
 	if c == KatakanaClass {
-		//TC.Infof("ACCEPT of Rule WB 13")
+		//TC().Debugf("ACCEPT of Rule WB 13")
 		return uax.DoAccept(rec, 0, PenaltyToSuppressBreak)
 	}
 	return uax.DoAbort(rec)
@@ -543,7 +516,7 @@ func finish_WB13(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 
 // start (AHLetter | Numeric | Katakana | ExtendNumLet) x ExtendNumLet
 func rule_WB13a(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
-	//TC.Debug("start WB 13a")
+	//TC().Debug("start WB 13a")
 	rec.MatchLen++
 	return finish_WB13a
 }
@@ -555,7 +528,7 @@ func finish_WB13a(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 		return finish_WB13a
 	}
 	if c == ExtendNumLetClass {
-		//TC.Infof("ACCEPT of Rule WB 13 a")
+		//TC().Debugf("ACCEPT of Rule WB 13 a")
 		return uax.DoAccept(rec, 0, PenaltyToSuppressBreak)
 	}
 	return uax.DoAbort(rec)
@@ -563,7 +536,7 @@ func finish_WB13a(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 
 // start ExtendNumLet x (AHLetter | Numeric | Katakana)
 func rule_WB13b(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
-	//TC.Debug("start WB 13b")
+	//TC().Debug("start WB 13b")
 	rec.MatchLen++
 	return finish_WB13b
 }
@@ -575,7 +548,7 @@ func finish_WB13b(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 		return finish_WB13b
 	}
 	if c == ALetterClass || c == Hebrew_LetterClass || c == NumericClass || c == KatakanaClass {
-		//TC.Infof("ACCEPT of Rule WB 13 b")
+		//TC().Debugf("ACCEPT of Rule WB 13 b")
 		return uax.DoAccept(rec, 0, PenaltyToSuppressBreak)
 	}
 	return uax.DoAbort(rec)
@@ -583,7 +556,7 @@ func finish_WB13b(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 
 // start RI x RI (blocking)
 func rule_WB15(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
-	//TC.Debug("start WB 15")
+	//TC().Debug("start WB 15")
 	rec.MatchLen++
 	gb := rec.UserData.(*WordBreaker)
 	gb.block(Regional_IndicatorClass)
@@ -599,7 +572,7 @@ func finish_WB15(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 	gb := rec.UserData.(*WordBreaker)
 	gb.unblock(Regional_IndicatorClass)
 	if c == Regional_IndicatorClass {
-		//TC.Infof("ACCEPT of Rule WB 15")
+		//TC().Debugf("ACCEPT of Rule WB 15")
 		return uax.DoAccept(rec, 0, PenaltyToSuppressBreak)
 	}
 	return uax.DoAbort(rec)
@@ -608,41 +581,23 @@ func finish_WB15(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 // Rule WB4: Ignore Format and Extend characters, except after sot, CR,
 // LF, and Newline.
 func rule_WB4(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
-	panic("WB4")
-	TC().Debugf("start WB 4")
+	//TC().Debugf("start WB 4")
 	c := UAX29Class(cpClass)
 	if c == ExtendClass || c == FormatClass || c == ZWJClass {
-		rec.MatchLen++
-		TC().Debugf("ACCEPT of Rule WB 4")
-		return uax.DoAccept(rec, 0, PenaltyToSuppressBreak)
-	}
-	return uax.DoAbort(rec)
-}
-
-// Rule WB4: No break between (Extend | Format | ZWJ)*
-func rule_WB4_x(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
-	panic("WB4x")
-	TC().Debugf("start WB 4 x")
-	c := UAX29Class(cpClass)
-	if c == ExtendClass || c == FormatClass || c == ZWJClass {
-		rec.MatchLen++
-		return finish_WB4
-	}
-	return uax.DoAbort(rec)
-}
-
-func finish_WB4(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
-	panic("WB4 cont")
-	TC().Debugf("continue WB 4 x")
-	c := UAX29Class(cpClass)
-	if c == ExtendClass || c == FormatClass || c == ZWJClass {
-		TC().Debugf("ACCEPT of Rule WB 4 x")
-		return uax.DoAccept(rec, 0, PenaltyToSuppressBreak)
+		gb := rec.UserData.(*WordBreaker)
+		prev := gb.previousClass
+		if prev != LFClass && prev != NewlineClass && prev != CRClass {
+			//TC().Debugf("ACCEPT of Rule WB 4")
+			return uax.DoAccept(rec, 0, PenaltyToSuppressBreak)
+		}
 	}
 	return uax.DoAbort(rec)
 }
 
 // --- Helpers ---------------------------------------------------------------
+func packPenalties(rec *uax.Recognizer, penalties ...int) []int {
+	return penalties
+}
 
 func setPenalty1(gb *WordBreaker, p int) {
 	if len(gb.penalties) == 0 {

@@ -9,7 +9,6 @@ import (
 	"github.com/npillmayer/schuko/testconfig"
 	"github.com/npillmayer/schuko/tracing"
 
-	"github.com/npillmayer/schuko/tracing/gologadapter"
 	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 )
 
@@ -55,9 +54,10 @@ func TestSimpleSegmenter1(t *testing.T) {
 	}
 }
 func TestSimpleSegmenter2(t *testing.T) {
-	gtrace.CoreTracer = gotestingadapter.New()
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := testconfig.QuickConfig(t)
 	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
 	seg := NewSegmenter() // will use a SimpleWordBreaker
 	seg.Init(strings.NewReader("lime-tree"))
 	n := 0
@@ -73,9 +73,9 @@ func TestSimpleSegmenter2(t *testing.T) {
 }
 
 func TestBounded(t *testing.T) {
-	// teardown := testconfig.QuickConfig(t)
-	// defer teardown()
-	gtrace.CoreTracer = gologadapter.New()
+	teardown := testconfig.QuickConfig(t)
+	defer teardown()
+	//gtrace.CoreTracer = gologadapter.New()
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	seg := NewSegmenter(NewSimpleWordBreaker())
@@ -105,10 +105,9 @@ func TestBounded(t *testing.T) {
 		n++
 	}
 	t.Logf("output = %v", output)
-	if n != 9 {
-		t.Errorf("Expected 9 segments, have %d", n)
+	if n != 10 {
+		t.Errorf("Expected 10 segments, have %d", n)
 	}
-	t.Fail()
 }
 
 func TestSimpleSegnew(t *testing.T) {

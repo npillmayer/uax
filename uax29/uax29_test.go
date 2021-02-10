@@ -8,7 +8,6 @@ import (
 	"github.com/npillmayer/schuko/gtrace"
 	"github.com/npillmayer/schuko/testconfig"
 	"github.com/npillmayer/schuko/tracing"
-	"github.com/npillmayer/schuko/tracing/gologadapter"
 	"github.com/npillmayer/uax/segment"
 	"github.com/npillmayer/uax/uax29"
 	"github.com/npillmayer/uax/ucd"
@@ -72,18 +71,17 @@ func TestWordBreaks2(t *testing.T) {
 }
 
 func TestWordBreakTestFile(t *testing.T) {
-	// teardown := testconfig.QuickConfig(t)
-	// defer teardown()
-	gtrace.CoreTracer = gologadapter.New()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	teardown := testconfig.QuickConfig(t)
+	defer teardown()
+	//gtrace.CoreTracer = gologadapter.New()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelError)
 	//
 	onWordBreak := uax29.NewWordBreaker(1)
 	seg := segment.NewSegmenter(onWordBreak)
 	//seg.BreakOnZero(true, false)
 	tf := ucd.OpenTestFile("./WordBreakTest.txt", t)
 	defer tf.Close()
-	//failcnt, i, from, to := 0, 0, 1, 1900
-	failcnt, i, from, to := 0, 0, 1528, 1528
+	failcnt, i, from, to := 0, 0, 1, 1900
 	for tf.Scan() {
 		i++
 		if i >= from {
@@ -91,7 +89,7 @@ func TestWordBreakTestFile(t *testing.T) {
 			in, out := ucd.BreakTestInput(tf.Text())
 			if !executeSingleTest(t, seg, i, in, out) {
 				failcnt++
-				t.Fatalf("test failed")
+				//t.Fatalf("test #%d failed", i)
 			}
 		}
 		if i >= to {
