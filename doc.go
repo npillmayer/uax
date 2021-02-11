@@ -43,44 +43,12 @@ or  environments.  For example, reliable detection of word boundaries
 in languages such as Thai, Lao, Chinese,  or  Japanese
 requires the use of dictionary lookup, analogous to English hyphenation.
 
-BSD License
-
-Copyright (c) 2017–20, Norbert Pillmayer
-
-All rights reserved.
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions
-are met:
-
-1. Redistributions of source code must retain the above copyright
-notice, this list of conditions and the following disclaimer.
-
-2. Redistributions in binary form must reproduce the above copyright
-notice, this list of conditions and the following disclaimer in the
-documentation and/or other materials provided with the distribution.
-
-3. Neither the name of this software nor the names of its contributors
-may be used to endorse or promote products derived from this software
-without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRETC, INDIRETC, INCIDENTAL,
-SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-THEORY OF LIABILITY, WHETHER IN CONTRATC, STRITC LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-Contents
+Package Contents
 
 Implementations of specific UAX algorithms is done in the various
 sub-packages of uax. The driver type for some of the breaking-algorithms
 sits in sub-package segment and will
-use algorithms from other sub-packages.
+use breaker-algorithms from other sub-packages.
 
 Base package uax provides some of the necessary
 means to implement UAX breaking algorithms. Please note that it is
@@ -97,14 +65,14 @@ Implementations in the sub-packages of uax try to strike a balance between
 efficiency and readability. The helper classes of uax allow implementors to
 transform UAX-rules into fairly readable small functions. From a maintenance
 point-of-view this is preferrable to huge and complex cascades of if-statements,
-which may sometimes provide better performance, but
+which may provide better performance, but
 are hard to understand. Most of the breaking algorithms within sub-packages of uax
 therefore utilize the helper types from package uax.
 
 We perform segmenting Unicode text based on rules, which are short
 regular expressions, i.e. finite state automata. This corresponds well with
 the formal UAX description of rules (except for the Bidi-rules, which are
-are better understood as rules for a context-sensitive grammar). Every step within a
+better understood as rules for a context-sensitive grammar). Every step within a
 rule is performed by executing a function. This function recognizes a single
 code-point class and returns another function. The returned function
 represents the expectation for the next code-point(-class).
@@ -162,15 +130,49 @@ this break.
 The UnicodeBreakers in this package (including sub-packages)
 will apply the following logic:
 
-(1) Mandatory breaks will have a penalty/merit of -10000 (uax.InfinitePenalty).
+(1) Mandatory breaks will have a penalty/merit of ≤ -10000 (uax.InfinitePenalty).
 
-(2) Inhibited breaks will have penalty >= 10000 (uax.InfiniteMerits).
+(2) Inhibited breaks will have penalty ≥ 10000 (uax.InfiniteMerits).
 
-(3) Neutral breaks will have a penalty of 0. The segmenter can be configured
-to reagard the zero value as breakable or not.
+(3) Neutral positions will have a penalty of 0. The segmenter can be configured
+to regard the zero value as breakable or not.
 
 The segmenter will aggregate penalties from its breakers and output aggregated
 penalties to the client.
+
+______________________________________________________________________
+
+BSD License
+
+Copyright (c) 2017–21, Norbert Pillmayer
+
+All rights reserved.
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions
+are met:
+
+1. Redistributions of source code must retain the above copyright
+notice, this list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright
+notice, this list of conditions and the following disclaimer in the
+documentation and/or other materials provided with the distribution.
+
+3. Neither the name of this software nor the names of its contributors
+may be used to endorse or promote products derived from this software
+without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRETC, INDIRETC, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRATC, STRITC LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 package uax
 
