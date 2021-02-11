@@ -1,11 +1,11 @@
 /*
-Package uax14 implements Unicode Annex #14 line breaking.
+Package uax14 implements Unicode Annex #14 line wrap.
 
 Under active development; use at your own risk
 
 BSD License
 
-Copyright (c) 2017-20, Norbert Pillmayer
+Copyright (c) 2017-21, Norbert Pillmayer
 
 All rights reserved.
 Redistribution and use in source and binary forms, with or without
@@ -92,8 +92,7 @@ func TC() tracing.Trace {
 	return gtrace.CoreTracer
 }
 
-// ClassForRune is the top-level client function:
-// Get the line breaking/wrap class for a Unicode code-point
+// ClassForRune gets the line breaking/wrap class for a Unicode code-point
 func ClassForRune(r rune) UAX14Class {
 	if r == rune(0) {
 		return eot
