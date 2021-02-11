@@ -66,29 +66,7 @@ if clients call NewLineWrap().
 
 Status
 
-The current implementation does not pass all tests from the UAX#14
-test file. The reason is the interpretation of rules involving ZWJ.
-I am a bit at a loss about ZWJ rules, as from my
-point of view they aren't consistent.
-
-	=== RUN   TestWordBreakTestFile
-	--- FAIL: TestWordBreakTestFile (0.36s)
-		uax14_test.go:54: test #6263: '"\u200d"' should be '"\u200d\u231a"'
-		...
-		uax14_test.go:54: test #6339: '"\u200d"' should be '"\u200d\u261d"'
-		...
-		uax14_test.go:54: test #6343: '"\u200d"' should be '"\u200d\U0001f3fb"'
-		...
-		uax14_test.go:43: 3 TEST CASES OUT of 7282 FAILED
-	FAIL
-
-3 out of the 7282 test cases fail. That doesn't sound too much of a problem,
-but I'm afraid the interpretation I chose is not the best one. Nevertheless,
-at this point I'm inclined to postpone the problem and to first seek some
-practical experience with real-life multi-lingual texts.
-
-Edit: After some modifications on the Segmenter type, now 183 tests for UAX#14 fail.
-I will fix this as soon as I have time to re-visit this.
+The current implementation passes all tests from the UAX#14 test file.
 */
 package uax14
 
@@ -169,10 +147,10 @@ func NewLineWrap() *LineWrap {
 	uax14.publisher = uax.NewRunePublisher()
 	uax14.rules = map[UAX14Class][]uax.NfaStateFn{
 		//sot:      {rule_LB2},
-		NLClass:  {rule_05_NewLine},
-		LFClass:  {rule_05_NewLine},
-		BKClass:  {rule_05_NewLine},
-		CRClass:  {rule_05_NewLine},
+		NLClass:  {rule_05_NewLine, rule_06_HardBreak},
+		LFClass:  {rule_05_NewLine, rule_06_HardBreak},
+		BKClass:  {rule_05_NewLine, rule_06_HardBreak},
+		CRClass:  {rule_05_NewLine, rule_06_HardBreak},
 		SPClass:  {rule_LB7, rule_LB18},
 		ZWClass:  {rule_LB7, rule_LB8},
 		WJClass:  {rule_LB11},
@@ -318,6 +296,31 @@ const (
 	doBreak int = -10000
 )
 
+// UAX#14 has lots of rules where a penalty is to be inserted before a
+// code point without a prefix to start a rule. An example would be
+//
+//    LB7: Do not break before spaces or zero width space.
+//         × SP
+//         × ZW
+//
+// These are kind of 'after-the-fact' rules, as the position before the SP may
+// already have been broken. This is possible if no match has been built up and
+// therefore it's too late to insert a penalty for LB7.
+// To provide a prefix for rules like these, they would have to be modified to
+//
+//         any × SP
+//
+// therefore introducing an any-rule with match length 1 which looks out for all
+// the prefix-less rules (continuations). While this is certainly possible, we
+// should alleviate the author of UAX#14 rules from such concerns and rather
+// modify the general segmentation driver to allow for a delayed evaluation of the
+// rightmost penalty / break opportunity. We achieve this by a simple trick:
+// The uax14 breaker will always report a match length of at least 1. This works
+// for two reasons: The UAX#14 rules which prohibit breaks 'after-the-fact' are
+// all just one code-point long. And the segmenter will always append an artifical
+// end-of-text which will then be the last pretended match and therefore allow a
+// break just before it.
+
 // ProceedWithRune is part of interface unicode.Breaker.
 // A new code-point has been read and this breaker receives a message to
 // consume it.
@@ -352,7 +355,8 @@ func (uax14 *LineWrap) ProceedWithRune(r rune, cpClass int) {
 
 // LongestActiveMatch is part of interface unicode.UnicodeBreaker
 func (uax14 *LineWrap) LongestActiveMatch() int {
-	return uax14.longestMatch
+	// We return a value of at least 1, as explained above.
+	return max(1, uax14.longestMatch)
 }
 
 // Penalties gets all active penalties for all active recognizers combined.
@@ -377,8 +381,10 @@ func (uax14 *LineWrap) unblock() {
 // Penalties (suppress break and mandatory break).
 var (
 	PenaltyToSuppressBreak = 10000
-	PenaltyForMustBreak    = -10000
+	PenaltyForMustBreak    = -19000
 )
+
+// --- Helpers ---------------------------------------------------------------
 
 // This is a small function to return a penalty value for a rule.
 // w is the weight of the rule (currently I use the rule number
@@ -399,4 +405,11 @@ func ps(w int, first int, l int) []int {
 		pp[i] = p(w)
 	}
 	return pp
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }

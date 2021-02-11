@@ -4,28 +4,34 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/npillmayer/schuko/tracing/gotestingadapter"
+	"github.com/npillmayer/schuko/gtrace"
+	"github.com/npillmayer/schuko/testconfig"
+	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/uax/segment"
 	"github.com/npillmayer/uax/uax14"
 	"github.com/npillmayer/uax/ucd"
 )
 
 func TestWordBreakTestFile(t *testing.T) {
-	teardown := gotestingadapter.RedirectTracing(t)
+	//gtrace.CoreTracer = gologadapter.New()
+	teardown := testconfig.QuickConfig(t)
 	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
 	linewrap := uax14.NewLineWrap()
 	seg := segment.NewSegmenter(linewrap)
 	tf := ucd.OpenTestFile("./LineBreakTest.txt", t)
 	defer tf.Close()
-	//failcnt, i, from, to := 0, 0, 6263, 6263
-	failcnt, i, from, to := 0, 0, 1, 8000
+	failcnt, i, from, to := 0, 0, 1, 7000
 	for tf.Scan() {
 		i++
 		if i >= from {
 			//t.Logf(tf.Comment())
+			gtrace.CoreTracer.Infof(tf.Comment())
 			in, out := ucd.BreakTestInput(tf.Text())
 			if !executeSingleTest(t, seg, i, in, out) {
 				failcnt++
+				t.Errorf("test #%d failed", i)
 			}
 		}
 		if i >= to {

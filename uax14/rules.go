@@ -5,7 +5,7 @@ import "github.com/npillmayer/uax"
 /*
 BSD License
 
-Copyright (c) 2017–20, Norbert Pillmayer (norbert@pillmayer.com)
+Copyright (c) 2017–21, Norbert Pillmayer (norbert@pillmayer.com)
 
 All rights reserved.
 Redistribution and use in source and binary forms, with or without
@@ -126,7 +126,7 @@ func rule_05_NewLine(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 	c := UAX14Class(cpClass)
 	if c == BKClass || c == NLClass || c == LFClass {
 		rec.MatchLen++
-		return uax.DoAccept(rec, PenaltyForMustBreak, PenaltyToSuppressBreak)
+		return uax.DoAccept(rec, PenaltyForMustBreak)
 	} else if c == CRClass {
 		rec.MatchLen++
 		return rule_05_CRLF
@@ -140,6 +140,15 @@ func rule_05_CRLF(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 		return uax.DoAccept(rec, PenaltyForMustBreak, PenaltyToSuppressBreak, PenaltyToSuppressBreak)
 	}
 	return uax.DoAccept(rec, 0, PenaltyForMustBreak, PenaltyToSuppressBreak)
+}
+
+func rule_06_HardBreak(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
+	c := UAX14Class(cpClass)
+	if c == BKClass || c == NLClass || c == LFClass || c == CRClass {
+		//rec.MatchLen++
+		return uax.DoAccept(rec, 0, PenaltyToSuppressBreak)
+	}
+	return uax.DoAbort(rec)
 }
 
 // LB7 Do not break before spaces or zero width space.

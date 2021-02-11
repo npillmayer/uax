@@ -583,13 +583,14 @@ func (s *Segmenter) inxForBreaker(b uax.UnicodeBreaker) int {
 func (s *Segmenter) insertPenalties(selector int, penalties []int) {
 	l := s.deque.Len()
 	if len(penalties) > l {
-		penalties = penalties[0:l] // drop excessive penalties
+		penalties = penalties[:l] // drop excessive penalties
 	}
 	var total [2]int
 	var r rune
 	for i, p := range penalties {
 		r, total[0], total[1] = s.deque.At(l - 1 - i)
-		total[selector] = bounded(total[selector] + p)
+		//total[selector] = bounded(total[selector] + p)
+		total[selector] = total[selector] + p
 		s.deque.SetAt(l-1-i, r, total[0], total[1])
 	}
 }
