@@ -29,7 +29,7 @@ const MaxByteLen int = 32766
 
 // StringFromString creates a grapheme string from a Go string.
 // As grapheme strings are not meant to be created for large amounts of text, but
-// rather for manageable segments, s is not allowed to exceed s^16-1 = 32766 bytes.
+// rather for manageable segments, s is not allowed to exceed 2^16-1 = 32766 bytes.
 //
 // StringFromString will panic if a larger input string is given.
 //
@@ -52,7 +52,7 @@ func StringFromString(s string) String {
 // of the input.
 //
 // As grapheme strings are not meant to be created for large amounts of text, but
-// rather for manageable segments, b is not allowed to exceed s^16-1 = 32766 bytes.
+// rather for manageable segments, b is not allowed to exceed 2^16-1 = 32766 bytes.
 //
 // StringFromBytes will panic if a larger input slice is given.
 //

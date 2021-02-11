@@ -133,8 +133,8 @@ type WordBreaker struct {
 //   segmenter.Init(...)
 //   for segmenter.Next() ...
 //
-// weight is a multilying factor for penalties. It must be 0…w…5 and will
-// be capped for values outside this range.
+// weight is a multiplying factor for penalties. It must be 0…w…5 and will
+// be capped for values outside this range. Currently this is not used by any test and should probably left to 1.
 //
 func NewWordBreaker(weight int) *WordBreaker {
 	gb := &WordBreaker{weight: capw(weight)}

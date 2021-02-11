@@ -16,7 +16,6 @@ import (
 func ExampleWordBreaker() {
 	onWords := uax29.NewWordBreaker(1)
 	segmenter := segment.NewSegmenter(onWords)
-	segmenter.BreakOnZero(true, false)
 	segmenter.Init(strings.NewReader("Hello World🇩🇪!"))
 	for segmenter.Next() {
 		fmt.Printf("'%s'\n", segmenter.Text())
@@ -36,8 +35,6 @@ func TestWordBreaks1(t *testing.T) {
 	//
 	onWords := uax29.NewWordBreaker(1)
 	segmenter := segment.NewSegmenter(onWords)
-	segmenter.BreakOnZero(true, false)
-	//segmenter.Init(strings.NewReader("Hello World "))
 	segmenter.Init(strings.NewReader("Hello World🇩🇪!"))
 	n := 0
 	for segmenter.Next() {
@@ -56,7 +53,6 @@ func TestWordBreaks2(t *testing.T) {
 	//
 	onWords := uax29.NewWordBreaker(1)
 	segmenter := segment.NewSegmenter(onWords)
-	//segmenter.BreakOnZero(true, false)
 	segmenter.Init(strings.NewReader("lime-tree"))
 	n := 0
 	for segmenter.Next() {
