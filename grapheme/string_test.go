@@ -55,6 +55,7 @@ func TestString(t *testing.T) {
 	if l != 11 {
 		t.Errorf("expected s.Len() to be 11, is %d", s.Len())
 	}
+	t.Fail()
 }
 
 func TestChineseString(t *testing.T) {

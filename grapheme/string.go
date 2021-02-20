@@ -86,7 +86,9 @@ func makeShortString(s string) String {
 		TC().Infof("next grapheme = '%s'", breaker.Text())
 		gstr.breaks = append(gstr.breaks, uint8(br))
 	}
-	TC().Errorf("breaker error = %v", breaker.Err())
+	if breaker.Err() != nil {
+		TC().Errorf("breaker error = %v", breaker.Err())
+	}
 	return gstr
 }
 
@@ -133,7 +135,9 @@ func makeMidString(s string) String {
 		TC().Infof("next grapheme = '%s'", breaker.Text())
 		gstr.breaks = append(gstr.breaks, uint16(br))
 	}
-	TC().Errorf("breaker error = %v", breaker.Err())
+	if breaker.Err() != nil {
+		TC().Errorf("breaker error = %v", breaker.Err())
+	}
 	return gstr
 }
 
