@@ -44,8 +44,18 @@ func (rl *ResolvedLevels) String() string {
 // Clients typically use this for line-wrapping. Cut-off level runs (= lines) can then
 // be reordered one by one.
 //
-func (rl *ResolvedLevels) Split(at uint64) (*ResolvedLevels, *ResolvedLevels) {
+// If parameter shift0 is set, all indices within resolved levels will be lowered by `at`,
+// resulting in the first level to have a left boundary of zero. This is useful for
+// cases where the clients splits the underlying text congruently to Bidi levels
+// and characters are therefore “re-positioned”.
+//
+func (rl *ResolvedLevels) Split(at uint64, shift0 bool) (*ResolvedLevels, *ResolvedLevels) {
 	prefix, suffix := split(rl.scraps, charpos(at))
+	if shift0 {
+		//suffix = shiftzero(suffix, charpos(at))
+		shiftzero(&suffix, charpos(at))
+		T().Errorf("shifted suffix = %v", suffix)
+	}
 	return &ResolvedLevels{scraps: prefix}, &ResolvedLevels{scraps: suffix}
 }
 
@@ -102,6 +112,17 @@ func split(scraps []scrap, at charpos) ([]scrap, []scrap) {
 
 func irsContains(scraps []scrap, pos charpos) bool {
 	return scraps[0].l <= pos && scraps[len(scraps)-1].r > pos
+}
+
+func shiftzero(scraps *[]scrap, offset charpos) { //[]scrap {
+	for i, s := range *scraps {
+		s.l = validcharpos(s.l, offset)
+		s.r = validcharpos(s.r, offset)
+		(*scraps)[i] = s
+		//T().Errorf("scrap = %v", s)
+	}
+	//T().Errorf("shifted = %v", scraps)
+	//return scraps
 }
 
 // The Reordering Phase of the UAX#9 algorithm is basically building a tree
@@ -436,4 +457,13 @@ func (rl *ResolvedLevels) DirectionAt(pos uint64) Direction {
 		}
 	}
 	return LeftToRight
+}
+
+// ---------------------------------------------------------------------------
+
+func validcharpos(p, diff charpos) charpos {
+	if p > diff {
+		return p - diff
+	}
+	return 0
 }

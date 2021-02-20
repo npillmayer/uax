@@ -146,7 +146,7 @@ func makeScrap(r rune, clz bidi.Class, pos charpos, length int) scrap {
 func (sc *bidiScanner) Scan(pipe chan<- scrap) {
 	var lookahead scrap
 	current := sc.initialOuterScrap(false)
-	var lastAL charpos // position of last AL character-run in input
+	lastAL := int64(-1) // position of last AL character-run in input
 	for {
 		r, length, bidiclz, ok := sc.nextRune(current.r) // read the next input rune
 		if !ok {                                         // if EOF, drain lookahead and quit
@@ -190,7 +190,7 @@ func (sc *bidiScanner) Scan(pipe chan<- scrap) {
 			lookahead = inheritStrongTypes(lookahead, current, lastAL)
 			current = sc.prepareRuleBD16(r, lookahead)
 			if isAL {
-				lastAL = current.l
+				lastAL = int64(current.l)
 			}
 		} else { // otherwise the current scrap grows
 			current = collapse(current, lookahead, current.bidiclz) // meld LA with current
@@ -249,6 +249,7 @@ func applyRulesW1to3(r rune, clz bidi.Class, current scrap) bidi.Class {
 		return currclz
 	case bidi.EN: // rule W2
 		if current.context.IsAL() {
+			T().Errorf("========= context: %v", current.context)
 			return bidi.AN
 		}
 	case bidi.AL: // rule W3
@@ -283,8 +284,9 @@ func (sc *bidiScanner) prepareRuleBD16(r rune, s scrap) scrap {
 	return s
 }
 
-// isAL is true if dest has been of bidi class AL (before UAX#9 rule W3 changed it)
-func inheritStrongTypes(dest, src scrap, lastAL charpos) scrap {
+// lastAL is the position of the last AL character that has occured (before
+// UAX#9 rule W3 changed it)
+func inheritStrongTypes(dest, src scrap, lastAL int64) scrap {
 	T().Debugf("bidi scanner: inherit %s => %s     %v", src, dest, src.context)
 	dest.context = src.context
 	switch dest.bidiclz {
@@ -294,7 +296,9 @@ func inheritStrongTypes(dest, src scrap, lastAL charpos) scrap {
 		dest.context.embeddingDir = bidi.R
 		//panic("R2")
 	default:
-		dest.context.SetStrongType(bidi.AL, lastAL)
+		if lastAL >= 0 {
+			dest.context.SetStrongType(bidi.AL, charpos(lastAL))
+		}
 		switch src.bidiclz {
 		case bidi.L, bidi.LRI:
 			dest.context.SetStrongType(bidi.L, src.l)
@@ -304,7 +308,7 @@ func inheritStrongTypes(dest, src scrap, lastAL charpos) scrap {
 			T().Debugf("bidi scanner LA has R context=%v from %v", dest.context, src.context)
 		case bidi.AL:
 			dest.context.SetStrongType(bidi.AL, src.l)
-			T().Debugf("la has AL context=%v from %v", dest.context, src.context)
+			T().Debugf("bidi scanner lA has AL context=%v from %v", dest.context, src.context)
 		}
 	}
 	return dest

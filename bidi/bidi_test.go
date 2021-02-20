@@ -68,14 +68,19 @@ func TestScannerMarkup(t *testing.T) {
 			scraps += fmt.Sprintf("\n[%2d] -> %s", n, s)
 		}
 		n++
+		if n == 3 && s.bidiclz != bidi.PDI {
+			t.Errorf("expected scrap #3 to be PDI, is %v", s)
+		}
+		if n == 4 && s.bidiclz != bidi.LRI {
+			t.Errorf("expected scrap #4 to be LRI, is %v", s)
+		}
 	}
 	t.Logf(scraps)
-	t.Fail()
 }
 
 func TestScannerScraps(t *testing.T) {
-	gtrace.CoreTracer = gotestingadapter.New()
-	teardown := gotestingadapter.RedirectTracing(t)
+	// gtrace.CoreTracer = gologadapter.New()
+	teardown := testconfig.QuickConfig(t)
 	defer teardown()
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelError)
 	//
@@ -112,8 +117,7 @@ func TestScannerScraps(t *testing.T) {
 }
 
 func TestSimpleReverse(t *testing.T) {
-	gtrace.CoreTracer = gotestingadapter.New()
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := testconfig.QuickConfig(t)
 	defer teardown()
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
@@ -132,8 +136,7 @@ func TestSimpleReverse(t *testing.T) {
 }
 
 func TestSimpleL2RReorder(t *testing.T) {
-	gtrace.CoreTracer = gotestingadapter.New()
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := testconfig.QuickConfig(t)
 	defer teardown()
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
@@ -155,8 +158,7 @@ func TestSimpleL2RReorder(t *testing.T) {
 }
 
 func TestRecursiveL2RReorder(t *testing.T) {
-	gtrace.CoreTracer = gotestingadapter.New()
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := testconfig.QuickConfig(t)
 	defer teardown()
 	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
@@ -380,7 +382,7 @@ func TestResolveCar2(t *testing.T) {
 	gtrace.CoreTracer = gotestingadapter.New()
 	teardown := gotestingadapter.RedirectTracing(t)
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelInfo)
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	input := "<car MEANS CAR.="
 	reader := strings.NewReader(input)
@@ -570,7 +572,7 @@ func TestTest(t *testing.T) {
 	s := []byte(input[:11])
 	t.Logf("s = '%s'", s)
 	t.Logf("reversing '%s' = '%s'", s, reverseString(s))
-	t.Fail()
+	//t.Fail()
 }
 
 // ---------------------------------------------------------------------------
