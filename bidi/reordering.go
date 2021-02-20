@@ -54,7 +54,7 @@ func (rl *ResolvedLevels) Split(at uint64, shift0 bool) (*ResolvedLevels, *Resol
 	if shift0 {
 		//suffix = shiftzero(suffix, charpos(at))
 		shiftzero(&suffix, charpos(at))
-		T().Errorf("shifted suffix = %v", suffix)
+		T().Debugf("resolved levels: shifted suffix levels = %v", suffix)
 	}
 	return &ResolvedLevels{scraps: prefix}, &ResolvedLevels{scraps: suffix}
 }
@@ -457,6 +457,65 @@ func (rl *ResolvedLevels) DirectionAt(pos uint64) Direction {
 		}
 	}
 	return LeftToRight
+}
+
+// SegmentIterator iterates over the text segments contained in a run.
+// Runs are the product of a re-ordering of text, which may lead to segments of text
+// to be shuffled around. A segment starts and ends at text positions of the unshuffled
+// text. Clients will need this information to create the correct visual order
+// of text segments.
+type SegmentIterator struct {
+	run      *Run
+	interval int
+	eof      bool
+}
+
+// SegmentIterator creates an interator for the text segments contained within a
+// Bidi run.
+//
+//     it := run.SegmentIterator()
+//     for it.Next() {
+//         dir, from, to := it.Segment()
+//         var segment string
+//         segment = myGetSegString(from, to)  // client func to get the text-segment by positions
+//         if dir == bidi.LeftToRight {
+//             segment = reverse(segment)
+//         }
+//         …                                   // visual output of segment
+//     }
+//
+// Clients of this package should proceed like this for every Run of an Ordering.
+//
+func (r *Run) SegmentIterator() *SegmentIterator {
+	return &SegmentIterator{
+		run: r,
+	}
+}
+
+// Next proceeds the iterator to the next segment of text.
+func (it *SegmentIterator) Next() bool {
+	if it.interval >= len(it.run.scraps) {
+		return false
+	}
+	it.interval++
+	if it.interval == len(it.run.scraps) {
+		it.eof = true
+	}
+	return true
+}
+
+// EOF returns true if the iterator has read the last segment.
+func (it *SegmentIterator) EOF() bool {
+	return it.eof
+}
+
+// Segment returns the bounds of the current segment of text.
+func (it *SegmentIterator) Segment() (Direction, uint64, uint64) {
+	if it.interval == 0 {
+		return it.run.Dir, 0, 0
+	}
+	s := it.run.scraps[it.interval-1]
+	return it.run.Dir, uint64(s.l), uint64(s.r)
 }
 
 // ---------------------------------------------------------------------------
