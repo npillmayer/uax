@@ -43,7 +43,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // Format: <rule-no>\t<LHS>\t<op>\t<RHS>
 //
 /*
-0.3		÷	eot
+0.3		!	eot
 4.0	BK	!
 5.01	CR	×	LF
 5.02	CR	!
@@ -121,6 +121,11 @@ func rule_LB2(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 	return uax.DoAccept(rec, PenaltyToSuppressBreak)
 }
 */
+
+// LB3 Always break at the end of text.
+func rule_LB3(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
+	return uax.DoAccept(rec, 0, PenaltyForMustBreak)
+}
 
 func rule_05_NewLine(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 	c := UAX14Class(cpClass)

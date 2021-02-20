@@ -66,7 +66,9 @@ if clients call NewLineWrap().
 
 Status
 
-The current implementation passes all tests from the UAX#14 test file.
+The current implementation passes all tests from the UAX#14 test file, except 3:
+
+    uax14_test.go:65: 3 TEST CASES OUT of 7001 FAILED
 */
 package uax14
 
@@ -146,6 +148,7 @@ func NewLineWrap() *LineWrap {
 	uax14.publisher = uax.NewRunePublisher()
 	uax14.rules = map[UAX14Class][]uax.NfaStateFn{
 		//sot:      {rule_LB2},
+		eot:      {rule_LB3},
 		NLClass:  {rule_05_NewLine, rule_06_HardBreak},
 		LFClass:  {rule_05_NewLine, rule_06_HardBreak},
 		BKClass:  {rule_05_NewLine, rule_06_HardBreak},
@@ -337,9 +340,11 @@ func (uax14 *LineWrap) ProceedWithRune(r rune, cpClass int) {
 			x = make([]int, 2)
 			x[1] = noBreak
 		}
+	} else {
+		x = setPenalty1(x, DefaultPenalty)
 	}
 	for i, p := range x { // positive penalties get lifted +1000
-		if p > 0 {
+		if p > DefaultPenalty {
 			p += noBreak
 			x[i] = p
 		}
@@ -379,8 +384,9 @@ func (uax14 *LineWrap) unblock() {
 
 // Penalties (suppress break and mandatory break).
 var (
-	PenaltyToSuppressBreak = 10000
-	PenaltyForMustBreak    = -19000
+	PenaltyToSuppressBreak = 10000  // Suppress break: ×
+	PenaltyForMustBreak    = -19000 // Break: !
+	DefaultPenalty         = 1      // Rule LB31: ÷    fragile, do not change!
 )
 
 // --- Helpers ---------------------------------------------------------------
@@ -391,6 +397,9 @@ var (
 func p(w int) int {
 	q := 31 - w
 	r := int(math.Pow(1.3, float64(q)))
+	if r == DefaultPenalty {
+		r = DefaultPenalty + 1
+	}
 	TC().P("rule", w).Debugf("penalty %d => %d", w, r)
 	return r
 }
@@ -400,8 +409,9 @@ func p(w int) int {
 func ps(w int, first int, l int) []int {
 	pp := make([]int, l+1)
 	pp[1] = first
+	p := p(w)
 	for i := 2; i <= l; i++ {
-		pp[i] = p(w)
+		pp[i] = p
 	}
 	return pp
 }
@@ -411,4 +421,16 @@ func max(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func setPenalty1(P []int, p int) []int {
+	if len(P) == 0 {
+		P = append(P, 0)
+		P = append(P, p)
+	} else if len(P) == 1 {
+		P = append(P, p)
+	} else if P[1] == 0 {
+		P[1] = p
+	}
+	return P
 }
