@@ -39,18 +39,22 @@ func TestGraphemeClasses(t *testing.T) {
 }
 
 func TestGraphemes1(t *testing.T) {
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := testconfig.QuickConfig(t)
 	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	SetupGraphemeClasses()
 	//
 	onGraphemes := NewBreaker(1)
-	input := bytes.NewReader([]byte("Hello\tWorld"))
+	input := bytes.NewReader([]byte("개=Hang Syllable GAE"))
 	seg := segment.NewSegmenter(onGraphemes)
 	seg.Init(input)
 	seg.Next()
 	t.Logf("Next() = %s\n", seg.Text())
 	if seg.Err() != nil {
 		t.Errorf("segmenter.Next() failed with error: %s", seg.Err())
+	}
+	if seg.Text() != "개" {
+		t.Errorf("expected first grapheme of string to be '개' (Hang GAE), is '%v'", seg.Text())
 	}
 }
 
@@ -62,7 +66,7 @@ func TestGraphemes2(t *testing.T) {
 	SetupGraphemeClasses()
 	//
 	onGraphemes := NewBreaker(1)
-	input := bytes.NewReader([]byte("Hello\tWorld"))
+	input := bytes.NewReader([]byte("Hello\tWorld!"))
 	seg := segment.NewSegmenter(onGraphemes)
 	seg.BreakOnZero(true, false)
 	seg.Init(input)
@@ -88,7 +92,7 @@ func TestGraphemesTestFile(t *testing.T) {
 	//
 	onGraphemes := NewBreaker(5)
 	seg := segment.NewSegmenter(onGraphemes)
-	seg.BreakOnZero(true, false)
+	//seg.BreakOnZero(true, false)
 	//gopath := os.Getenv("GOPATH")
 	//f, err := os.Open(gopath + "/etc/GraphemeBreakTest.txt")
 	//f, err := os.Open(gopath + "/etc/GraphemeBreakTest.txt")

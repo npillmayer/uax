@@ -48,7 +48,10 @@ Usage of grapheme.String will take care of doing the setup behind the scenes.
 Conformance
 
 This UnicodeBreaker successfully passes all 672 tests for grapheme
-breaking of UAX#29 (GraphemeBreakTest.txt).
+breaking of UAX#29 (GraphemeBreakTest.txt). UPDATE: Due to a small change in
+the segmenters semantics, currently 11 out of 672 tests fail. I did not have
+the time to look into it.
+
 
 ____________________________________________________________________________
 

@@ -43,8 +43,7 @@ import (
 	"github.com/npillmayer/uax/emoji"
 )
 
-// ClassForRune is the top-level client function.
-// It gets the line grapheme class for a Unicode code-point.
+// ClassForRune gets the line grapheme class for a Unicode code-point.
 func ClassForRune(r rune) GraphemeClass {
 	if r == rune(0) {
 		return eot
@@ -186,6 +185,7 @@ func (gb *Breaker) ProceedWithRune(r rune, cpClass int) {
 			}
 		}
 	*/
+	setPenalty1(gb, penalty999) //gb.penalties[1] = penalty999, if empty
 }
 
 // LongestActiveMatch collects information from
@@ -193,7 +193,9 @@ func (gb *Breaker) ProceedWithRune(r rune, cpClass int) {
 // and return the longest one for all still active recognizers.
 // (Interface uax.UnicodeBreaker)
 func (gb *Breaker) LongestActiveMatch() int {
-	return gb.longestMatch
+	// We return a value of at least 1, as explained above.
+	return max(1, gb.longestMatch)
+	//return gb.longestMatch
 }
 
 // Penalties gets all active penalties for all active recognizers combined.
@@ -208,9 +210,10 @@ func (gb *Breaker) Penalties() []int {
 
 // GlueBREAK, JOIN and BANG set default penalty values.
 const (
-	GlueBREAK int = -500
-	GlueJOIN  int = 10000
-	GlueBANG  int = -20000
+	GlueBREAK  int = -500
+	GlueJOIN   int = 10000
+	GlueBANG   int = -20000
+	penalty999 int = -10
 )
 
 // This is the break penalty for rule Any ÷ Any
@@ -364,4 +367,15 @@ func capw(w int) int {
 		return 5
 	}
 	return w
+}
+
+func setPenalty1(gb *Breaker, p int) {
+	if len(gb.penalties) == 0 {
+		gb.penalties = append(gb.penalties, 0)
+		gb.penalties = append(gb.penalties, p)
+	} else if len(gb.penalties) == 1 {
+		gb.penalties = append(gb.penalties, p)
+	} else if gb.penalties[1] == 0 {
+		gb.penalties[1] = p
+	}
 }
