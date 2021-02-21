@@ -78,6 +78,3 @@ import (
 func T() tracing.Trace {
 	return gtrace.CoreTracer
 }
-
-// Version is the Unicode edition from which the tables are derived.
-const Version = "13.0.0"
