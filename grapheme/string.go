@@ -83,7 +83,7 @@ func makeShortString(s string) String {
 	br := 0
 	for breaker.Next() {
 		br += len(breaker.Bytes())
-		TC().Infof("next grapheme = '%s'", breaker.Text())
+		TC().Debugf("next grapheme = '%s'", breaker.Text())
 		gstr.breaks = append(gstr.breaks, uint8(br))
 	}
 	if breaker.Err() != nil {
@@ -132,7 +132,7 @@ func makeMidString(s string) String {
 	br := 0
 	for breaker.Next() {
 		br += len(breaker.Bytes())
-		TC().Infof("next grapheme = '%s'", breaker.Text())
+		TC().Debugf("next grapheme = '%s'", breaker.Text())
 		gstr.breaks = append(gstr.breaks, uint16(br))
 	}
 	if breaker.Err() != nil {
