@@ -465,40 +465,65 @@ func (rl *ResolvedLevels) DirectionAt(pos uint64) Direction {
 // text. Clients will need this information to create the correct visual order
 // of text segments.
 type SegmentIterator struct {
-	run      *Run
+	//run      *Run
+	Dir      Direction
+	scraps   []scrap
+	reverse  bool
 	interval int
 	eof      bool
 }
 
 // SegmentIterator creates an interator for the text segments contained within a
-// Bidi run.
+// Bidi run. Assume the output devices current direction is set to left-to-right:
 //
-//     it := run.SegmentIterator()
+//     it := run.SegmentIterator(run.IsOpposite(bidi.LeftToRight))
 //     for it.Next() {
 //         dir, from, to := it.Segment()
 //         var segment string
 //         segment = myGetSegString(from, to)  // client func to get the text-segment by positions
-//         if dir == bidi.LeftToRight {
-//             segment = reverse(segment)
+//         if dir == bidi.RightToLeft {
+//             segment = reverse(segment)      // client func to reverse graphemes of a string
 //         }
 //         …                                   // visual output of segment
 //     }
 //
 // Clients of this package should proceed like this for every Run of an Ordering.
 //
-func (r *Run) SegmentIterator() *SegmentIterator {
-	return &SegmentIterator{
-		run: r,
+// Parameter reverse should be set to true if the clients expects fragments of
+// the run in reverse order. This will be the case in situations where the direction
+// of the run is opposite to the visual direction of an output device and the
+// application has to handle visual re-ordering.
+//
+func (r *Run) SegmentIterator(reverse bool) *SegmentIterator {
+	it := &SegmentIterator{
+		//run:     r,
+		Dir:     r.Dir,
+		scraps:  r.scraps,
+		reverse: reverse,
 	}
+	if reverse {
+		mid := len(it.scraps) / 2
+		for i := 0; i < mid; i++ {
+			j := len(it.scraps) - i - 1
+			it.scraps[i], it.scraps[j] = it.scraps[j], it.scraps[i]
+		}
+	}
+	return it
+}
+
+// IsOpposite returns true if the run's direction is oppostite to the
+// given direction.
+func (r *Run) IsOpposite(dir Direction) bool {
+	return dir != r.Dir
 }
 
 // Next proceeds the iterator to the next segment of text.
 func (it *SegmentIterator) Next() bool {
-	if it.interval >= len(it.run.scraps) {
+	if it.interval >= len(it.scraps) {
 		return false
 	}
 	it.interval++
-	if it.interval == len(it.run.scraps) {
+	if it.interval == len(it.scraps) {
 		it.eof = true
 	}
 	return true
@@ -512,10 +537,10 @@ func (it *SegmentIterator) EOF() bool {
 // Segment returns the bounds of the current segment of text.
 func (it *SegmentIterator) Segment() (Direction, uint64, uint64) {
 	if it.interval == 0 {
-		return it.run.Dir, 0, 0
+		return it.Dir, 0, 0
 	}
-	s := it.run.scraps[it.interval-1]
-	return it.run.Dir, uint64(s.l), uint64(s.r)
+	s := it.scraps[it.interval-1]
+	return it.Dir, uint64(s.l), uint64(s.r)
 }
 
 // ---------------------------------------------------------------------------
