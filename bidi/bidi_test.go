@@ -234,6 +234,24 @@ func TestFlatten1(t *testing.T) {
 	}
 }
 
+func TestSplitSingle(t *testing.T) {
+	teardown := testconfig.QuickConfig(t)
+	defer teardown()
+	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	//
+	var scraps = [...]scrap{
+		{l: 0, r: 0, bidiclz: bidi.LRI},
+		{l: 0, r: 35, bidiclz: bidi.L},
+		{l: 35, r: 50, bidiclz: bidi.R},
+		{l: 50, r: 51, bidiclz: bidi.L},
+		{l: 51, r: 51, bidiclz: bidi.PDI},
+	}
+	prefix, suffix := split(scraps[:], 38)
+	if len(prefix) != 3 || len(suffix) != 4 {
+		t.Errorf("expected split into 3|4, is %d|%d", len(prefix), len(suffix))
+	}
+}
+
 func TestSplit(t *testing.T) {
 	gtrace.CoreTracer = gotestingadapter.New()
 	teardown := gotestingadapter.RedirectTracing(t)

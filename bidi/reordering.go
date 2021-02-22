@@ -89,7 +89,7 @@ func split(scraps []scrap, at charpos) ([]scrap, []scrap) {
 		}
 		// children are split at this point
 		// restch is set to right part of children split
-		rest := scrap{r: s.r}
+		rest := scrap{r: s.r, bidiclz: s.bidiclz}
 		s.r, rest.l = at, at
 		rest.children = restch
 		rseg := make([]scrap, len(scraps)-i+1)

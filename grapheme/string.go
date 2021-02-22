@@ -38,6 +38,7 @@ const MaxByteLen int = 32766
 // may be of length 0 even if the input string is not.
 //
 func StringFromString(s string) String {
+	SetupGraphemeClasses()
 	if len(s) < math.MaxUint8 {
 		return makeShortString(s)
 	} else if len(s) < math.MaxUint16 {
