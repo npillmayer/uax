@@ -10,7 +10,7 @@ import (
 	"github.com/npillmayer/schuko/gtrace"
 	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/schuko/tracing/gologadapter"
-	"github.com/npillmayer/uax/ucd"
+	"github.com/npillmayer/uax/internal/ucd"
 )
 
 // T traces to the global core tracer.

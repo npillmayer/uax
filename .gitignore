@@ -8,5 +8,5 @@
 *.code-workspace
 *.swp
 generator
+tablegen
 ,*.txt
-uax11/gen/gen

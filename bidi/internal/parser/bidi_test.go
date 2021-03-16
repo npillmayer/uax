@@ -16,7 +16,7 @@ import (
 	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/schuko/tracing/gologadapter"
 	"github.com/npillmayer/schuko/tracing/gotestingadapter"
-	"github.com/npillmayer/uax/ucd"
+	"github.com/npillmayer/uax/internal/ucd"
 	"golang.org/x/text/unicode/bidi"
 )
 

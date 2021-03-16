@@ -7,9 +7,9 @@ import (
 	"github.com/npillmayer/schuko/gtrace"
 	"github.com/npillmayer/schuko/testconfig"
 	"github.com/npillmayer/schuko/tracing"
+	"github.com/npillmayer/uax/internal/ucd"
 	"github.com/npillmayer/uax/segment"
 	"github.com/npillmayer/uax/uax14"
-	"github.com/npillmayer/uax/ucd"
 )
 
 func TestSimpleLineWrap(t *testing.T) {
