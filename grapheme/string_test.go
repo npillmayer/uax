@@ -49,13 +49,12 @@ func TestString(t *testing.T) {
 	x := s.Nth(2)
 	t.Logf("s.Nth(2) = %#U", x[0])
 	if x != "l" {
-		t.Errorf("expected s.Nth(2) to be 'l', is %s", x)
+		t.Errorf("expected s.Nth(2) to be 'l', is %#v", x)
 	}
 	l := s.Len()
 	if l != 11 {
 		t.Errorf("expected s.Len() to be 11, is %d", s.Len())
 	}
-	t.Fail()
 }
 
 func TestChineseString(t *testing.T) {
