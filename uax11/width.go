@@ -216,11 +216,11 @@ var eaMatch = language.NewMatcher([]language.Tag{
 func ContextFromEnvironment() *Context {
 	userLocale, err := jj.DetectIETF()
 	if err != nil {
-		T().Errorf(err.Error())
+		tracer().Errorf(err.Error())
 		userLocale = "en-US"
-		T().Infof("UAX#11 sets default user locale %v", userLocale)
+		tracer().Infof("UAX#11 sets default user locale %v", userLocale)
 	} else {
-		T().Infof("UAX#11 detected user locale %v", userLocale)
+		tracer().Infof("UAX#11 detected user locale %v", userLocale)
 	}
 	lang := language.Make(userLocale)
 	script, _ := lang.Script()

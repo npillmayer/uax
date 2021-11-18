@@ -32,37 +32,13 @@ implementing the UAX#29 word breaking algorithm.
 
 _______________________________________________________________________
 
-BSD License
+License
 
-Copyright (c) 2017–21, Norbert Pillmayer
+Governed by a 3-Clause BSD license. License file may be found in the root
+folder of this module.
 
-All rights reserved.
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions
-are met:
+Copyright © 2021 Norbert Pillmayer <norbert@pillmayer.com>
 
-1. Redistributions of source code must retain the above copyright
-notice, this list of conditions and the following disclaimer.
-
-2. Redistributions in binary form must reproduce the above copyright
-notice, this list of conditions and the following disclaimer in the
-documentation and/or other materials provided with the distribution.
-
-3. Neither the name of this software nor the names of its contributors
-may be used to endorse or promote products derived from this software
-without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 package segment
@@ -76,15 +52,13 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/npillmayer/schuko/gtrace"
-
 	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/uax"
 )
 
-// CT traces to the core-tracer.
-func CT() tracing.Trace {
-	return gtrace.CoreTracer
+// tracer traces to uax.segment .
+func tracer() tracing.Trace {
+	return tracing.Select("uax.segment")
 }
 
 // ErrBoundReached is returned from BoundedNext() if the reason for returning false
@@ -397,7 +371,7 @@ func (s *Segmenter) next(bound int64) bool {
 			return false
 		}
 		if s.pos-int64(s.deque.Len()) > bound {
-			CT().Debugf("exiting because of bound reached: %d-%d>%d", s.pos, s.deque.Len(), bound)
+			tracer().Debugf("exiting because of bound reached: %d-%d>%d", s.pos, s.deque.Len(), bound)
 			return false
 		}
 	}
@@ -410,7 +384,7 @@ func (s *Segmenter) next(bound int64) bool {
 	//CT().Debugf("CUT=%v", cut)
 	s.activeSegment = s.buffer.Bytes()
 	//CT().Debugf("s.positionOfBreakOpp=%d", s.positionOfBreakOpportunity)
-	CT().P("length", strconv.Itoa(l)).Debugf("Next() = \"%v\"", string(s.activeSegment))
+	tracer().P("length", strconv.Itoa(l)).Debugf("Next() = \"%v\"", string(s.activeSegment))
 	return true
 }
 
@@ -430,7 +404,7 @@ func (s *Segmenter) readRune() error {
 	}
 	r, sz, err := s.reader.ReadRune()
 	s.pos += int64(sz)
-	CT().P("rune", fmt.Sprintf("%#U", r)).Debugf("--------------------------------------")
+	tracer().P("rune", fmt.Sprintf("%#U", r)).Debugf("--------------------------------------")
 	if err == nil {
 		//s.deque.PushBack(r, s.primarySeed, s.secondarySeed)
 		s.deque.PushBack(r, 0, 0)
@@ -439,7 +413,7 @@ func (s *Segmenter) readRune() error {
 		s.atEOF = true
 		err = nil
 	} else { // error case, err is non-nil
-		CT().P("rune", fmt.Sprintf("%#U", r)).Errorf("ReadRune() error: %s", err)
+		tracer().P("rune", fmt.Sprintf("%#U", r)).Errorf("ReadRune() error: %s", err)
 		s.atEOF = true
 	}
 	return err
@@ -457,7 +431,7 @@ func (s *Segmenter) readRune() error {
 //
 func (s *Segmenter) readEnoughInputAndFindBreak(bound int64) (err error) {
 	// if Q consists just of 0 rune (EOT), do nothing and return false
-	CT().Debugf("segmenter: read enough input, EOF=%v, |Q|=%d", s.atEOF, s.deque.Len())
+	tracer().Debugf("segmenter: read enough input, EOF=%v, |Q|=%d", s.atEOF, s.deque.Len())
 	// if s.atEOF && s.deque.Len() == 1 {
 	// 	front, _, _ := s.deque.Front()
 	// 	if front == rune(0) {
@@ -467,7 +441,7 @@ func (s *Segmenter) readEnoughInputAndFindBreak(bound int64) (err error) {
 	// }
 	for s.positionOfBreakOpportunity < 0 {
 		if s.pos-int64(s.longestActiveMatch) > bound {
-			CT().Infof("segmenter: bound reached")
+			tracer().Infof("segmenter: bound reached")
 			return ErrBoundReached
 		}
 		// CT().Debugf("pos=%d - %d = %d --> %d", s.pos, s.longestActiveMatch,
@@ -478,7 +452,7 @@ func (s *Segmenter) readEnoughInputAndFindBreak(bound int64) (err error) {
 		if from > 0 {
 			// this may happen if the previous iteration hit a bound
 			// or if a run of no-breaks was inserted by the breaker(s)
-			CT().Debugf("active match is short; previous iteration did not deliver (all) breakpoints")
+			tracer().Debugf("active match is short; previous iteration did not deliver (all) breakpoints")
 			if s.positionOfBreakOpportunity >= 0 {
 				skipRead = true // we need not read in a rune if we had a breakpoint at bound
 			}
@@ -506,7 +480,7 @@ func (s *Segmenter) readEnoughInputAndFindBreak(bound int64) (err error) {
 				s.insertPenalties(s.inxForBreaker(breaker), breaker.Penalties())
 			}
 			s.printQ()
-			CT().Debugf("-- all breakers done --")
+			tracer().Debugf("-- all breakers done --")
 		}
 		// The Q is updated. The longest active match may have been changed and
 		// we have to scan from the start of the Q to the new position of active match.
@@ -518,7 +492,7 @@ func (s *Segmenter) readEnoughInputAndFindBreak(bound int64) (err error) {
 		s.positionOfBreakOpportunity = s.findBreakOpportunity(qlen-s.longestActiveMatch,
 			boundDist)
 		//s.positionOfBreakOpportunity = s.findBreakOpportunity(qlen - 1 - s.longestActiveMatch)
-		CT().Debugf("segmenter: breakpos=%d, Q-len=%d, active match=%d",
+		tracer().Debugf("segmenter: breakpos=%d, Q-len=%d, active match=%d",
 			s.positionOfBreakOpportunity, s.deque.Len(), s.longestActiveMatch)
 		s.printQ()
 	}
@@ -545,25 +519,25 @@ func (s *Segmenter) findBreakOpportunity(to int, boundDist int64) int {
 	if to-1 < 0 || boundDist < 0 {
 		return -1
 	}
-	CT().Debugf("segmenter: searching for break opportunity from 0 to %d|%d: ", to-1, boundDist)
+	tracer().Debugf("segmenter: searching for break opportunity from 0 to %d|%d: ", to-1, boundDist)
 	breakopp := -1
 	i := 0
 	for ; i < to && int64(i) <= boundDist; i++ {
 		j, p0, p1 := s.deque.At(i)
 		if isPossibleBreak(p0, s.breakOnZero[0]) || (len(s.breakers) > 1 && isPossibleBreak(p1, s.breakOnZero[1])) {
 			breakopp = i
-			CT().Debugf("segmenter: penalties[%#U] = %d|%d   --- 8< ---", j, p0, p1)
+			tracer().Debugf("segmenter: penalties[%#U] = %d|%d   --- 8< ---", j, p0, p1)
 			break
 		}
-		CT().Debugf("segmenter: penalties[%#U] = %d|%d", j, p0, p1)
+		tracer().Debugf("segmenter: penalties[%#U] = %d|%d", j, p0, p1)
 	}
 	if breakopp >= 0 {
-		CT().Debugf("segmenter: break opportunity at %d", breakopp)
+		tracer().Debugf("segmenter: break opportunity at %d", breakopp)
 	} else if int64(i) == boundDist+1 {
 		breakopp = int(boundDist)
-		CT().Debugf("segmenter: break at bound position %d", breakopp)
+		tracer().Debugf("segmenter: break at bound position %d", breakopp)
 	} else {
-		CT().Debugf("segmenter: no break opportunity")
+		tracer().Debugf("segmenter: no break opportunity")
 	}
 	return breakopp
 }
@@ -620,7 +594,7 @@ func (s *Segmenter) getFrontSegment(buf *bytes.Buffer, bound int64) (int, bool) 
 	var isCutOff bool
 	start := s.pos - int64(s.deque.Len())
 	if start+int64(l) >= bound { // front segment would extend bound
-		CT().Debugf("segmenter: bound reached")
+		tracer().Debugf("segmenter: bound reached")
 		isCutOff = true // we truncate l to Q-start---->|bound
 		if l = int(bound) - int(s.pos) + s.deque.Len(); l < 0 {
 			return 0, true
@@ -645,7 +619,7 @@ func (s *Segmenter) getFrontSegment(buf *bytes.Buffer, bound int64) (int, bool) 
 		cnt++
 		s.lastPenalties[0], s.lastPenalties[1] = p0, p1
 	}
-	CT().Debugf("cutting front segment of length 0..%d: '%v'", l, buf)
+	tracer().Debugf("cutting front segment of length 0..%d: '%v'", l, buf)
 	// There may be further break opportunities between this break and the start of the
 	// current longest match. Advance the pointer to the next break opportunity, if any.
 	boundDist := bound
@@ -688,7 +662,7 @@ func (s *Segmenter) getFrontSegment(buf *bytes.Buffer, bound int64) (int, bool) 
 
 // Debugging helper. Print the content of the current queue to the debug log.
 func (s *Segmenter) printQ() {
-	if CT().GetTraceLevel() < tracing.LevelDebug {
+	if tracer().GetTraceLevel() < tracing.LevelDebug {
 		return
 	}
 	var sb strings.Builder
@@ -699,7 +673,7 @@ func (s *Segmenter) printQ() {
 		sb.WriteString(fmt.Sprintf(" <- %s", a.String()))
 	}
 	sb.WriteString(" .")
-	CT().P("UAX |Q|=", s.deque.Len()).Debugf(sb.String())
+	tracer().P("UAX |Q|=", s.deque.Len()).Debugf(sb.String())
 }
 
 // --- Helpers ----------------------------------------------------------

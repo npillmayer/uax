@@ -16,8 +16,6 @@ import (
 	"github.com/npillmayer/uax/segment"
 )
 
-//var TC tracing.Trace = gologadapter.New()
-
 func TestGraphemeClasses(t *testing.T) {
 	teardown := gotestingadapter.RedirectTracing(t)
 	defer teardown()
@@ -86,7 +84,7 @@ func TestGraphemes2(t *testing.T) {
 func TestGraphemesTestFile(t *testing.T) {
 	teardown := testconfig.QuickConfig(t)
 	defer teardown()
-	TC().SetTraceLevel(tracing.LevelInfo)
+	tracer().SetTraceLevel(tracing.LevelInfo)
 	//
 	SetupGraphemeClasses()
 	//
@@ -116,7 +114,7 @@ func TestGraphemesTestFile(t *testing.T) {
 			parts := strings.Split(line, "#")
 			testInput, comment := parts[0], parts[1]
 			//TC().Infof("#######################################################")
-			TC().Infof(comment)
+			tracer().Infof(comment)
 			in, out := breakTestInput(testInput)
 			if !executeSingleTest(t, seg, i, in, out) {
 				failcnt++
@@ -128,7 +126,7 @@ func TestGraphemesTestFile(t *testing.T) {
 		}
 	}
 	if err := scan.Err(); err != nil {
-		TC().Infof("reading input:", err)
+		tracer().Infof("reading input:", err)
 	}
 	if failcnt > 11 {
 		t.Errorf("%d TEST CASES OUT of %d FAILED", failcnt, i-from+1)
@@ -165,7 +163,7 @@ func breakTestInput(ti string) (string, []string) {
 }
 
 func executeSingleTest(t *testing.T, seg *segment.Segmenter, tno int, in string, out []string) bool {
-	TC().Infof("expecting %v", ost(out))
+	tracer().Infof("expecting %v", ost(out))
 	seg.Init(strings.NewReader(in))
 	i := 0
 	ok := true
