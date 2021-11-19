@@ -8,8 +8,7 @@ import (
 
 // This is a very rough implementation.
 // Creating Unicode tables is a rare task, and I do not plan to distribute
-// this little CLI. That's probably a stupid attitude, but right now I will
-// prioritize other tasks. Sorry for that!
+// this little CLI.
 
 // We collect range-tables per character category.
 // rangeTables will map category->table
