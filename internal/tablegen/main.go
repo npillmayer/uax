@@ -54,7 +54,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/npillmayer/uax/internal/ucd"
+	"github.com/npillmayer/uax/internal/ucdparse"
 )
 
 var prefix = flag.String("x", "", "prefix to categories, used for table naming")
@@ -64,7 +64,7 @@ var prefix = flag.String("x", "", "prefix to categories, used for table naming")
 // this little CLI.  Sorry for that.
 func main() {
 	buf := new(bytes.Buffer)
-	ranges := make(map[string]*ucd.RangeTableCollector)
+	ranges := make(map[string]*ucdparse.RangeTableCollector)
 	//
 	// command line flags
 	var packageNameFlag = flag.String("p", "packagenotset", "package name of output package")
@@ -84,15 +84,15 @@ func main() {
 	printPreamble(buf, *packageNameFlag)
 
 	// parse UCD file and collect ranges
-	ucd.Parse(resp.Body, func(p *ucd.Parser) {
-		l, r := p.Range(0)             // char range in field 0
-		t := p.String(categoryFieldNo) // character category
+	ucdparse.Parse(resp.Body, func(p *ucdparse.Token) {
+		l, r := p.Range()             // char range in field 0
+		t := p.Field(categoryFieldNo) // character category
 		t = strings.TrimSpace(t)
 		if t == "" {
 			return
 		}
 		append(ranges, t, l, r)
-	}, ucd.OptionKeepRanges())
+	})
 
 	// output range information per category
 	for _, rt := range ranges {
@@ -111,15 +111,15 @@ func main() {
 
 // append a character-range [l…r| to a table collector for category cat.
 // l and r may be identical.
-func append(ranges map[string]*ucd.RangeTableCollector, cat string, l, r rune) {
-	var t *ucd.RangeTableCollector
+func append(ranges map[string]*ucdparse.RangeTableCollector, cat string, l, r rune) {
+	var t *ucdparse.RangeTableCollector
 	if *prefix != "" {
 		cat = *prefix + "_" + cat
 	}
 	var ok bool
 	if t, ok = ranges[cat]; !ok {
 		fmt.Fprintf(os.Stderr, "creating table %s\n", cat)
-		t = &ucd.RangeTableCollector{Cat: cat}
+		t = &ucdparse.RangeTableCollector{Cat: cat}
 		ranges[cat] = t
 	}
 	t.Append(l, r)
@@ -150,7 +150,7 @@ import "unicode"
 //
 //     var PREFIX_A *unicode.RangeTable = _PREFIX_A
 //
-func printVarSection(buf *bytes.Buffer, ranges map[string]*ucd.RangeTableCollector) {
+func printVarSection(buf *bytes.Buffer, ranges map[string]*ucdparse.RangeTableCollector) {
 	fmt.Fprintf(buf, "var (\n")
 	for k, _ := range ranges {
 		fmt.Fprintf(buf, "    %s *unicode.RangeTable = _%s\n", k, k)

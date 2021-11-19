@@ -43,7 +43,7 @@ import (
 	"os"
 
 	"github.com/emirpasic/gods/lists/arraylist"
-	"github.com/npillmayer/uax/internal/ucd"
+	"github.com/npillmayer/uax/internal/ucdparse"
 )
 
 var logger = log.New(os.Stderr, "UAX#29 generator: ", log.LstdFlags)
@@ -80,11 +80,11 @@ func loadUnicodeGraphemeBreakFile() (map[string][]rune, error) {
 		return nil, err
 	}
 	defer f.Close()
-	parser := ucd.NewUCDParser(f)
+	parser, err := ucdparse.New(f)
 	gcls := make(map[string]*arraylist.List, len(graphemeClassnames))
 	for parser.Next() {
-		from, to := parser.Range(0)
-		clstr := parser.String(1)
+		from, to := parser.Token.Range()
+		clstr := parser.Token.Field(1)
 		list := gcls[clstr]
 		if list == nil {
 			list = arraylist.New()
@@ -94,7 +94,7 @@ func loadUnicodeGraphemeBreakFile() (map[string][]rune, error) {
 		}
 		gcls[clstr] = list
 	}
-	err = parser.Err()
+	err = parser.Token.Error
 	if err != nil {
 		log.Fatal(err)
 	}

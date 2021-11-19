@@ -18,17 +18,17 @@ import (
 // subsequent step function. Step functions may consume input characters ("match(…)").
 //
 type scanner struct {
-	Buf       *lineBuffer   // line buffer abstracts away properties of input readers
-	Step      scannerStep   // the next scanner step to execute in a chain
-	LastError error         // last error, if any
-	Token     *scannerToken // last token produced by scanner
+	Buf       *lineBuffer // line buffer abstracts away properties of input readers
+	Step      scannerStep // the next scanner step to execute in a chain
+	LastError error       // last error, if any
+	Token     *Token      // last token produced by scanner
 }
 
 // We're buiding up a scanner from chains of scanner step functions.
 // Tokens may be modified by a step function.
 // A scanner step will return the next step in the chain, or nil to stop/accept.
 //
-type scannerStep func(*scannerToken) (*scannerToken, scannerStep)
+type scannerStep func(*Token) (*Token, scannerStep)
 
 // New creates a scanner for an input reader.
 func New(inputReader io.Reader) (*scanner, error) {
@@ -42,7 +42,7 @@ func New(inputReader io.Reader) (*scanner, error) {
 }
 
 // Parse iterates over each line of the data file and calls callback f on it.
-func Parse(r io.Reader, f func(token *scannerToken)) error {
+func Parse(r io.Reader, f func(token *Token)) error {
 	sc, err := New(r)
 	if err != nil {
 		return err
@@ -97,7 +97,7 @@ func (sc *scanner) Next() bool {
 //      -> EOF:   emptyDocument
 //      -> other: docRoot
 //
-func (sc *scanner) ScanFileStart(token *scannerToken) (*scannerToken, scannerStep) {
+func (sc *scanner) ScanFileStart(token *Token) (*Token, scannerStep) {
 	token.TokenType = emptyDocument
 	if sc.Buf == nil {
 		token.Error = errors.New("no valid input document")
@@ -115,12 +115,12 @@ func (sc *scanner) ScanFileStart(token *scannerToken) (*scannerToken, scannerSte
 }
 
 // StepItem is a step function to start recognizing a line-level item.
-func (sc *scanner) ScanItem(token *scannerToken) (*scannerToken, scannerStep) {
+func (sc *scanner) ScanItem(token *Token) (*Token, scannerStep) {
 	fmt.Println("---> ScanItem")
 	return token, sc.ScanRuneRange
 }
 
-func (sc *scanner) ScanRuneRange(token *scannerToken) (*scannerToken, scannerStep) {
+func (sc *scanner) ScanRuneRange(token *Token) (*Token, scannerStep) {
 	la := sc.Buf.Lookahead
 	marker := sc.Buf.ByteCursor
 	if marker > 0 {
@@ -183,7 +183,7 @@ func isHexDigit(r rune) bool {
 	return unicode.IsDigit(r) || (r >= 'a' && r <= 'f') || (r >= 'A' && r <= 'F')
 }
 
-func (sc *scanner) ScanItemBody(token *scannerToken) (*scannerToken, scannerStep) {
+func (sc *scanner) ScanItemBody(token *Token) (*Token, scannerStep) {
 	rest := sc.Buf.ReadLineRemainder()
 	fmt.Printf("remainder = %q\n", rest)
 	a := strings.Split(rest, "#")

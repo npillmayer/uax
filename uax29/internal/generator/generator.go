@@ -48,7 +48,7 @@ import (
 	"os"
 
 	"github.com/emirpasic/gods/lists/arraylist"
-	"github.com/npillmayer/uax/internal/ucd"
+	"github.com/npillmayer/uax/internal/ucdparse"
 )
 
 var logger = log.New(os.Stderr, "UAX#29 generator: ", log.LstdFlags)
@@ -74,11 +74,14 @@ func loadUnicodeLineBreakFile() (map[string][]rune, error) {
 		return nil, err
 	}
 	defer f.Close()
-	p := ucd.NewUCDParser(f)
+	p, err := ucdparse.New(f)
+	if err != nil {
+		return nil, err
+	}
 	lbcs := make(map[string]*arraylist.List, len(uax29classnames))
 	for p.Next() {
-		from, to := p.Range(0)
-		brclzstr := p.String(1)
+		from, to := p.Token.Range()
+		brclzstr := p.Token.Field(1)
 		list := lbcs[brclzstr]
 		if list == nil {
 			list = arraylist.New()
@@ -88,7 +91,7 @@ func loadUnicodeLineBreakFile() (map[string][]rune, error) {
 		}
 		lbcs[brclzstr] = list
 	}
-	err = p.Err()
+	err = p.Token.Error
 	if err != nil {
 		log.Fatal(err)
 	}
