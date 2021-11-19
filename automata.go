@@ -174,7 +174,7 @@ func DoAbort(rec *Recognizer) NfaStateFn {
 func DoAccept(rec *Recognizer, penalties ...int) NfaStateFn {
 	rec.MatchLen++
 	rec.penalties = penalties
-	CT().Debugf("ACCEPT with %v", rec.penalties)
+	tracer().Debugf("ACCEPT with %v", rec.penalties)
 	return nil
 }
 

@@ -53,7 +53,7 @@ func (pq *DefaultRunePublisher) Fix(at int) {
 		}
 		for i := 0; i < pq.gap; i++ {
 			if pq.q[i].Done() {
-				CT().Errorf("prioq.Fix(%d) failed", at)
+				tracer().Errorf("prioq.Fix(%d) failed", at)
 				pq.print()
 				panic("internal queue order compromised")
 			}

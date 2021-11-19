@@ -96,7 +96,7 @@ func TestBounded(t *testing.T) {
 		t.Fatalf("Expected 5 segments, have %d", n)
 	}
 	t.Logf("bounded: passed 1st test ")
-	CT().Infof("======= rest =======")
+	tracer().Infof("======= rest =======")
 	for seg.Next() {
 		p1, p2 := seg.Penalties()
 		t.Logf("segment: penalty = %5d|%d for breaking after '%s'\n",
