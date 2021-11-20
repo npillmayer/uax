@@ -5,16 +5,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/npillmayer/schuko/gtrace"
-	"github.com/npillmayer/schuko/testconfig"
-	"github.com/npillmayer/schuko/tracing"
-
 	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 )
 
 func TestWhitespace1(t *testing.T) {
-	gtrace.CoreTracer = gotestingadapter.New()
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "uax.segment")
 	defer teardown()
 	seg := NewSegmenter()
 	seg.Init(strings.NewReader("Hello World!"))
@@ -25,8 +20,7 @@ func TestWhitespace1(t *testing.T) {
 }
 
 func TestWhitespace2(t *testing.T) {
-	gtrace.CoreTracer = gotestingadapter.New()
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "uax.segment")
 	defer teardown()
 	seg := NewSegmenter()
 	seg.Init(strings.NewReader("	for (i=0; i<5; i++)   count += i;"))
@@ -37,8 +31,7 @@ func TestWhitespace2(t *testing.T) {
 }
 
 func TestSimpleSegmenter1(t *testing.T) {
-	gtrace.CoreTracer = gotestingadapter.New()
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "uax.segment")
 	defer teardown()
 	seg := NewSegmenter() // will use a SimpleWordBreaker
 	seg.Init(strings.NewReader("Hello World "))
@@ -54,9 +47,8 @@ func TestSimpleSegmenter1(t *testing.T) {
 	}
 }
 func TestSimpleSegmenter2(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "uax.segment")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	seg := NewSegmenter() // will use a SimpleWordBreaker
 	seg.Init(strings.NewReader("lime-tree"))
@@ -73,10 +65,8 @@ func TestSimpleSegmenter2(t *testing.T) {
 }
 
 func TestBounded(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "uax.segment")
 	defer teardown()
-	//gtrace.CoreTracer = gologadapter.New()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	seg := NewSegmenter(NewSimpleWordBreaker())
 	seg.Init(strings.NewReader("Hello World, how are you?"))
@@ -111,9 +101,8 @@ func TestBounded(t *testing.T) {
 }
 
 func TestSimpleSegnew(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "uax.segment")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelInfo)
 	//
 	seg := NewSegmenter(NewSimpleWordBreaker())
 	seg.Init(strings.NewReader("Hello World, how are you?"))

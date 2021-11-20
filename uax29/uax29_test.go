@@ -5,9 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/npillmayer/schuko/gtrace"
-	"github.com/npillmayer/schuko/testconfig"
 	"github.com/npillmayer/schuko/tracing"
+	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 	"github.com/npillmayer/uax/internal/ucdparse"
 	"github.com/npillmayer/uax/segment"
 	"github.com/npillmayer/uax/uax29"
@@ -28,10 +27,8 @@ func ExampleWordBreaker() {
 }
 
 func TestWordBreaks1(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "uax.segment")
 	defer teardown()
-	// gtrace.CoreTracer = gologadapter.New()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	onWords := uax29.NewWordBreaker(1)
 	segmenter := segment.NewSegmenter(onWords)
@@ -47,9 +44,8 @@ func TestWordBreaks1(t *testing.T) {
 }
 
 func TestWordBreaks2(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "uax.segment")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	onWords := uax29.NewWordBreaker(1)
 	segmenter := segment.NewSegmenter(onWords)
@@ -67,10 +63,9 @@ func TestWordBreaks2(t *testing.T) {
 }
 
 func TestWordBreakTestFile(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "uax.segment")
 	defer teardown()
-	//gtrace.CoreTracer = gologadapter.New()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelError)
+	tracer := tracing.Select("uax.segment")
 	//
 	onWordBreak := uax29.NewWordBreaker(1)
 	seg := segment.NewSegmenter(onWordBreak)
@@ -81,7 +76,7 @@ func TestWordBreakTestFile(t *testing.T) {
 	for tf.Scan() {
 		i++
 		if i >= from {
-			gtrace.CoreTracer.Infof(tf.Comment())
+			tracer.Infof(tf.Comment())
 			in, out := ucdparse.BreakTestInput(tf.Text())
 			if !executeSingleTest(t, seg, i, in, out) {
 				failcnt++
