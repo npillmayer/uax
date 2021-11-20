@@ -9,15 +9,12 @@ import (
 	"testing"
 	"unicode"
 
-	"github.com/npillmayer/schuko/gtrace"
-	"github.com/npillmayer/schuko/testconfig"
-	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 	"github.com/npillmayer/uax/segment"
 )
 
 func TestGraphemeClasses(t *testing.T) {
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "uax.segment")
 	defer teardown()
 	c1 := LClass
 	if c1.String() != "LClass" {
@@ -37,9 +34,8 @@ func TestGraphemeClasses(t *testing.T) {
 }
 
 func TestGraphemes1(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "uax.segment")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	SetupGraphemeClasses()
 	//
 	onGraphemes := NewBreaker(1)
@@ -57,9 +53,8 @@ func TestGraphemes1(t *testing.T) {
 }
 
 func TestGraphemes2(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "uax.segment")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelInfo)
 	//
 	SetupGraphemeClasses()
 	//
@@ -82,9 +77,8 @@ func TestGraphemes2(t *testing.T) {
 }
 
 func TestGraphemesTestFile(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "uax.segment")
 	defer teardown()
-	tracer().SetTraceLevel(tracing.LevelInfo)
 	//
 	SetupGraphemeClasses()
 	//
