@@ -39,13 +39,3 @@ Copyright © 2021 Norbert Pillmayer <norbert@pillmayer.com>
 
 */
 package shaping
-
-import (
-	"github.com/npillmayer/schuko/gtrace"
-	"github.com/npillmayer/schuko/tracing"
-)
-
-// tracer traces to a global core tracer
-func tracer() tracing.Trace {
-	return gtrace.CoreTracer
-}

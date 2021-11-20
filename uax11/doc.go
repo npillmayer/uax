@@ -53,11 +53,10 @@ Copyright © 2021 Norbert Pillmayer <norbert@pillmayer.com>
 package uax11
 
 import (
-	"github.com/npillmayer/schuko/gtrace"
 	"github.com/npillmayer/schuko/tracing"
 )
 
-// tracer traces to a global core tracer
+// tracer traces to uax.segment .
 func tracer() tracing.Trace {
-	return gtrace.CoreTracer
+	return tracing.Select("uax.segment")
 }
