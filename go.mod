@@ -6,7 +6,7 @@ require (
 	github.com/cloudfoundry/jibber_jabber v0.0.0-20151120183258-bcc4c8345a21
 	github.com/emirpasic/gods v1.12.0
 	github.com/jolestar/go-commons-pool v2.0.0+incompatible
-	github.com/npillmayer/schuko v0.2.0-alpha.2
+	github.com/npillmayer/schuko v0.2.0-alpha.3
 	golang.org/x/text v0.3.3
 )
 
