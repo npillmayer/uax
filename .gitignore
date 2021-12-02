@@ -8,3 +8,5 @@
 *.code-workspace
 *.swp
 ,*.txt
+*.prof
+*.test

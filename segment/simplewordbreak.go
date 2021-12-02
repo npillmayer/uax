@@ -123,6 +123,6 @@ func (swb *SimpleWordBreaker) LongestActiveMatch() int {
 
 // Penalties is part of interface UnicodeBreaker
 func (swb *SimpleWordBreaker) Penalties() []int {
-	tracer().Debugf("word breaker: emitting %v\n", swb.penalties)
+	//tracer().Debugf("word breaker: emitting %v\n", swb.penalties)
 	return swb.penalties
 }
