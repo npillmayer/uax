@@ -175,10 +175,8 @@ github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd/go.mod h1:6dJ
 github.com/modern-go/reflect2 v1.0.1/go.mod h1:bx2lNnkwVCuqBIxFjflWJWanXIb3RllmbCylyMrvgv0=
 github.com/mwitkow/go-conntrack v0.0.0-20161129095857-cc309e4a2223/go.mod h1:qRWi+5nqEBWmkhHvq77mSJWrCKwh8bxhgT7d/eI7P4U=
 github.com/npillmayer/nestext v0.1.3/go.mod h1:h2lrijH8jpicr25dFY+oAJLyzlya6jhnuG+zWp9L0Uk=
-github.com/npillmayer/schuko v0.2.0-alpha.1 h1:EZetlx6HQAGkOQqZ4BvHiMYqqwNiwTAtmDhnFy+oYZM=
-github.com/npillmayer/schuko v0.2.0-alpha.1/go.mod h1:gJhWdxRCnA0eWHE2ziKAd0x5AlSCP884C8+VswD/fPg=
-github.com/npillmayer/schuko v0.2.0-alpha.2 h1:NFF/9KYNE1nTP0V5Sez8C1XSRqONNpIdgFajLQLNPbI=
-github.com/npillmayer/schuko v0.2.0-alpha.2/go.mod h1:fmY+GquSPYHz66HRFIfNO8LvDw9eHeoqjeFBw6moyH0=
+github.com/npillmayer/schuko v0.2.0-alpha.3 h1:gVG+7ffq71R0B8ILewC2MHzwUlzNsKBnnAeeY5NeXUU=
+github.com/npillmayer/schuko v0.2.0-alpha.3/go.mod h1:fmY+GquSPYHz66HRFIfNO8LvDw9eHeoqjeFBw6moyH0=
 github.com/nxadm/tail v1.4.4 h1:DQuhQpB1tVlglWS2hLQ5OV6B5r8aGxSrPc5Qo6uTN78=
 github.com/nxadm/tail v1.4.4/go.mod h1:kenIhsEOeOJmVchQTgglprH7qJGnHDVpk1VPCcaMI8A=
 github.com/oklog/run v1.0.0/go.mod h1:dlhp/R75TPv97u0XWUtDeV/lRKWPKSdTuV0TZvrmrQA=
