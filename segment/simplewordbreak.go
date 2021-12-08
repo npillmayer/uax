@@ -40,11 +40,11 @@ const (
 // classes, which will return 1 for whitespace and 0 otherwise.
 // (Interface UnicodeBreaker)
 func (swb *SimpleWordBreaker) CodePointClassFor(r rune) int {
-	if r == 0 {
-		return eofType
-	}
 	if unicode.IsSpace(r) {
 		return spaceType
+	}
+	if r == 0 {
+		return eofType
 	}
 	return wordType
 }
@@ -56,64 +56,35 @@ func (swb *SimpleWordBreaker) StartRulesFor(rune, int) {
 	}
 }
 
-// var immediateBreakBefore = []int{0, -2000}
-// var inhibitBreakBefore = []int{1000, 0}
-
 // ProceedWithRune is part of interface UnicodeBreaker
 func (swb *SimpleWordBreaker) ProceedWithRune(r rune, cpClass int) {
-	// if r == 0 {
-	// 	if swb.matchLen > 0 { // previous rune(s) is/were whitespace
-	// 		// close a match of length matchLen (= count of whitespace runes)
-	// 		swb.penalties = swb.penaltiesSlice[:0]       // re-set penalties
-	// 		swb.penalties = append(swb.penalties, 1000)  // inhibit break before WS span
-	// 		swb.penalties = append(swb.penalties, -2000) // break point
-	// 		for i := 2; i <= swb.matchLen; i++ {         // inhibit break between WS runes
-	// 			swb.penalties = append(swb.penalties, 1000)
-	// 		}
-	// 		swb.penalties = append(swb.penalties, -900) // break before end of text
-	// 		swb.matchLen = 0
-	// 	} else {
-	// 		swb.penalties = immediateBreakBefore // break before end of text
-	// 	}
-	// 	return
-	// }
 	if r != 0 && cpClass == swb.matchType {
 		swb.penalties = swb.penalties[:0]
 		swb.matchLen[swb.matchType]++
-		//swb.penalties = nil
-		//swb.penalties = inhibitBreakBefore // do not break between non-whitespace
 		return
 	}
 	if cpClass != swb.matchType && swb.matchLen[swb.matchType] > 0 {
 		// close a match of length matchLen (= count of runes)
 		swb.penalties = swb.penalties[:0]
 		if swb.matchType == spaceType {
-			tracer().Debugf("word breaker: closing spaces run")
-			swb.penalties = append(swb.penalties, 0)
-			swb.penalties = append(swb.penalties, PenaltyAfterWhitespace)
+			//tracer().Debugf("word breaker: closing spaces run")
+			// swb.penalties = append(swb.penalties, 0)
+			// swb.penalties = append(swb.penalties, PenaltyAfterWhitespace)
+			swb.penalties = append(swb.penalties, 0, PenaltyAfterWhitespace)
 		} else {
-			tracer().Debugf("word breaker: closing word run")
-			swb.penalties = append(swb.penalties, 0)
-			swb.penalties = append(swb.penalties, PenaltyBeforeWhitespace)
+			//tracer().Debugf("word breaker: closing word run")
+			// swb.penalties = append(swb.penalties, 0)
+			// swb.penalties = append(swb.penalties, PenaltyBeforeWhitespace)
+			swb.penalties = append(swb.penalties, 0, PenaltyBeforeWhitespace)
 		}
-		// swb.penalties = append(swb.penalties, 1000) // inhibit break before WS span
-		// for i := 2; i <= swb.matchLen; i++ {        // inhibit break between WS runes
-		// 	swb.penalties = append(swb.penalties, 1000)
-		// }
-		// swb.penalties = append(swb.penalties, -900)
-		//swb.matchLen = 0
 	}
 	if r != 0 && cpClass != swb.matchType {
-		//CT().Debugf("word breaker: char type changed to %d", cpClass)
 		swb.matchLen[swb.matchType] = 0
 		swb.matchType = cpClass
 		swb.matchLen[swb.matchType] = 1
 	} else if r == 0 {
 		swb.matchType = eofType
 	}
-	// else {
-	// 	swb.penalties = inhibitBreakBefore // do not break between non-whitespace
-	// }
 }
 
 // LongestActiveMatch is part of interface UnicodeBreaker

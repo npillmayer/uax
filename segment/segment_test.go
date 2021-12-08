@@ -1,6 +1,7 @@
 package segment
 
 import (
+	"bufio"
 	"fmt"
 	"strings"
 	"testing"
@@ -8,6 +9,10 @@ import (
 	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 )
+
+func init() {
+	corpusRunes = []rune(corpus)
+}
 
 func TestWhitespace1(t *testing.T) {
 	teardown := gotestingadapter.QuickConfig(t, "uax.segment")
@@ -184,8 +189,8 @@ var p1, p2 int
 
 func BenchmarkBytesSegmenter(b *testing.B) {
 	seg := NewSegmenter() // will use a SimpleWordBreaker
-	corpusReader := strings.NewReader(corpus)
 	for i := 0; i < b.N; i++ {
+		corpusReader := strings.NewReader(corpus)
 		seg.Init(corpusReader)
 		for seg.Next() {
 			p1, p2 = seg.Penalties()
@@ -195,11 +200,23 @@ func BenchmarkBytesSegmenter(b *testing.B) {
 
 func BenchmarkRunesSegmenter(b *testing.B) {
 	seg := NewSegmenter() // will use a SimpleWordBreaker
-	runeCorpus := []rune(corpus)
 	for i := 0; i < b.N; i++ {
-		seg.InitFromSlice(runeCorpus)
+		seg.InitFromSlice(corpusRunes)
 		for seg.Next() {
 			p1, p2 = seg.Penalties()
+		}
+	}
+}
+
+func BenchmarkScanSplit(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		corpusReader := strings.NewReader(corpus)
+		scan := bufio.NewScanner(corpusReader)
+		scan.Split(bufio.ScanWords)
+		for scan.Scan() {
+			if len(scan.Bytes()) > 0 {
+				p1 = len(scan.Bytes())
+			}
 		}
 	}
 }
@@ -224,3 +241,5 @@ a) Sein Egalitarismus bleibt immer liberal: Die Gleichheitsforderungen werden st
 b) Sein Egalitarismus ist nur relativ und nicht absolut: Die Gleichheit ist kein Selbstzweck, sondern dient als Mittel zu dem Zweck, die Lage der Schwächsten zu verbessern; um dieses Zieles willen wird unter bestimmten Bedingungen auch Ungleichheit zugelassen.
 Die Theorien von Rawls stehen in enger Verbindung mit dem Prinzip der Marktwirtschaft und sind daher für den zeitgenössische Diskurs besonders relevant. Der egalitäre Aspekt löste eine Gegenbewegung aus, die u.a. in der Doktrin des Neoliberalismus einen Ausdruck fand. Diese Strömung bezweifelt, dass soziale Gerechtigkeit überhaupt ein legitimes Ziel politischen Handelns ist. Hauptkritik an Spielarten des Egalitarismus ist die Feststellung, dass in einer pluralistischen Gesellschaft jedes Ziel einer Förderung bzw. eines ginanziellen Ausgleichs willkürlich sei1 und zwangsweise in einen „paternalistischen Verteilungsdespotismus“ münde [Mbcdbe]. Dies führe allenfalls zu einer degenerierten Gleichheit, in der – in Anlehnung an Orwells Roman „Animal Farm“ – manche eben „gleicher als andere“ seien.
 `
+
+var corpusRunes []rune
