@@ -64,21 +64,9 @@ func readBrackets() []bracketPair {
 		}
 		pair := bracketPair{}
 		pair.o, _ = t.Range()
-		//pair.o = readHexRune(t.Field(1))
 		pair.c = readHexRune(t.Field(1))
 		bracketList = append(bracketList, pair)
 		tracing.Debugf(t.Comment)
-		// if len(fields) >= 3 {
-		// 	typ := strings.TrimSpace(fields[2])
-		// 	if typ != "o" {
-		// 		continue
-		// 	}
-		// 	pair := bracketPair{}
-		// 	pair.o = readHexRune(fields[0])
-		// 	pair.c = readHexRune(fields[1])
-		// 	bracketList = append(bracketList, pair)
-		// 	tracing.Debugf(strings.TrimSpace(tf.Comment()))
-		//}
 	})
 	if err != nil {
 		tracing.Errorf(err.Error())
