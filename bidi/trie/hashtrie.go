@@ -33,14 +33,14 @@ type TinyHashTrie struct {
 func NewTinyHashTrie(size uint8, catcnt int8) (*TinyHashTrie, error) {
 	//func NewTinyHashTrie(size int16, catcnt int8) (*TinyHashTrie, error) {
 	if catcnt > 50 {
-		T().Errorf("number of categories to store may not exceed 50")
+		tracer().Errorf("number of categories to store may not exceed 50")
 		return nil, errors.New("number of categories to store may not exceed 50")
 	}
 	trie := &TinyHashTrie{
 		size:   int(size),       // TODO find nearest prime
 		catcnt: int(catcnt) + 1, // make room for cat = 0
 	}
-	T().Infof("hash trie size = %d for %d categories", trie.size, trie.catcnt-1)
+	tracer().Infof("hash trie size = %d for %d categories", trie.size, trie.catcnt-1)
 	trie.headercode = category(trie.catcnt) + 1
 	trie.alpha = pointer(math.Round(0.61803 * float64(trie.size)))
 	trie.span = pointer(trie.size - 2*trie.catcnt)
@@ -79,7 +79,7 @@ func (trie *TinyHashTrie) advanceToChild(p pointer, c category, n int) pointer {
 		if trie.frozen {
 			return 0
 		}
-		T().Debugf("link[%d] is unassigned, inserting first child=%d", p, c)
+		tracer().Debugf("link[%d] is unassigned, inserting first child=%d", p, c)
 		return trie.insertFirstbornChildAndProgress(p, c, n)
 	}
 	//T().Debugf("position link[%d] is occupied →%d", p, trie.link[p])
@@ -113,12 +113,12 @@ func (trie *TinyHashTrie) insertFirstbornChildAndProgress(p pointer, c category,
 		}
 		//
 		if trie.ch[h] == empty && trie.ch[h+pointer(c)] == empty {
-			T().Debugf("found an empty child slot=%d→%d", h, h+(pointer(c)))
+			tracer().Debugf("found an empty child slot=%d→%d", h, h+(pointer(c)))
 			break
 		}
 	}
 	if trys == tolerance {
-		T().Errorf("abort find")
+		tracer().Errorf("abort find")
 		panic("abort find")
 	}
 	trie.link[p], trie.link[h] = h, p
@@ -138,12 +138,12 @@ func (trie *TinyHashTrie) insertChildIntoFamily(p, q pointer, c category) pointe
 	trie.sibling[q], trie.sibling[h] = trie.sibling[h], q
 	trie.ch[q] = c
 	trie.link[q] = 0
-	T().Debugf("Inserted %d at q=%d with header=%d", c, q, trie.link[p])
+	tracer().Debugf("Inserted %d at q=%d with header=%d", c, q, trie.link[p])
 	return q
 }
 
 func (trie *TinyHashTrie) moveFamily(p pointer, c category, n int) (pointer, pointer) {
-	T().Debugf("have to move family for c=%d", c)
+	tracer().Debugf("have to move family for c=%d", c)
 	//
 	var h pointer                               // trial header location
 	var x = pointer(n) * trie.alpha % trie.span // nominal position of header #n
@@ -159,7 +159,7 @@ func (trie *TinyHashTrie) moveFamily(p pointer, c category, n int) (pointer, poi
 	trys := 0
 	for ; trys < tolerance; trys++ {
 		// Compute the next trial header location
-		T().Debugf("trying to find a home for family")
+		tracer().Debugf("trying to find a home for family")
 		if h < pointer(trie.size-trie.catcnt) {
 			h++
 		} else {
@@ -169,19 +169,19 @@ func (trie *TinyHashTrie) moveFamily(p pointer, c category, n int) (pointer, poi
 		if trie.ch[h+pointer(c)] != empty {
 			continue
 		}
-		T().Debugf("found a potential home h=%d", h)
+		tracer().Debugf("found a potential home h=%d", h)
 		r = trie.link[p]
 		delta = h - r
 		for trie.ch[r+delta] == empty && trie.sibling[r] != trie.link[p] {
 			r = trie.sibling[r]
-			T().Debugf(".")
+			tracer().Debugf(".")
 		}
 		if trie.ch[r+delta] == empty {
 			break // found a slot
 		}
 	}
 	if trys >= tolerance {
-		T().Errorf("abort find")
+		tracer().Errorf("abort find")
 		panic("abort find")
 	}
 	q = h + pointer(c)
@@ -269,15 +269,15 @@ func (trie *TinyHashTrie) Stats() {
 			filllink++
 		}
 	}
-	T().Infof("Trie Statistics:")
-	T().Infof("  Size of trie:   %d", trie.size)
-	T().Infof("  Category count: %d", trie.catcnt)
-	T().Infof("  Links:    %d of %d (%.1f%%)", filllink, trie.size, float32(filllink)/float32(trie.size)*100)
-	T().Infof("  Children: %d of %d (%.1f%%)", fillch, trie.size, float32(fillch)/float32(trie.size)*100)
+	tracer().Infof("Trie Statistics:")
+	tracer().Infof("  Size of trie:   %d", trie.size)
+	tracer().Infof("  Category count: %d", trie.catcnt)
+	tracer().Infof("  Links:    %d of %d (%.1f%%)", filllink, trie.size, float32(filllink)/float32(trie.size)*100)
+	tracer().Infof("  Children: %d of %d (%.1f%%)", fillch, trie.size, float32(fillch)/float32(trie.size)*100)
 	var memory uint64
 	memory = uint64(unsafe.Sizeof(*trie))
 	test := pointer(1)
 	word := int(unsafe.Sizeof(test))
 	memory += uint64(trie.size * 2 * word)
-	T().Infof("  Memory:   %d bytes", memory)
+	tracer().Infof("  Memory:   %d bytes", memory)
 }

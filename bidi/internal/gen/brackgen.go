@@ -7,34 +7,30 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/npillmayer/schuko/gtrace"
 	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/schuko/tracing/gologadapter"
-	"github.com/npillmayer/uax/internal/ucd"
+	"github.com/npillmayer/uax/internal/ucdparse"
 )
 
-// T traces to the global core tracer.
-func T() tracing.Trace {
-	return gtrace.CoreTracer
-}
-
 func main() {
-	gtrace.CoreTracer = gologadapter.New()
 	tlevel := flag.String("trace", "I", "Trace level")
 	outf := flag.String("o", "_bracketpairs.go", "Output file name")
 	pkg := flag.String("pkg", "main", "Package name to use in output file")
 	flag.Parse()
-	T().Infof("Generating Unicode bracket pairs")
-	T().SetTraceLevel(traceLevel(*tlevel))
+	logAdapter := gologadapter.GetAdapter()
+	trace := logAdapter()
+	trace.SetTraceLevel(traceLevel(*tlevel))
+	tracing.SetTraceSelector(mytrace{tracer: trace})
+	tracing.Infof("Generating Unicode bracket pairs")
 	pairs := readBrackets()
-	T().Infof("Read %d bracket pairs", len(pairs))
+	tracing.Infof("Read %d bracket pairs", len(pairs))
 	if len(pairs) == 0 {
-		T().Errorf("Did not read any bracket pairs, exiting")
+		tracing.Errorf("Did not read any bracket pairs, exiting")
 		os.Exit(1)
 	}
 	f, err := os.Create(*outf)
 	if err != nil {
-		T().Errorf(err.Error())
+		tracing.Errorf(err.Error())
 		os.Exit(2)
 	}
 	defer f.Close()
@@ -42,7 +38,8 @@ func main() {
 	f.WriteString("type BracketPair struct {\n    o rune\n    c rune\n}\n\n")
 	f.WriteString("var UAX9BracketPairs = []BracketPair{\n")
 	for _, p := range pairs {
-		f.WriteString(fmt.Sprintf("    BracketPair{o: %q, c: %q},\n", p.o, p.c))
+		//f.WriteString(fmt.Sprintf("    BracketPair{o: %q, c: %q},\n", p.o, p.c))
+		f.WriteString(fmt.Sprintf("    {o: %q, c: %q},\n", p.o, p.c))
 	}
 	f.WriteString("}\n")
 }
@@ -53,25 +50,41 @@ type bracketPair struct {
 }
 
 func readBrackets() []bracketPair {
-	tf := ucd.OpenTestFile("./BidiBrackets.txt", nil)
-	T().Infof("Found file BidiBrackets.txt ...")
-	defer tf.Close()
-	bracketList := make([]bracketPair, 0, 65)
-	for tf.Scan() {
-		fields := strings.Split(tf.Text(), ";")
-		if len(fields) >= 3 {
-			typ := strings.TrimSpace(fields[2])
-			if typ != "o" {
-				continue
-			}
-			pair := bracketPair{}
-			pair.o = readHexRune(fields[0])
-			pair.c = readHexRune(fields[1])
-			bracketList = append(bracketList, pair)
-			T().Debugf(strings.TrimSpace(tf.Comment()))
-		}
+	file, err := os.Open("./BidiBrackets.txt")
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
 	}
-	T().Debugf("done.")
+	defer file.Close()
+	tracing.Infof("Found file BidiBrackets.txt ...")
+	bracketList := make([]bracketPair, 0, 65)
+	err = ucdparse.Parse(file, func(t *ucdparse.Token) {
+		if typ := strings.TrimSpace(t.Field(2)); typ != "o" {
+			return
+		}
+		pair := bracketPair{}
+		pair.o, _ = t.Range()
+		//pair.o = readHexRune(t.Field(1))
+		pair.c = readHexRune(t.Field(1))
+		bracketList = append(bracketList, pair)
+		tracing.Debugf(t.Comment)
+		// if len(fields) >= 3 {
+		// 	typ := strings.TrimSpace(fields[2])
+		// 	if typ != "o" {
+		// 		continue
+		// 	}
+		// 	pair := bracketPair{}
+		// 	pair.o = readHexRune(fields[0])
+		// 	pair.c = readHexRune(fields[1])
+		// 	bracketList = append(bracketList, pair)
+		// 	tracing.Debugf(strings.TrimSpace(tf.Comment()))
+		//}
+	})
+	if err != nil {
+		tracing.Errorf(err.Error())
+		os.Exit(1)
+	}
+	tracing.Debugf("done.")
 	return bracketList
 }
 
@@ -91,4 +104,12 @@ func traceLevel(l string) tracing.TraceLevel {
 		return tracing.LevelError
 	}
 	return tracing.LevelDebug
+}
+
+type mytrace struct {
+	tracer tracing.Trace
+}
+
+func (t mytrace) Select(string) tracing.Trace {
+	return t.tracer
 }

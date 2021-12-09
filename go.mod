@@ -12,7 +12,6 @@ require (
 
 require (
 	github.com/fortytw2/leaktest v1.3.0 // indirect
-	github.com/npillmayer/gotype v0.0.0-20201204061902-df8e6285672b // indirect
 	github.com/onsi/ginkgo v1.15.0 // indirect
 	github.com/onsi/gomega v1.10.5 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20200615113413-eeeca48fe776 // indirect

@@ -3,16 +3,14 @@ package trie
 import (
 	"testing"
 
-	"github.com/npillmayer/schuko/gtrace"
 	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 )
 
 func TestEnterSimple(t *testing.T) {
-	gtrace.CoreTracer = gotestingadapter.New()
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "uax.bidi")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	tracing.Select("uax.bidi").SetTraceLevel(tracing.LevelError)
 	//
 	trie, _ := NewTinyHashTrie(139, 46)
 	p1 := trie.AllocPositionForWord([]byte{13, 20})
@@ -30,10 +28,9 @@ func TestEnterSimple(t *testing.T) {
 }
 
 func TestEnterZero(t *testing.T) {
-	gtrace.CoreTracer = gotestingadapter.New()
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "uax.bidi")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	tracing.Select("uax.bidi").SetTraceLevel(tracing.LevelError)
 	//
 	trie, _ := NewTinyHashTrie(139, 46)
 	p1 := trie.AllocPositionForWord([]byte{0, 0})
@@ -44,10 +41,9 @@ func TestEnterZero(t *testing.T) {
 }
 
 func TestIterator(t *testing.T) {
-	gtrace.CoreTracer = gotestingadapter.New()
-	teardown := gotestingadapter.RedirectTracing(t)
+	teardown := gotestingadapter.QuickConfig(t, "uax.bidi")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	tracing.Select("uax.bidi").SetTraceLevel(tracing.LevelError)
 	//
 	trie, _ := NewTinyHashTrie(139, 46)
 	word := []byte{13, 20}

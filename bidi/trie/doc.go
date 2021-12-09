@@ -18,11 +18,10 @@ Copyright © 2021 Norbert Pillmayer <norbert@pillmayer.com>
 package trie
 
 import (
-	"github.com/npillmayer/schuko/gtrace"
 	"github.com/npillmayer/schuko/tracing"
 )
 
-// T traces to the global core tracer
-func T() tracing.Trace {
-	return gtrace.CoreTracer
+// tracer traces with key 'uax.bidi'.
+func tracer() tracing.Trace {
+	return tracing.Select("uax.bid")
 }
