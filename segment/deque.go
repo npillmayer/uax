@@ -42,7 +42,7 @@ func (a *atom) String() string {
 
 // minCapacity is the smallest capacity that deque may have.
 // Must be power of 2 for bitwise modulus: x % n == x & (n - 1).
-const minCapacity = 16
+const minCapacity = 64
 
 // Len returns the number of elements currently stored in the queue.
 func (q *deque) Len() int {
@@ -53,10 +53,10 @@ func (q *deque) Len() int {
 // elements are removed with PopFront(), and LIFO when elements are removed
 // with PopBack().
 func (q *deque) PushBack(r rune, p0 int, p1 int) {
-	q.growIfFull()
-	q.buf[q.tail].r = r
-	q.buf[q.tail].penalty0 = p0
-	q.buf[q.tail].penalty1 = p1
+	if q.count >= len(q.buf) {
+		q.growIfFull()
+	}
+	q.buf[q.tail] = atom{r: r, penalty0: p0, penalty1: p1}
 	// Calculate new tail position.
 	q.tail = q.next(q.tail)
 	q.count++
@@ -84,9 +84,7 @@ func (q *deque) PopFront() (rune, int, int) {
 	r := q.buf[q.head].r
 	p0 := q.buf[q.head].penalty0
 	p1 := q.buf[q.head].penalty1
-	q.buf[q.head].r = 0        // re-initialize atom
-	q.buf[q.head].penalty0 = 0 // re-initialize atom
-	q.buf[q.head].penalty1 = 0 // re-initialize atom
+	q.buf[q.head] = atom{} // re-initialize atom
 	// Calculate new head position.
 	q.head = q.next(q.head)
 	q.count--
@@ -143,6 +141,13 @@ func (q *deque) Back() (rune, int, int) {
 	return r, p0, p1
 }
 
+// LastRune returns the rune at the last atom position. This function is unsed
+// in the most inner loop and therefore provided as a special case to `Back()`.
+// It does not check for empty Q.
+func (q *deque) LastRune() rune {
+	return q.buf[q.prev(q.tail)].r
+}
+
 // At returns the element at index i in the queue without removing the element
 // from the queue.  This method accepts only non-negative index values.  At(0)
 // refers to the first element and is the same as Front().  At(Len()-1) refers
@@ -164,6 +169,17 @@ func (q *deque) At(i int) (rune, int, int) {
 	p0 := q.buf[at].penalty0
 	p1 := q.buf[at].penalty1
 	return r, p0, p1
+}
+
+// AtomAt returns the container atom at position i.
+// We provide this for performance reasons, as it is used in the most inner loop
+// of the segmenter.
+func (q *deque) AtomAt(i int) *atom {
+	if i < 0 || i >= q.count {
+		panic("deque: At() called with index out of range")
+	}
+	at := (q.head + i) & (len(q.buf) - 1) // bitwise modulus
+	return &q.buf[at]
 }
 
 // SetAt modifies the element at index i in the queue. This method accepts
@@ -258,6 +274,9 @@ func (q *deque) next(i int) int {
 
 // growIfFull resizes up if the buffer is full.
 func (q *deque) growIfFull() {
+	if q.count < len(q.buf) { // everything is fine
+		return
+	}
 	if len(q.buf) == 0 {
 		q.buf = make([]atom, minCapacity)
 		return

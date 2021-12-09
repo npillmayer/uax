@@ -1,4 +1,4 @@
-package ucd
+package ucdparse
 
 import (
 	"bufio"

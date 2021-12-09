@@ -84,11 +84,11 @@ func makeShortString(s string) String {
 	br := 0
 	for breaker.Next() {
 		br += len(breaker.Bytes())
-		TC().Debugf("next grapheme = '%s'", breaker.Text())
+		tracer().Debugf("next grapheme = '%s'", breaker.Text())
 		gstr.breaks = append(gstr.breaks, uint8(br))
 	}
 	if breaker.Err() != nil {
-		TC().Errorf("breaker error = %v", breaker.Err())
+		tracer().Errorf("breaker error = %v", breaker.Err())
 	}
 	return gstr
 }
@@ -133,11 +133,11 @@ func makeMidString(s string) String {
 	br := 0
 	for breaker.Next() {
 		br += len(breaker.Bytes())
-		TC().Debugf("next grapheme = '%s'", breaker.Text())
+		tracer().Debugf("next grapheme = '%s'", breaker.Text())
 		gstr.breaks = append(gstr.breaks, uint16(br))
 	}
 	if breaker.Err() != nil {
-		TC().Errorf("breaker error = %v", breaker.Err())
+		tracer().Errorf("breaker error = %v", breaker.Err())
 	}
 	return gstr
 }
@@ -170,7 +170,7 @@ func prepareBreaking(s string) *segment.Segmenter {
 	breaker := makeGraphemeBreaker()
 	start, _ := uax.PositionOfFirstLegalRune(s)
 	if start < 0 {
-		TC().Errorf("cannot create grapheme string from invalid rune input")
+		tracer().Errorf("cannot create grapheme string from invalid rune input")
 	}
 	breaker.Init(&rr{input: s[start:], pos: 0})
 	return breaker
@@ -189,7 +189,7 @@ type rr struct {
 
 func (reader *rr) ReadRune() (r rune, size int, err error) {
 	r, size = utf8.DecodeRuneInString(reader.input)
-	TC().Debugf("read rune %v with size %d", r, size)
+	tracer().Debugf("read rune %v with size %d", r, size)
 	if r == utf8.RuneError {
 		err = io.EOF
 		return

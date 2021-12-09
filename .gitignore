@@ -7,6 +7,6 @@
 *.pdf
 *.code-workspace
 *.swp
-generator
-tablegen
 ,*.txt
+*.prof
+*.test

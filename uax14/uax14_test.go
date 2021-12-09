@@ -4,18 +4,16 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/npillmayer/schuko/gtrace"
-	"github.com/npillmayer/schuko/testconfig"
 	"github.com/npillmayer/schuko/tracing"
-	"github.com/npillmayer/uax/internal/ucd"
+	"github.com/npillmayer/schuko/tracing/gotestingadapter"
+	"github.com/npillmayer/uax/internal/ucdparse"
 	"github.com/npillmayer/uax/segment"
 	"github.com/npillmayer/uax/uax14"
 )
 
 func TestSimpleLineWrap(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "uax.segment")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
 	//
 	linewrap := uax14.NewLineWrap()
 	seg := segment.NewSegmenter(linewrap)
@@ -32,14 +30,13 @@ func TestSimpleLineWrap(t *testing.T) {
 }
 
 func TestWordBreakTestFile(t *testing.T) {
-	//gtrace.CoreTracer = gologadapter.New()
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "uax.segment")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelDebug)
+	tracer := tracing.Select("uax.segment")
 	//
 	linewrap := uax14.NewLineWrap()
 	seg := segment.NewSegmenter(linewrap)
-	tf := ucd.OpenTestFile("./LineBreakTest.txt", t)
+	tf := ucdparse.OpenTestFile("./LineBreakTest.txt", t)
 	defer tf.Close()
 	//failcnt, i, from, to := 0, 0, 6263, 7000
 	failcnt, i, from, to := 0, 0, 0, 7000
@@ -47,8 +44,8 @@ func TestWordBreakTestFile(t *testing.T) {
 		i++
 		if i >= from {
 			//t.Logf(tf.Comment())
-			gtrace.CoreTracer.Infof(tf.Comment())
-			in, out := ucd.BreakTestInput(tf.Text())
+			tracer.Infof(tf.Comment())
+			in, out := ucdparse.BreakTestInput(tf.Text())
 			if !executeSingleTest(t, seg, i, in, out) {
 				failcnt++
 				t.Logf("test #%d failed", i)

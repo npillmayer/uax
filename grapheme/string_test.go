@@ -4,9 +4,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/npillmayer/schuko/gtrace"
-	"github.com/npillmayer/schuko/testconfig"
-	"github.com/npillmayer/schuko/tracing"
+	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 )
 
 func TestRuneReader(t *testing.T) {
@@ -34,9 +32,8 @@ func TestRuneReader(t *testing.T) {
 }
 
 func TestString(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "uax.segment")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelInfo)
 	//
 	SetupGraphemeClasses()
 	//
@@ -58,9 +55,8 @@ func TestString(t *testing.T) {
 }
 
 func TestChineseString(t *testing.T) {
-	teardown := testconfig.QuickConfig(t)
+	teardown := gotestingadapter.QuickConfig(t, "uax.segment")
 	defer teardown()
-	gtrace.CoreTracer.SetTraceLevel(tracing.LevelInfo)
 	//
 	SetupGraphemeClasses()
 	//

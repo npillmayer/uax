@@ -3,39 +3,6 @@ Package uax14 implements Unicode Annex #14 line wrap.
 
 Under active development; use at your own risk
 
-BSD License
-
-Copyright (c) 2017-21, Norbert Pillmayer
-
-All rights reserved.
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions
-are met:
-
-1. Redistributions of source code must retain the above copyright
-notice, this list of conditions and the following disclaimer.
-
-2. Redistributions in binary form must reproduce the above copyright
-notice, this list of conditions and the following disclaimer in the
-documentation and/or other materials provided with the distribution.
-
-3. Neither the name of this software nor the names of its contributors
-may be used to endorse or promote products derived from this software
-without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-
 Contents
 
 UAX#14 is the Unicode Annex for Line Breaking (Line Wrap).
@@ -69,6 +36,23 @@ Status
 The current implementation passes all tests from the UAX#14 test file, except 3:
 
     uax14_test.go:65: 3 TEST CASES OUT of 7001 FAILED
+
+______________________________________________________________________
+
+License
+
+This project is provided under the terms of the UNLICENSE or
+the 3-Clause BSD license denoted by the following SPDX identifier:
+
+SPDX-License-Identifier: 'Unlicense' OR 'BSD-3-Clause'
+
+You may use the project under the terms of either license.
+
+Licenses are reproduced in the license file in the root folder of this module.
+
+Copyright © 2021 Norbert Pillmayer <norbert@pillmayer.com>
+
+
 */
 package uax14
 
@@ -76,8 +60,6 @@ import (
 	"math"
 	"sync"
 	"unicode"
-
-	"github.com/npillmayer/schuko/gtrace"
 
 	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/uax"
@@ -89,9 +71,9 @@ const (
 	optSpaces UAX14Class = 1002 // pseudo class
 )
 
-// TC traces to the core-tracer.
-func TC() tracing.Trace {
-	return gtrace.CoreTracer
+// tracer traces to uax.segment .
+func tracer() tracing.Trace {
+	return tracing.Select("uax.segment")
 }
 
 // ClassForRune gets the line breaking/wrap class for a Unicode code-point
@@ -102,7 +84,7 @@ func ClassForRune(r rune) UAX14Class {
 	for lbc := UAX14Class(0); lbc <= ZWJClass; lbc++ {
 		urange := rangeFromUAX14Class[lbc]
 		if urange == nil {
-			TC().Errorf("-- no range for class %s\n", lbc)
+			tracer().Errorf("-- no range for class %s\n", lbc)
 		} else if unicode.Is(urange, r) {
 			return lbc
 		}
@@ -188,7 +170,7 @@ func NewLineWrap() *LineWrap {
 		ZWJClass: {rule_LB8a},
 	}
 	if rangeFromUAX14Class == nil {
-		TC().Infof("UAX#14 classes not yet initialized -> initializing")
+		tracer().Infof("UAX#14 classes not yet initialized -> initializing")
 	}
 	SetupClasses()
 	uax14.lastClass = sot
@@ -215,14 +197,14 @@ func (uax14 *LineWrap) StartRulesFor(r rune, cpClass int) {
 	c := UAX14Class(cpClass)
 	if c != RIClass || !uax14.blockedRI {
 		if rules := uax14.rules[c]; len(rules) > 0 {
-			TC().P("class", c).Debugf("starting %d rule(s) for class %s", len(rules), c)
+			tracer().P("class", c).Debugf("starting %d rule(s) for class %s", len(rules), c)
 			for _, rule := range rules {
 				rec := uax.NewPooledRecognizer(cpClass, rule)
 				rec.UserData = uax14
 				uax14.publisher.SubscribeMe(rec)
 			}
 		} else {
-			TC().P("class", c).Debugf("starting no rule")
+			tracer().P("class", c).Debugf("starting no rule")
 		}
 		/*
 			if uax14.shadow == ZWJClass {
@@ -288,7 +270,7 @@ func substitueSomeClasses(c UAX14Class, lastClass UAX14Class) (UAX14Class, UAX14
 		}
 	}
 	if shadow != c {
-		TC().Debugf("subst %+q -> %+q", shadow, c)
+		tracer().Debugf("subst %+q -> %+q", shadow, c)
 	}
 	return c, shadow
 }
@@ -400,7 +382,7 @@ func p(w int) int {
 	if r == DefaultPenalty {
 		r = DefaultPenalty + 1
 	}
-	TC().P("rule", w).Debugf("penalty %d => %d", w, r)
+	tracer().P("rule", w).Debugf("penalty %d => %d", w, r)
 	return r
 }
 

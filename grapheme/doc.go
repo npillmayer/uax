@@ -52,51 +52,31 @@ breaking of UAX#29 (GraphemeBreakTest.txt). UPDATE: Due to a small change in
 the segmenters semantics, currently 11 out of 672 tests fail. I did not have
 the time to look into it.
 
-
 ____________________________________________________________________________
 
-BSD License
+License
 
-Copyright (c) 2017–21, Norbert Pillmayer
+This project is provided under the terms of the UNLICENSE or
+the 3-Clause BSD license denoted by the following SPDX identifier:
 
-All rights reserved.
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions
-are met:
+SPDX-License-Identifier: 'Unlicense' OR 'BSD-3-Clause'
 
-1. Redistributions of source code must retain the above copyright
-notice, this list of conditions and the following disclaimer.
+You may use the project under the terms of either license.
 
-2. Redistributions in binary form must reproduce the above copyright
-notice, this list of conditions and the following disclaimer in the
-documentation and/or other materials provided with the distribution.
+Licenses are reproduced in the license file in the root folder of this module.
 
-3. Neither the name of this software nor the names of its contributors
-may be used to endorse or promote products derived from this software
-without specific prior written permission.
+Copyright © 2021 Norbert Pillmayer <norbert@pillmayer.com>
 
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRETC, INDIRETC, INCIDENTAL,
-SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-THEORY OF LIABILITY, WHETHER IN CONTRATC, STRITC LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 package grapheme
 
 import (
-	"github.com/npillmayer/schuko/gtrace"
 	"github.com/npillmayer/schuko/tracing"
 )
 
-// TC traces to the core-tracer.
-func TC() tracing.Trace {
-	return gtrace.CoreTracer
+// tracer traces to uax.segment .
+func tracer() tracing.Trace {
+	return tracing.Select("uax.segment")
 }
 
 // Version is the Unicode version this package conforms to.

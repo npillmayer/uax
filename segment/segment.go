@@ -1,8 +1,6 @@
 /*
 Package segment is about Unicode text segmenting.
 
-Under active development; use at your own risk
-
 Typical Usage
 
 Segmenter provides an interface similar to bufio.Scanner for reading data
@@ -19,50 +17,31 @@ breaking engine for a segmenter. Multiple breaking engines may be
 supplied (where the first one is called the primary breaker and any
 following breaker is a secondary breaker).
 
-	breaker1 := ...
-	breaker2 := ...
-	segmenter := unicode.NewSegmenter(breaker1, breaker2)
-	segmenter.Init(...)
-	for segmenter.Next() {
-		// do something with segmenter.Text() or segmenter.Bytes()
-	}
+    breaker1 := ...
+    breaker2 := ...
+    segmenter := unicode.NewSegmenter(breaker1, breaker2)
+    segmenter.Init(...)
+    for segmenter.Next() {
+       // do something with segmenter.Text(), .Runes() or .Bytes()
+    }
 
 An example for an UnicodeBreaker is "uax29.WordBreak", a breaker
 implementing the UAX#29 word breaking algorithm.
 
 _______________________________________________________________________
 
-BSD License
+License
 
-Copyright (c) 2017–21, Norbert Pillmayer
+This project is provided under the terms of the UNLICENSE or
+the 3-Clause BSD license denoted by the following SPDX identifier:
 
-All rights reserved.
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions
-are met:
+SPDX-License-Identifier: 'Unlicense' OR 'BSD-3-Clause'
 
-1. Redistributions of source code must retain the above copyright
-notice, this list of conditions and the following disclaimer.
+You may use the project under the terms of either license.
 
-2. Redistributions in binary form must reproduce the above copyright
-notice, this list of conditions and the following disclaimer in the
-documentation and/or other materials provided with the distribution.
+Licenses are reproduced in the license file in the root folder of this module.
 
-3. Neither the name of this software nor the names of its contributors
-may be used to endorse or promote products derived from this software
-without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+Copyright © 2021 Norbert Pillmayer <norbert@pillmayer.com>
 
 */
 package segment
@@ -73,18 +52,15 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"strconv"
 	"strings"
-
-	"github.com/npillmayer/schuko/gtrace"
 
 	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/uax"
 )
 
-// CT traces to the core-tracer.
-func CT() tracing.Trace {
-	return gtrace.CoreTracer
+// tracer traces to uax.segment .
+func tracer() tracing.Trace {
+	return tracing.Select("uax.segment")
 }
 
 // ErrBoundReached is returned from BoundedNext() if the reason for returning false
@@ -100,22 +76,19 @@ var ErrBoundReached = errors.New("bound reached")
 // using whitespace as boundaries. For more sophisticated breakers see
 // sub-packages of package uax.
 type Segmenter struct {
-	deque         *deque               // where we collect runes and penalties
-	reader        io.RuneReader        // where we get the next runes from
-	breakers      []uax.UnicodeBreaker // our work horses
-	activeSegment []byte               // the most recent segment to build
-	buffer        *bytes.Buffer        // wrapper around activeSegment
-	lastPenalties [2]int               // penalties at last break opportunity
-	maxSegmentLen int                  // maximum length allowed for segments
-	pos           int64                // current position in text
-	breakOnZero   [2]bool              // treat zero value as a valid breakpoint?
-	//primaryAgg, secondaryAgg   uax.PenaltyAggregator
-	//primarySeed, secondarySeed int
-	longestActiveMatch         int
-	positionOfBreakOpportunity int
-	err                        error
-	atEOF                      bool
-	inUse                      bool // Next() has been called; buffer is in use.
+	deque                      *deque               // where we collect runes and penalties
+	reader                     io.RuneReader        // where we get the next runes from
+	breakers                   []uax.UnicodeBreaker // our work horses
+	runesBuf                   runewrite            // rune buffer for segment output (active segement)
+	maxSegmentLen              int                  // maximum length allowed for segments
+	lastPenalties              [2]int               // penalties at last break opportunity
+	pos                        int                  // current position in input text
+	breakOnZero                [2]bool              // treat zero value as a valid breakpoint?
+	longestActiveMatch         int                  // bookkeeping for matching
+	positionOfBreakOpportunity int                  // bookkeeping for matching
+	atEOF                      bool                 // at end of input buffer
+	inUse                      bool                 // Next() has been called; buffer is in use.
+	err                        error                // collects the first error occured
 }
 
 // MaxSegmentSize is the maximum size used to buffer a segment
@@ -144,28 +117,41 @@ func NewSegmenter(breakers ...uax.UnicodeBreaker) *Segmenter {
 		breakers = []uax.UnicodeBreaker{NewSimpleWordBreaker()}
 	}
 	s.breakers = breakers
-	// s.primaryAgg = uax.AddPenalties
-	// s.secondaryAgg = uax.AddPenalties
 	return s
 }
 
 // Init initializes a Segmenter with an io.RuneReader to read from.
-// s is either a newly created segmenter to be initialized, or we may
+// s is either a newly created segmenter to be initialized, or
 // re-initializes a segmenter already in use.
 func (s *Segmenter) Init(reader io.RuneReader) {
 	if reader == nil {
 		reader = strings.NewReader("")
 	}
 	s.reader = reader
+	s.runesBuf = s.runesBuf.Reset(nil)
+	s.init()
+}
+
+// InitFromSlice is like Init, except using a slice of runes as an input buffer.
+// s is either a newly created segmenter to be initialized, or
+// re-initializes a segmenter already in use.
+func (s *Segmenter) InitFromSlice(buf []rune) {
+	if buf == nil {
+		buf = []rune{}
+	}
+	s.reader = &runeread{runes: buf}
+	s.runesBuf = s.runesBuf.Reset(buf)
+	s.init()
+}
+
+func (s *Segmenter) init() {
 	if s.deque == nil {
 		s.deque = &deque{} // Q of atoms
-		s.buffer = bytes.NewBuffer(make([]byte, 0, startBufSize))
 		s.maxSegmentLen = MaxSegmentSize
 	} else {
 		s.deque.Clear()
 		s.longestActiveMatch = 0
 		s.atEOF = false
-		s.buffer.Reset()
 		s.inUse = false
 		s.lastPenalties[0], s.lastPenalties[1] = 0, 0
 		s.pos = 0
@@ -183,12 +169,32 @@ func (s *Segmenter) Init(reader io.RuneReader) {
 //
 // Buffer panics if it is called after scanning has started. Clients will have
 // to call Init(...) again to permit re-setting the buffer.
+//
+// Deprecated: Use RuneBuffer instead.
 func (s *Segmenter) Buffer(buf []byte, max int) {
 	if s.inUse {
 		panic("segment.Buffer: buffer already in use; cannot be re-set")
 	}
-	s.buffer = bytes.NewBuffer(buf)
-	s.maxSegmentLen = max
+}
+
+// RuneBuffer sets the initial buffer to use when scanning and the maximum size of
+// buffer that may be allocated during segmenting.
+// The maximum segment size is the larger of max and cap(buf).
+// If max <= cap(buf), Next() will use this buffer only and do no allocation.
+//
+// By default, Segmenter uses an internal buffer and sets the maximum token size
+// to MaxSegmentSize.
+//
+// Buffer panics if it is called after scanning has started. Clients will have
+// to call Init(...) again to permit re-setting the buffer.
+func (s *Segmenter) RuneBuffer(buf []rune, max int) {
+	if s.inUse {
+		panic("segment.Buffer: buffer already in use; cannot be re-set")
+	}
+	if len(buf) > 0 {
+		s.runesBuf.output = buf
+		s.runesBuf.maxSegLen = max
+	}
 }
 
 // Err returns the first non-EOF error that was encountered by the
@@ -215,31 +221,6 @@ func (s *Segmenter) BreakOnZero(forP1, forP2 bool) {
 	s.breakOnZero[1] = forP2
 }
 
-// Set the null-value for penalties. Penalties equal to this value will
-// be treated as if no penalty occured (possibly resulting in the
-// suppression of a break opportunity).
-//
-// There is one null-value for each UnicodeBreaker. The segmenter issues
-// a break whenever one of the UnicodeBreakers signals a non-null penalty.
-// The default null-value function treats any penalty >= 1000 as a null,
-// i.e. suppresses the break opportunity.
-//
-// bInx is the position 0..n-1 of the UnicodeBreaker as provided during
-// construction of the segmenter.
-// The call to SetNullPenalty panics if bInx is out of range.
-/*
-func (s *Segmenter) SetNullPenalty(bInx int, isNull func(int) bool) {
-	if bInx < 0 || bInx >= len(s.breakers) {
-		panic("segment.SetNullPenalty: Index of UnicodeBreaker out of range!")
-	}
-	if isNull == nil {
-		s.nullPenalty[bInx] = tooBad
-	} else {
-		s.nullPenalty[bInx] = isNull
-	}
-}
-*/
-
 // Penalties >= InfinitePenalty are considered too bad for being a break opportunity.
 func isPossibleBreak(p int, breakOnZero bool) bool {
 	if p >= uax.InfinitePenalty {
@@ -253,15 +234,29 @@ func isPossibleBreak(p int, breakOnZero bool) bool {
 
 // Bytes returns the most recent token generated by a call to Next().
 // The underlying array may point to data that will be overwritten by a
-// subsequent call to Next(). No allocation is performed.
+// subsequent call to Next().
 func (s *Segmenter) Bytes() []byte {
-	return s.activeSegment
+	buf := bytes.Buffer{}
+	for _, r := range s.runesBuf.Runes() {
+		buf.WriteRune(r)
+	}
+	return buf.Bytes()
+}
+
+// Bytes returns the most recent token generated by a call to Next().
+// The underlying array may point to data that will be overwritten by a
+// subsequent call to Next().
+//
+// If the segmenter has been initialized with a `[]rune` input argument, Runes() will return
+// a slice of it. No allocation is performed.
+func (s *Segmenter) Runes() []rune {
+	return s.runesBuf.Runes()
 }
 
 // Text returns the most recent segment generated by a call to Next()
 // as a newly allocated string holding its bytes.
 func (s *Segmenter) Text() string {
-	return string(s.activeSegment)
+	return string(s.runesBuf.Runes())
 }
 
 // Penalties returns the last penalties a segmenter calculated.
@@ -275,7 +270,7 @@ func (s *Segmenter) Penalties() (int, int) {
 // Next gets the next segment, together with the accumulated penalty for this break.
 //
 // Next() advances the Segmenter to the next segment, which will then be available
-// through the Bytes() or Text() method. It returns false when the segmenting
+// through the Runes(), Bytes() or Text() method. It returns false when the segmenting
 // stops, either by reaching the end of the input or an error.
 // After Next() returns false, the Err() method will return any error
 // that occurred during scanning, except for io.EOF.
@@ -301,10 +296,7 @@ func (s *Segmenter) Next() bool {
 //
 // See also method `Next`.
 //
-func (s *Segmenter) BoundedNext(bound int64) bool {
-	// CT().Infof("BoundedNext(%d) return with ", bound)
-	// CT().Infof("pos=%d, active=%d, break=%d", s.pos, s.longestActiveMatch, s.positionOfBreakOpportunity)
-	// s.printQ()
+func (s *Segmenter) BoundedNext(bound int) bool {
 	return s.next(bound - 1) // semantics in `next` is including, API is excluding bound
 }
 
@@ -314,32 +306,6 @@ func (s *Segmenter) setErr(err error) {
 		s.err = err
 	}
 }
-
-// SetPenaltyAggregator sets an aggregate function for penalties from the primary
-// breaker.
-// Default is uax.AddPenalties. Not all aggregators may be monoids; for
-// aggregators which are semi-groups (i.e., have not neutral element), a seed
-// is required to give a starting
-// point for aggregation.
-// func (s *Segmenter) SetPenaltyAggregator(pa uax.PenaltyAggregator, seed int) {
-// 	if pa != nil {
-// 		s.primaryAgg = pa
-// 		s.primarySeed = seed
-// 	}
-// }
-
-// SetSecondaryPenaltyAggregator sets an aggregate function for penalties
-// from all the secondary breaks.
-// Default is uax.AddPenalties. Not all aggregators may be monoids; for
-// aggregators which are semi-groups (i.e., have not neutral element), a seed
-// is required to give a starting
-// point for aggregation.
-// func (s *Segmenter) SetSecondaryPenaltyAggregator(pa uax.PenaltyAggregator, seed int) {
-// 	if pa != nil {
-// 		s.secondaryAgg = pa
-// 		s.secondarySeed = seed
-// 	}
-// }
 
 // How it works
 // ============
@@ -383,7 +349,7 @@ func (s *Segmenter) setErr(err error) {
 
 // next advances the input pointer until a possible break point has been
 // found or alternatively the bound has been reached while trying.
-func (s *Segmenter) next(bound int64) bool {
+func (s *Segmenter) next(bound int) bool {
 	if s.reader == nil {
 		s.setErr(ErrNotInitialized)
 	}
@@ -393,24 +359,23 @@ func (s *Segmenter) next(bound int64) bool {
 		err := s.readEnoughInputAndFindBreak(bound)
 		if err != nil && err != io.EOF {
 			s.setErr(err)
-			s.activeSegment = nil
+			s.runesBuf = s.runesBuf.Reset(nil)
 			return false
 		}
-		if s.pos-int64(s.deque.Len()) > bound {
-			CT().Debugf("exiting because of bound reached: %d-%d>%d", s.pos, s.deque.Len(), bound)
+		if s.pos-s.deque.Len() > bound {
+			tracer().Debugf("exiting because of bound reached: %d-%d>%d", s.pos, s.deque.Len(), bound)
 			return false
 		}
 	}
 	//
 	if s.positionOfBreakOpportunity < 0 { // didn't find a break opportunity
-		s.activeSegment = nil
+		s.runesBuf = s.runesBuf.Reset(nil)
 		return false
 	}
-	l, _ := s.getFrontSegment(s.buffer, bound)
-	//CT().Debugf("CUT=%v", cut)
-	s.activeSegment = s.buffer.Bytes()
-	//CT().Debugf("s.positionOfBreakOpp=%d", s.positionOfBreakOpportunity)
-	CT().P("length", strconv.Itoa(l)).Debugf("Next() = \"%v\"", string(s.activeSegment))
+	//l, _ := s.getFrontSegment(bound)
+	s.getFrontSegment(bound)
+	// tracer().Debugf("s.positionOfBreakOpp=%d", s.positionOfBreakOpportunity)
+	//tracer().P("length", strconv.Itoa(l)).Debugf("Next() = \"%s\"", s.runesBuf)
 	return true
 }
 
@@ -429,17 +394,18 @@ func (s *Segmenter) readRune() error {
 		return io.EOF
 	}
 	r, sz, err := s.reader.ReadRune()
-	s.pos += int64(sz)
-	CT().P("rune", fmt.Sprintf("%#U", r)).Debugf("--------------------------------------")
+	s.pos += sz
+	//tracer().P("rune", r).Debugf("--------------------------------------")
 	if err == nil {
-		//s.deque.PushBack(r, s.primarySeed, s.secondarySeed)
 		s.deque.PushBack(r, 0, 0)
-	} else if err == io.EOF {
+		return nil
+	}
+	if err == io.EOF {
 		s.deque.PushBack(eotAtom.r, eotAtom.penalty0, eotAtom.penalty1)
 		s.atEOF = true
 		err = nil
 	} else { // error case, err is non-nil
-		CT().P("rune", fmt.Sprintf("%#U", r)).Errorf("ReadRune() error: %s", err)
+		tracer().P("rune", r).Errorf("ReadRune() error: %s", err)
 		s.atEOF = true
 	}
 	return err
@@ -455,30 +421,22 @@ func (s *Segmenter) readRune() error {
 // travel beyond the bound until the longest active match passes past the bound.
 // We return ErrBoundReached in this case.
 //
-func (s *Segmenter) readEnoughInputAndFindBreak(bound int64) (err error) {
+func (s *Segmenter) readEnoughInputAndFindBreak(bound int) (err error) {
 	// if Q consists just of 0 rune (EOT), do nothing and return false
-	CT().Debugf("segmenter: read enough input, EOF=%v, |Q|=%d", s.atEOF, s.deque.Len())
-	// if s.atEOF && s.deque.Len() == 1 {
-	// 	front, _, _ := s.deque.Front()
-	// 	if front == rune(0) {
-	// 		s.lastPenalties[0], s.lastPenalties[1] = 0, 0
-	// 		return io.EOF
-	// 	}
-	// }
+	//tracer().Debugf("segmenter: read enough input, EOF=%v, |Q|=%d", s.atEOF, s.deque.Len())
 	for s.positionOfBreakOpportunity < 0 {
-		if s.pos-int64(s.longestActiveMatch) > bound {
-			CT().Infof("segmenter: bound reached")
+		if s.pos-s.longestActiveMatch > bound {
+			tracer().Infof("segmenter: bound reached")
 			return ErrBoundReached
 		}
-		// CT().Debugf("pos=%d - %d = %d --> %d", s.pos, s.longestActiveMatch,
-		// 	s.pos-int64(s.longestActiveMatch), bound)
+		// tracer().Debugf("pos=%d - %d = %d --> %d", s.pos, s.longestActiveMatch,
 		qlen := s.deque.Len()
 		from := max(0, qlen-1-s.longestActiveMatch) // current longest match limit, now old
 		skipRead := false
 		if from > 0 {
 			// this may happen if the previous iteration hit a bound
 			// or if a run of no-breaks was inserted by the breaker(s)
-			CT().Debugf("active match is short; previous iteration did not deliver (all) breakpoints")
+			//tracer().Debugf("active match is short; previous iteration did not deliver (all) breakpoints")
 			if s.positionOfBreakOpportunity >= 0 {
 				skipRead = true // we need not read in a rune if we had a breakpoint at bound
 			}
@@ -487,40 +445,41 @@ func (s *Segmenter) readEnoughInputAndFindBreak(bound int64) (err error) {
 			if err = s.readRune(); err != nil {
 				break
 			}
-			if s.deque.Len() == qlen {
-				panic("segmenter: code-point deque did not grow") // TODO remove this after extensive testing
-			}
+			// if s.deque.Len() == qlen { // TODO remove this after extensive testing
+			// 	panic("segmenter: code-point deque did not grow")
+			// }
 			// Now we've got read in a new rune and are ready to fire up the breakers for it.
 			// We then harvest the new-found penalties from every breaker and insert the
 			// aggregates at the atoms in the Q.
 			qlen = s.deque.Len()
 			s.longestActiveMatch = 0
-			r, _, _ := s.deque.Back()
+			r := s.deque.LastRune()
 			for _, breaker := range s.breakers {
 				cpClass := breaker.CodePointClassFor(r)
 				breaker.StartRulesFor(r, cpClass)
 				breaker.ProceedWithRune(r, cpClass)
-				if breaker.LongestActiveMatch() > s.longestActiveMatch {
-					s.longestActiveMatch = breaker.LongestActiveMatch()
+				if lam := breaker.LongestActiveMatch(); lam > s.longestActiveMatch {
+					s.longestActiveMatch = lam
 				}
 				s.insertPenalties(s.inxForBreaker(breaker), breaker.Penalties())
 			}
-			s.printQ()
-			CT().Debugf("-- all breakers done --")
+			//s.printQ()
+			//tracer().Debugf("-- all breakers done --")
 		}
 		// The Q is updated. The longest active match may have been changed and
 		// we have to scan from the start of the Q to the new position of active match.
 		// If we find a breaking opportunity, we're done.
 		boundDist := bound
 		if bound < math.MaxInt64 {
-			boundDist = bound - s.pos + int64(s.deque.Len())
+			//boundDist = bound - s.pos + s.deque.Len()
+			boundDist = bound - s.pos + qlen
 		}
 		s.positionOfBreakOpportunity = s.findBreakOpportunity(qlen-s.longestActiveMatch,
 			boundDist)
 		//s.positionOfBreakOpportunity = s.findBreakOpportunity(qlen - 1 - s.longestActiveMatch)
-		CT().Debugf("segmenter: breakpos=%d, Q-len=%d, active match=%d",
-			s.positionOfBreakOpportunity, s.deque.Len(), s.longestActiveMatch)
-		s.printQ()
+		// tracer().Debugf("segmenter: breakpos=%d, Q-len=%d, active match=%d",
+		// 	s.positionOfBreakOpportunity, s.deque.Len(), s.longestActiveMatch)
+		//s.printQ()
 	}
 	return err
 }
@@ -541,29 +500,30 @@ func (s *Segmenter) readEnoughInputAndFindBreak(bound int64) (err error) {
 // but rather the distance (in runes) to the bound position.
 //
 // Returns the Q-position to break or -1.
-func (s *Segmenter) findBreakOpportunity(to int, boundDist int64) int {
+func (s *Segmenter) findBreakOpportunity(to int, boundDist int) int {
 	if to-1 < 0 || boundDist < 0 {
 		return -1
 	}
-	CT().Debugf("segmenter: searching for break opportunity from 0 to %d|%d: ", to-1, boundDist)
+	//tracer().Debugf("segmenter: searching for break opportunity from 0 to %d|%d: ", to-1, boundDist)
 	breakopp := -1
 	i := 0
-	for ; i < to && int64(i) <= boundDist; i++ {
-		j, p0, p1 := s.deque.At(i)
-		if isPossibleBreak(p0, s.breakOnZero[0]) || (len(s.breakers) > 1 && isPossibleBreak(p1, s.breakOnZero[1])) {
+	for ; i < to && i <= boundDist; i++ {
+		//_, p0, p1 := s.deque.At(i)
+		q := s.deque.AtomAt(i)
+		if isPossibleBreak(q.penalty0, s.breakOnZero[0]) || (len(s.breakers) > 1 && isPossibleBreak(q.penalty1, s.breakOnZero[1])) {
 			breakopp = i
-			CT().Debugf("segmenter: penalties[%#U] = %d|%d   --- 8< ---", j, p0, p1)
+			//tracer().Debugf("segmenter: penalties[%#U] = %d|%d   --- 8< ---", j, p0, p1)
 			break
 		}
-		CT().Debugf("segmenter: penalties[%#U] = %d|%d", j, p0, p1)
+		//tracer().Debugf("segmenter: penalties[%#U] = %d|%d", j, p0, p1)
 	}
 	if breakopp >= 0 {
-		CT().Debugf("segmenter: break opportunity at %d", breakopp)
-	} else if int64(i) == boundDist+1 {
+		//tracer().Debugf("segmenter: break opportunity at %d", breakopp)
+	} else if i == boundDist+1 {
 		breakopp = int(boundDist)
-		CT().Debugf("segmenter: break at bound position %d", breakopp)
+		//tracer().Debugf("segmenter: break at bound position %d", breakopp)
 	} else {
-		CT().Debugf("segmenter: no break opportunity")
+		//tracer().Debugf("segmenter: no break opportunity")
 	}
 	return breakopp
 }
@@ -585,13 +545,23 @@ func (s *Segmenter) insertPenalties(selector int, penalties []int) {
 	if len(penalties) > l {
 		penalties = penalties[:l] // drop excessive penalties
 	}
-	var total [2]int
-	var r rune
+	//var total [2]int
+	//var r rune
+	l -= 1 // now index of last
 	for i, p := range penalties {
-		r, total[0], total[1] = s.deque.At(l - 1 - i)
+		at := l - i
+		atom := s.deque.AtomAt(at)
+		if selector == 0 {
+			atom.penalty0 += p
+		} else {
+			atom.penalty1 += p
+		}
+		//r, total[0], total[1] = s.deque.At(l - i)
 		//total[selector] = bounded(total[selector] + p)
-		total[selector] = total[selector] + p
-		s.deque.SetAt(l-1-i, r, total[0], total[1])
+		//total[selector] = total[selector] + p
+		//total[selector] += p
+
+		//s.deque.SetAt(l-i, r, total[0], total[1])
 	}
 }
 
@@ -606,100 +576,59 @@ func (s *Segmenter) insertPenalties(selector int, penalties []int) {
 // After the cut-off getFrontSegments recursivley searches for another break
 // opportunity which may have been marked by breakers with acceptable penalties.
 //
-func (s *Segmenter) getFrontSegment(buf *bytes.Buffer, bound int64) (int, bool) {
+func (s *Segmenter) getFrontSegment(bound int) (int, bool) {
 	seglen := 0
 	s.lastPenalties[0], s.lastPenalties[1] = 0, 0
-	buf.Reset()
+	s.runesBuf = s.runesBuf.SetMark()
 	l := min(s.deque.Len()-1, s.positionOfBreakOpportunity)
 	if l < 0 {
 		panic("l < 0")
 		//return 0, true
 	}
-	// CT().Debugf("pos=%d, break=%d", s.pos, s.positionOfBreakOpportunity)
-	// CT().Debugf("at %d, l=%d", int(s.pos)-int(s.longestActiveMatch)+l, l)
 	var isCutOff bool
-	start := s.pos - int64(s.deque.Len())
-	if start+int64(l) >= bound { // front segment would extend bound
-		CT().Debugf("segmenter: bound reached")
+	start := s.pos - s.deque.Len()
+	if start+l >= bound { // front segment would extend bound
+		tracer().Debugf("segmenter: bound reached")
 		isCutOff = true // we truncate l to Q-start---->|bound
 		if l = int(bound) - int(s.pos) + s.deque.Len(); l < 0 {
 			return 0, true
 		}
 	}
-	if l > buf.Len() {
-		if l > s.maxSegmentLen {
-			s.setErr(ErrTooLong)
-			return 0, true
-		}
-		newSize := max(buf.Len()+startBufSize, l+1)
-		if newSize > s.maxSegmentLen {
-			newSize = s.maxSegmentLen
-		}
-		buf.Grow(newSize)
-	}
-	cnt := 0
 	for i := 0; i <= l; i++ {
 		r, p0, p1 := s.deque.PopFront()
-		written, _ := buf.WriteRune(r)
+		written, _ := (&s.runesBuf).WriteRune(r)
 		seglen += written
-		cnt++
 		s.lastPenalties[0], s.lastPenalties[1] = p0, p1
 	}
-	CT().Debugf("cutting front segment of length 0..%d: '%v'", l, buf)
+	//tracer().Debugf("cutting front segment of length 0..%d: '%v'", l, s.runesBuf)
 	// There may be further break opportunities between this break and the start of the
 	// current longest match. Advance the pointer to the next break opportunity, if any.
 	boundDist := bound
 	if bound < math.MaxInt64 {
-		boundDist = bound - s.pos + int64(s.deque.Len())
+		boundDist = bound - s.pos + s.deque.Len()
 	}
 	s.positionOfBreakOpportunity = s.findBreakOpportunity(s.deque.Len()-s.longestActiveMatch,
 		boundDist)
-	s.printQ()
+	//s.printQ()
 	return seglen, isCutOff
 }
-
-// func (s *Segmenter) copySegment(buf *bytes.Buffer) int {
-// 	buf.Reset()
-// 	l := s.deque.Len() - 1
-// 	if l > buf.Len() {
-// 		if l > s.maxSegmentLen {
-// 			s.setErr(ErrTooLong)
-// 			return 0
-// 		}
-// 		newSize := max(buf.Len()+startBufSize, l+1)
-// 		if newSize > s.maxSegmentLen {
-// 			newSize = s.maxSegmentLen
-// 		}
-// 		buf.Grow(newSize)
-// 	}
-// 	seglen, cnt := 0, 0
-// 	for i := 0; i <= l; i++ {
-// 		r, p0, p1 := s.deque.At(i)
-// 		written, _ := buf.WriteRune(r)
-// 		seglen += written
-// 		cnt++
-// 		s.lastPenalties[0] = p0
-// 		s.lastPenalties[1] = p1
-// 	}
-// 	return seglen
-// }
 
 // ----------------------------------------------------------------------
 
 // Debugging helper. Print the content of the current queue to the debug log.
 func (s *Segmenter) printQ() {
-	if CT().GetTraceLevel() < tracing.LevelDebug {
+	if tracer().GetTraceLevel() < tracing.LevelDebug {
 		return
 	}
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("Q : "))
+	sb.WriteString("Q : ")
 	for i := 0; i < s.deque.Len(); i++ {
 		var a atom
 		a.r, a.penalty0, a.penalty1 = s.deque.At(i)
 		sb.WriteString(fmt.Sprintf(" <- %s", a.String()))
 	}
 	sb.WriteString(" .")
-	CT().P("UAX |Q|=", s.deque.Len()).Debugf(sb.String())
+	tracer().P("UAX |Q|=", s.deque.Len()).Debugf(sb.String())
 }
 
 // --- Helpers ----------------------------------------------------------
@@ -725,4 +654,100 @@ func bounded(p int) int {
 		p = uax.InfiniteMerits
 	}
 	return p
+}
+
+// runeread is a helper to wrap a `[]rune` into a cheap RuneReader.
+type runeread struct {
+	runes []rune
+	pos   int
+}
+
+func (rr *runeread) ReadRune() (rune, int, error) {
+	if rr.pos >= len(rr.runes) {
+		return 0, 0, io.EOF
+	}
+	r := rr.runes[rr.pos]
+	rr.pos++
+	return r, 1, nil
+}
+
+// runewrite is a helper to wrap a `[]rune` into a cheap Buffer.
+type runewrite struct {
+	maxSegLen  int
+	isBacked   bool
+	backing    []rune // optional slice to back input
+	start, end int    // limits of sub-slice
+	output     []rune // output buffer
+}
+
+func (rw *runewrite) WriteRune(r rune) (int, error) {
+	var err error
+	if rw.isBacked {
+		// we're not really writing anything, but rather just remembering the slice
+		// limits of our (future) return segment
+		// if r != rw.backing[rw.end] {
+		// 	tracer().Debugf("rune writer and backing store out of sync: %#U", r)
+		// 	err = fmt.Errorf("rune writer and backing store out of sync: %#U", r)
+		// }
+		rw.end++
+	} else {
+		// we're copying runes to an output buffer
+		c := cap(rw.output)
+		if c == len(rw.output) { // if buffer full
+			if c >= rw.maxSegLen {
+				return 0, ErrTooLong
+			}
+			// extend output buffer
+			newSize := max(c+startBufSize, len(rw.output)+1)
+			if newSize > rw.maxSegLen {
+				newSize = rw.maxSegLen
+			}
+			old := rw.output[:]
+			rw.output = make([]rune, len(old), newSize)
+			copy(rw.output[:len(old)], old)
+		}
+		rw.output = append(rw.output, r)
+	}
+	return 1, err
+}
+
+func (rw runewrite) Runes() []rune {
+	if rw.isBacked {
+		return rw.backing[rw.start:rw.end]
+	}
+	return rw.output
+}
+
+func (rw runewrite) SetMark() runewrite {
+	if rw.isBacked {
+		rw.start = rw.end
+	} else {
+		rw.output = rw.output[:0]
+	}
+	return rw
+}
+
+func (rw runewrite) Reset(backingBuf []rune) runewrite {
+	if cap(rw.output) > 0 {
+		rw.output = rw.output[:0]
+	}
+	if backingBuf == nil {
+		rw.isBacked = false
+		if rw.output == nil {
+			rw.output = make([]rune, 0, startBufSize)
+		}
+		rw.backing = nil
+	} else {
+		rw.isBacked = true
+		rw.backing = backingBuf
+	}
+	rw.start, rw.end = 0, 0
+	return rw
+}
+
+func (rw runewrite) String() string {
+	if rw.isBacked {
+		return string(rw.backing[rw.start:rw.end])
+	}
+	return string(rw.output)
 }
