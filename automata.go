@@ -85,9 +85,10 @@ func NewPooledRecognizer(cpClass int, stateFn NfaStateFn) *Recognizer {
 
 // Clears the Recognizer and puts it back into the pool.
 func (rec *Recognizer) releaseIntoPool() {
-	rec.penalties = nil
 	rec.Expect = 0
 	rec.MatchLen = 0
+	rec.UserData = nil
+	rec.penalties = rec.penalties[:0]
 	rec.nextStep = nil
 	globalRecognizerPool.Put(rec)
 }
