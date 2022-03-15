@@ -41,7 +41,6 @@ import (
 
 	"os"
 
-	"github.com/emirpasic/gods/lists/arraylist"
 	"github.com/npillmayer/uax/internal/ucdparse"
 )
 
@@ -76,33 +75,19 @@ func loadUnicodeEmojiBreakFile() (map[string][]rune, error) {
 	if err != nil {
 		return nil, err
 	}
-	gcls := make(map[string]*arraylist.List, len(emojiClassnames))
+	runeranges := make(map[string][]rune, len(emojiClassnames))
 	for parser.Next() {
 		from, to := parser.Token.Range()
 		clstr := parser.Token.Field(1)
-		list := gcls[clstr]
-		if list == nil {
-			list = arraylist.New()
-		}
+		list := runeranges[clstr]
 		for r := from; r <= to; r++ {
-			list.Add(r)
+			list = append(list, r)
 		}
-		gcls[clstr] = list
+		runeranges[clstr] = list
 	}
 	err = parser.Token.Error
 	if err != nil {
 		log.Fatal(err)
-	}
-	runeranges := make(map[string][]rune)
-	for k, v := range gcls {
-		runelist := make([]rune, gcls[k].Size())
-		it := v.Iterator()
-		i := 0
-		for it.Next() {
-			runelist[i] = it.Value().(rune)
-			i++
-		}
-		runeranges[k] = runelist
 	}
 	return runeranges, err
 }

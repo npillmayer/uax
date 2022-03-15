@@ -41,7 +41,6 @@ import (
 
 	"os"
 
-	"github.com/emirpasic/gods/lists/arraylist"
 	"github.com/npillmayer/uax/internal/ucdparse"
 )
 
@@ -72,33 +71,19 @@ func loadUnicodeLineBreakFile() (map[string][]rune, error) {
 	if err != nil {
 		return nil, err
 	}
-	lbcs := make(map[string]*arraylist.List, len(uax14classnames))
+	runeranges := make(map[string][]rune, len(uax14classnames))
 	for p.Next() {
 		from, to := p.Token.Range()
 		brclzstr := p.Token.Field(1)
-		list := lbcs[brclzstr]
-		if list == nil {
-			list = arraylist.New()
-		}
+		list := runeranges[brclzstr]
 		for r := from; r <= to; r++ {
-			list.Add(r)
+			list = append(list, r)
 		}
-		lbcs[brclzstr] = list
+		runeranges[brclzstr] = list
 	}
 	err = p.Token.Error
 	if err != nil {
 		log.Fatal(err)
-	}
-	runeranges := make(map[string][]rune)
-	for k, v := range lbcs {
-		runelist := make([]rune, lbcs[k].Size())
-		it := v.Iterator()
-		i := 0
-		for it.Next() {
-			runelist[i] = it.Value().(rune)
-			i++
-		}
-		runeranges[k] = runelist
 	}
 	return runeranges, err
 }
