@@ -9,13 +9,12 @@ import (
 	"testing"
 	"unicode"
 
-	"github.com/npillmayer/schuko/tracing/gotestingadapter"
+	"github.com/npillmayer/uax/internal/tracing"
 	"github.com/npillmayer/uax/segment"
 )
 
 func TestGraphemeClasses(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "uax.segment")
-	defer teardown()
+	tracing.SetTestingLog(t)
 	c1 := LClass
 	if c1.String() != "LClass" {
 		t.Errorf("String(LClass) should be 'LClass', is %s", c1)
@@ -34,8 +33,7 @@ func TestGraphemeClasses(t *testing.T) {
 }
 
 func TestGraphemes1(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "uax.segment")
-	defer teardown()
+	tracing.SetTestingLog(t)
 	SetupGraphemeClasses()
 	//
 	onGraphemes := NewBreaker(1)
@@ -53,8 +51,7 @@ func TestGraphemes1(t *testing.T) {
 }
 
 func TestGraphemes2(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "uax.segment")
-	defer teardown()
+	tracing.SetTestingLog(t)
 	//
 	SetupGraphemeClasses()
 	//
@@ -77,8 +74,7 @@ func TestGraphemes2(t *testing.T) {
 }
 
 func TestGraphemesTestFile(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "uax.segment")
-	defer teardown()
+	tracing.SetTestingLog(t)
 	//
 	SetupGraphemeClasses()
 	//
@@ -108,7 +104,7 @@ func TestGraphemesTestFile(t *testing.T) {
 			parts := strings.Split(line, "#")
 			testInput, comment := parts[0], parts[1]
 			//TC().Infof("#######################################################")
-			tracer().Infof(comment)
+			tracing.Infof(comment)
 			in, out := breakTestInput(testInput)
 			if !executeSingleTest(t, seg, i, in, out) {
 				failcnt++
@@ -120,7 +116,7 @@ func TestGraphemesTestFile(t *testing.T) {
 		}
 	}
 	if err := scan.Err(); err != nil {
-		tracer().Infof("reading input:", err)
+		tracing.Infof("reading input:", err)
 	}
 	if failcnt > 11 {
 		t.Errorf("%d TEST CASES OUT of %d FAILED", failcnt, i-from+1)
@@ -157,7 +153,7 @@ func breakTestInput(ti string) (string, []string) {
 }
 
 func executeSingleTest(t *testing.T, seg *segment.Segmenter, tno int, in string, out []string) bool {
-	tracer().Infof("expecting %v", ost(out))
+	tracing.Infof("expecting %v", ost(out))
 	seg.Init(strings.NewReader(in))
 	i := 0
 	ok := true

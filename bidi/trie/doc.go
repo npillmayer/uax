@@ -16,12 +16,3 @@ folder of this module.
 Copyright © 2021 Norbert Pillmayer <norbert@pillmayer.com>
 */
 package trie
-
-import (
-	"github.com/npillmayer/schuko/tracing"
-)
-
-// tracer traces with key 'uax.bidi'.
-func tracer() tracing.Trace {
-	return tracing.Select("uax.bid")
-}

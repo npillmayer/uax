@@ -8,16 +8,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/npillmayer/schuko/tracing"
+	"github.com/npillmayer/uax/internal/tracing"
 	"golang.org/x/text/unicode/bidi"
-
-	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 )
 
 func TestClasses(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "uax.bidi")
-	defer teardown()
-	tracing.Select("uax.bidi").SetTraceLevel(tracing.LevelError)
+	tracing.SetTestingLog(t)
 	//
 	t.Logf("L = %s", classString(bidi.L))
 	if classString(bidi.L) != "L" {
@@ -38,9 +34,7 @@ func TestClasses(t *testing.T) {
 }
 
 func TestScannerMarkup(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "uax.bidi")
-	defer teardown()
-	tracing.Select("uax.bidi").SetTraceLevel(tracing.LevelError)
+	tracing.SetTestingLog(t)
 	//
 	input := strings.NewReader("the fox")
 	markup := func(pos uint64) int {
@@ -75,9 +69,7 @@ func TestScannerMarkup(t *testing.T) {
 }
 
 func TestScannerScraps(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "uax.bidi")
-	defer teardown()
-	tracing.Select("uax.bidi").SetTraceLevel(tracing.LevelError)
+	tracing.SetTestingLog(t)
 	//
 	inputs := []struct {
 		str string
@@ -112,9 +104,7 @@ func TestScannerScraps(t *testing.T) {
 }
 
 func TestSimpleReverse(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "uax.bidi")
-	defer teardown()
-	tracing.Select("uax.bidi").SetTraceLevel(tracing.LevelError)
+	tracing.SetTestingLog(t)
 	//
 	var scraps = [...]scrap{
 		{l: 0, r: 5, bidiclz: bidi.L},
@@ -131,9 +121,7 @@ func TestSimpleReverse(t *testing.T) {
 }
 
 func TestSimpleL2RReorder(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "uax.bidi")
-	defer teardown()
-	tracing.Select("uax.bidi").SetTraceLevel(tracing.LevelError)
+	tracing.SetTestingLog(t)
 	//
 	var scraps = [...]scrap{
 		{l: 0, r: 5, bidiclz: bidi.L},
@@ -153,9 +141,7 @@ func TestSimpleL2RReorder(t *testing.T) {
 }
 
 func TestRecursiveL2RReorder(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "uax.bidi")
-	defer teardown()
-	tracing.Select("uax.bidi").SetTraceLevel(tracing.LevelError)
+	tracing.SetTestingLog(t)
 	//
 	var scraps = [...]scrap{
 		{l: 0, r: 10, bidiclz: bidi.R},
@@ -195,9 +181,7 @@ func TestRunConcat(t *testing.T) {
 }
 
 func TestFlatten1(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "uax.bidi")
-	defer teardown()
-	tracing.Select("uax.bidi").SetTraceLevel(tracing.LevelError)
+	tracing.SetTestingLog(t)
 	//
 	var scraps = [...]scrap{
 		{l: 0, r: 10, bidiclz: bidi.R},
@@ -215,7 +199,7 @@ func TestFlatten1(t *testing.T) {
 	t.Logf("scraps=%v", scraps)
 	rev := reorder(scraps[:], 0, len(scraps), LeftToRight)
 	t.Logf("   rev=%v", rev)
-	tracer().Debugf("=====================================")
+	tracing.Debugf("=====================================")
 	flat := flatten(rev, LeftToRight)
 	t.Logf("flat runs = %v", flat)
 	// [(R2L 5 15…20|R) (L2R 5 10…15|EN) (R2L 10 0…10|R) (L2R 15 20…35|L)
@@ -229,9 +213,7 @@ func TestFlatten1(t *testing.T) {
 }
 
 func TestSplitSingle(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "uax.bidi")
-	defer teardown()
-	tracing.Select("uax.bidi").SetTraceLevel(tracing.LevelError)
+	tracing.SetTestingLog(t)
 	//
 	var scraps = [...]scrap{
 		{l: 0, r: 0, bidiclz: bidi.LRI},
@@ -247,9 +229,7 @@ func TestSplitSingle(t *testing.T) {
 }
 
 func TestSplit(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "uax.bidi")
-	defer teardown()
-	tracing.Select("uax.bidi").SetTraceLevel(tracing.LevelError)
+	tracing.SetTestingLog(t)
 	//
 	var scraps = [...]scrap{
 		{l: 0, r: 0, bidiclz: bidi.LRI},
@@ -274,9 +254,7 @@ func TestSplit(t *testing.T) {
 }
 
 func TestScannerBrackets(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "uax.bidi")
-	defer teardown()
-	tracing.Select("uax.bidi").SetTraceLevel(tracing.LevelError)
+	tracing.SetTestingLog(t)
 	//
 	input := strings.NewReader("hi (YOU[])")
 	scnr := newScanner(input, nil, TestMode(true))
@@ -295,9 +273,7 @@ func TestScannerBrackets(t *testing.T) {
 }
 
 func TestSimple(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "uax.bidi")
-	defer teardown()
-	tracing.Select("uax.bidi").SetTraceLevel(tracing.LevelError)
+	tracing.SetTestingLog(t)
 	//
 	reader := strings.NewReader("hello 123.45")
 	levels := ResolveParagraph(reader, nil, TestMode(true))
@@ -308,9 +284,7 @@ func TestSimple(t *testing.T) {
 }
 
 func TestBrackets(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "uax.bidi")
-	defer teardown()
-	tracing.Select("uax.bidi").SetTraceLevel(tracing.LevelError)
+	tracing.SetTestingLog(t)
 	//
 	reader := strings.NewReader("hello (WORLD)")
 	levels := ResolveParagraph(reader, nil, TestMode(true))
@@ -321,9 +295,7 @@ func TestBrackets(t *testing.T) {
 }
 
 func TestIRS(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "uax.bidi")
-	defer teardown()
-	tracing.Select("uax.bidi").SetTraceLevel(tracing.LevelError)
+	tracing.SetTestingLog(t)
 	//
 	reader := strings.NewReader("hel<lo WORLD=")
 	levels := ResolveParagraph(reader, nil, TestMode(true))
@@ -338,9 +310,7 @@ func TestIRS(t *testing.T) {
 }
 
 func TestIRSLoner(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "uax.bidi")
-	defer teardown()
-	tracing.Select("uax.bidi").SetTraceLevel(tracing.LevelError)
+	tracing.SetTestingLog(t)
 	//
 	reader := strings.NewReader("hel<lo WORLD")
 	levels := ResolveParagraph(reader, nil, TestMode(true))
@@ -357,9 +327,7 @@ func TestIRSLoner(t *testing.T) {
 // First try to resolve level runs for all the examples.
 
 func TestResolveCar1(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "uax.bidi")
-	defer teardown()
-	tracing.Select("uax.bidi").SetTraceLevel(tracing.LevelError)
+	tracing.SetTestingLog(t)
 	//
 	input := "car means CAR."
 	t.Logf("input of length %d is '%s'", len(input), input)
@@ -375,9 +343,7 @@ func TestResolveCar1(t *testing.T) {
 }
 
 func TestResolveCar2(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "uax.bidi")
-	defer teardown()
-	tracing.Select("uax.bidi").SetTraceLevel(tracing.LevelError)
+	tracing.SetTestingLog(t)
 	//
 	input := "<car MEANS CAR.="
 	reader := strings.NewReader(input)
@@ -399,9 +365,7 @@ func TestResolveCar2(t *testing.T) {
 }
 
 func TestResolveCar3(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "uax.bidi")
-	defer teardown()
-	tracing.Select("uax.bidi").SetTraceLevel(tracing.LevelError)
+	tracing.SetTestingLog(t)
 	//
 	input := "he said “<car MEANS CAR=.” “<IT DOES=,” she agreed."
 	t.Logf("input with len=%d : '%v'", len(input), input)
@@ -424,9 +388,7 @@ func TestResolveCar3(t *testing.T) {
 }
 
 func TestResolveCar4(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "uax.bidi")
-	defer teardown()
-	tracing.Select("uax.bidi").SetTraceLevel(tracing.LevelError)
+	tracing.SetTestingLog(t)
 	//
 	input := "DID YOU SAY ’>he said “<car MEANS CAR=”=‘?"
 	t.Logf("input with len=%d : '%v'", len(input), input)
@@ -455,9 +417,7 @@ func TestResolveCar4(t *testing.T) {
 }
 
 func TestOrderCar1(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "uax.bidi")
-	defer teardown()
-	tracing.Select("uax.bidi").SetTraceLevel(tracing.LevelError)
+	tracing.SetTestingLog(t)
 	//
 	input := "car means CAR."
 	t.Logf("input of length %d is '%s'", len(input), input)
@@ -483,9 +443,7 @@ func TestOrderCar1(t *testing.T) {
 }
 
 func TestOrderCar2(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "uax.bidi")
-	defer teardown()
-	tracing.Select("uax.bidi").SetTraceLevel(tracing.LevelError)
+	tracing.SetTestingLog(t)
 	//
 	input := "<car MEANS CAR.="
 	reader := strings.NewReader(input)
@@ -509,9 +467,7 @@ func TestOrderCar2(t *testing.T) {
 }
 
 func TestOrderCar3(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "uax.bidi")
-	defer teardown()
-	tracing.Select("uax.bidi").SetTraceLevel(tracing.LevelError)
+	tracing.SetTestingLog(t)
 	//
 	input := "he said “<car MEANS CAR=.” “<IT DOES=,” she agreed."
 	t.Logf("input = '%s'", input)
@@ -539,9 +495,7 @@ func TestOrderCar3(t *testing.T) {
 }
 
 func NoTestUAXFile(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "uax.bidi")
-	defer teardown()
-	tracing.Select("uax.bidi").SetTraceLevel(tracing.LevelError)
+	tracing.SetTestingLog(t)
 	//
 	readBidiTests("./uaxbiditest/BidiCharacterTest.txt")
 }

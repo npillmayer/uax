@@ -5,8 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/npillmayer/schuko/tracing"
-	"github.com/npillmayer/schuko/tracing/gotestingadapter"
+	"github.com/npillmayer/uax/internal/tracing"
 	"github.com/npillmayer/uax/internal/ucdparse"
 	"github.com/npillmayer/uax/segment"
 	"github.com/npillmayer/uax/uax29"
@@ -27,8 +26,7 @@ func ExampleWordBreaker() {
 }
 
 func TestWordBreaks1(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "uax.segment")
-	defer teardown()
+	tracing.SetTestingLog(t)
 	//
 	onWords := uax29.NewWordBreaker(1)
 	segmenter := segment.NewSegmenter(onWords)
@@ -44,8 +42,7 @@ func TestWordBreaks1(t *testing.T) {
 }
 
 func TestWordBreaks2(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "uax.segment")
-	defer teardown()
+	tracing.SetTestingLog(t)
 	//
 	onWords := uax29.NewWordBreaker(1)
 	segmenter := segment.NewSegmenter(onWords)
@@ -63,9 +60,7 @@ func TestWordBreaks2(t *testing.T) {
 }
 
 func TestWordBreakTestFile(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "uax.segment")
-	defer teardown()
-	tracer := tracing.Select("uax.segment")
+	tracing.SetTestingLog(t)
 	//
 	onWordBreak := uax29.NewWordBreaker(1)
 	seg := segment.NewSegmenter(onWordBreak)
@@ -76,7 +71,7 @@ func TestWordBreakTestFile(t *testing.T) {
 	for tf.Scan() {
 		i++
 		if i >= from {
-			tracer.Infof(tf.Comment())
+			t.Log(tf.Comment())
 			in, out := ucdparse.BreakTestInput(tf.Text())
 			if !executeSingleTest(t, seg, i, in, out) {
 				failcnt++

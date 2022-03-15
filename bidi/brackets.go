@@ -3,6 +3,8 @@ package bidi
 import (
 	"fmt"
 	"sync"
+
+	"github.com/npillmayer/uax/internal/tracing"
 )
 
 // BD16MaxNesting is the maximum stack depth for rule BS16 as defined in UAX#9.
@@ -147,14 +149,14 @@ func (bs bracketStack) push(r rune, s scrap) (bool, bracketStack) {
 			return true, append(bs, b)
 		}
 	}
-	tracer().Errorf("Push of %c failed, not found as opening bracket")
+	tracing.Errorf("Push of %c failed, not found as opening bracket")
 	return false, bs
 }
 
 // popWith checks of an opening bracket on the bracket stack matching a given
 // closing bracket. It performs steps 1–5 from the algorithm described above.
 func (bs bracketStack) popWith(b rune, pos charpos) (bool, brktpos, bracketStack) {
-	tracer().Debugf("popWith: rune=%v, bracket stack is %v", b, bs)
+	tracing.Debugf("popWith: rune=%v, bracket stack is %v", b, bs)
 	if len(bs) == 0 {
 		return false, brktpos{}, bs
 	}
@@ -221,19 +223,19 @@ func (bph *bracketPairHandler) UpdateClosingBrackets(s scrap) {
 
 func (bph *bracketPairHandler) dump() {
 	if len(bph.stack) == 0 {
-		tracer().Debugf("BD16: Bracket Stack is empty")
+		tracing.Debugf("BD16: Bracket Stack is empty")
 	} else {
-		tracer().Debugf("BD16: Bracket Stack:")
+		tracing.Debugf("BD16: Bracket Stack:")
 		for i, p := range bph.stack {
-			tracer().Debugf("\t[%d] %v at %d", i, p.pair, p.opening)
+			tracing.Debugf("\t[%d] %v at %d", i, p.pair, p.opening)
 		}
 	}
 	if len(bph.pairings) == 0 {
-		tracer().Debugf("BD16: No pairings found")
+		tracing.Debugf("BD16: No pairings found")
 	} else {
-		tracer().Debugf("BD16: Bracket Pairings:")
+		tracing.Debugf("BD16: Bracket Pairings:")
 		for i, pair := range bph.pairings {
-			tracer().Debugf("\t[%d] %v", i, pair)
+			tracing.Debugf("\t[%d] %v", i, pair)
 		}
 	}
 }

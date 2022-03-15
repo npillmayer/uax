@@ -3,6 +3,8 @@ package uax
 import (
 	"fmt"
 	"sync"
+
+	"github.com/npillmayer/uax/internal/tracing"
 )
 
 // UnicodeBreaker represents a logic to split up
@@ -154,7 +156,7 @@ func DoAbort(rec *Recognizer) NfaStateFn {
 func DoAccept(rec *Recognizer, penalties ...int) NfaStateFn {
 	rec.MatchLen++
 	rec.penalties = penalties
-	tracer().Debugf("ACCEPT with %v", rec.penalties)
+	tracing.Debugf("ACCEPT with %v", rec.penalties)
 	return nil
 }
 

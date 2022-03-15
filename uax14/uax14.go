@@ -61,8 +61,8 @@ import (
 	"sync"
 	"unicode"
 
-	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/uax"
+	"github.com/npillmayer/uax/internal/tracing"
 )
 
 const (
@@ -70,11 +70,6 @@ const (
 	eot       UAX14Class = 1001 // pseudo class
 	optSpaces UAX14Class = 1002 // pseudo class
 )
-
-// tracer traces to uax.segment .
-func tracer() tracing.Trace {
-	return tracing.Select("uax.segment")
-}
 
 // ClassForRune gets the line breaking/wrap class for a Unicode code-point
 func ClassForRune(r rune) UAX14Class {
@@ -84,7 +79,7 @@ func ClassForRune(r rune) UAX14Class {
 	for lbc := UAX14Class(0); lbc <= ZWJClass; lbc++ {
 		urange := rangeFromUAX14Class[lbc]
 		if urange == nil {
-			tracer().Errorf("-- no range for class %s\n", lbc)
+			tracing.Errorf("-- no range for class %s\n", lbc)
 		} else if unicode.Is(urange, r) {
 			return lbc
 		}
@@ -170,7 +165,7 @@ func NewLineWrap() *LineWrap {
 		ZWJClass: {rule_LB8a},
 	}
 	if rangeFromUAX14Class == nil {
-		tracer().Infof("UAX#14 classes not yet initialized -> initializing")
+		tracing.Infof("UAX#14 classes not yet initialized -> initializing")
 	}
 	SetupClasses()
 	uax14.lastClass = sot
@@ -197,14 +192,14 @@ func (uax14 *LineWrap) StartRulesFor(r rune, cpClass int) {
 	c := UAX14Class(cpClass)
 	if c != RIClass || !uax14.blockedRI {
 		if rules := uax14.rules[c]; len(rules) > 0 {
-			tracer().P("class", c).Debugf("starting %d rule(s) for class %s", len(rules), c)
+			tracing.P("class", c).Debugf("starting %d rule(s) for class %s", len(rules), c)
 			for _, rule := range rules {
 				rec := uax.NewPooledRecognizer(cpClass, rule)
 				rec.UserData = uax14
 				uax14.publisher.SubscribeMe(rec)
 			}
 		} else {
-			tracer().P("class", c).Debugf("starting no rule")
+			tracing.P("class", c).Debugf("starting no rule")
 		}
 		/*
 			if uax14.shadow == ZWJClass {
@@ -270,7 +265,7 @@ func substitueSomeClasses(c UAX14Class, lastClass UAX14Class) (UAX14Class, UAX14
 		}
 	}
 	if shadow != c {
-		tracer().Debugf("subst %+q -> %+q", shadow, c)
+		tracing.Debugf("subst %+q -> %+q", shadow, c)
 	}
 	return c, shadow
 }
@@ -382,7 +377,7 @@ func p(w int) int {
 	if r == DefaultPenalty {
 		r = DefaultPenalty + 1
 	}
-	tracer().P("rule", w).Debugf("penalty %d => %d", w, r)
+	tracing.P("rule", w).Debugf("penalty %d => %d", w, r)
 	return r
 }
 

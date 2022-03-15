@@ -3,12 +3,11 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
 
-	"github.com/npillmayer/schuko/tracing"
-	"github.com/npillmayer/schuko/tracing/gologadapter"
 	"github.com/npillmayer/uax/internal/ucdparse"
 )
 
@@ -17,20 +16,21 @@ func main() {
 	outf := flag.String("o", "_bracketpairs.go", "Output file name")
 	pkg := flag.String("pkg", "main", "Package name to use in output file")
 	flag.Parse()
-	logAdapter := gologadapter.GetAdapter()
-	trace := logAdapter()
-	trace.SetTraceLevel(traceLevel(*tlevel))
-	tracing.SetTraceSelector(mytrace{tracer: trace})
-	tracing.Infof("Generating Unicode bracket pairs")
+
+	if *tlevel == "D" {
+		debugEnabled = true
+	}
+
+	Infof("Generating Unicode bracket pairs")
 	pairs := readBrackets()
-	tracing.Infof("Read %d bracket pairs", len(pairs))
+	Infof("Read %d bracket pairs", len(pairs))
 	if len(pairs) == 0 {
-		tracing.Errorf("Did not read any bracket pairs, exiting")
+		Errorf("Did not read any bracket pairs, exiting")
 		os.Exit(1)
 	}
 	f, err := os.Create(*outf)
 	if err != nil {
-		tracing.Errorf(err.Error())
+		Errorf(err.Error())
 		os.Exit(2)
 	}
 	defer f.Close()
@@ -56,7 +56,7 @@ func readBrackets() []bracketPair {
 		os.Exit(1)
 	}
 	defer file.Close()
-	tracing.Infof("Found file BidiBrackets.txt ...")
+	Infof("Found file BidiBrackets.txt ...")
 	bracketList := make([]bracketPair, 0, 65)
 	err = ucdparse.Parse(file, func(t *ucdparse.Token) {
 		if typ := strings.TrimSpace(t.Field(2)); typ != "o" {
@@ -66,13 +66,13 @@ func readBrackets() []bracketPair {
 		pair.o, _ = t.Range()
 		pair.c = readHexRune(t.Field(1))
 		bracketList = append(bracketList, pair)
-		tracing.Debugf(t.Comment)
+		Debugf(t.Comment)
 	})
 	if err != nil {
-		tracing.Errorf(err.Error())
+		Errorf(err.Error())
 		os.Exit(1)
 	}
-	tracing.Debugf("done.")
+	Debugf("done.")
 	return bracketList
 }
 
@@ -82,22 +82,23 @@ func readHexRune(inp string) rune {
 	return rune(n)
 }
 
-func traceLevel(l string) tracing.TraceLevel {
-	switch l {
-	case "D":
-		return tracing.LevelDebug
-	case "I":
-		return tracing.LevelInfo
-	case "E":
-		return tracing.LevelError
+var debugEnabled bool
+
+func Debugf(format string, args ...interface{}) {
+	printf(os.Stdout, format, args...)
+}
+
+func Infof(format string, args ...interface{}) {
+	printf(os.Stdout, format, args...)
+}
+
+func Errorf(format string, args ...interface{}) {
+	printf(os.Stderr, format, args...)
+}
+
+func printf(out io.Writer, format string, args ...interface{}) {
+	fmt.Fprintf(out, format, args...)
+	if strings.HasSuffix(format, "\n") {
+		out.Write([]byte{'\n'})
 	}
-	return tracing.LevelDebug
-}
-
-type mytrace struct {
-	tracer tracing.Trace
-}
-
-func (t mytrace) Select(string) tracing.Trace {
-	return t.tracer
 }

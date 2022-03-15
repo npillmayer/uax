@@ -3,14 +3,11 @@ package trie
 import (
 	"testing"
 
-	"github.com/npillmayer/schuko/tracing"
-	"github.com/npillmayer/schuko/tracing/gotestingadapter"
+	"github.com/npillmayer/uax/internal/tracing"
 )
 
 func TestEnterSimple(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "uax.bidi")
-	defer teardown()
-	tracing.Select("uax.bidi").SetTraceLevel(tracing.LevelError)
+	tracing.SetTestingLog(t)
 	//
 	trie, _ := NewTinyHashTrie(139, 46)
 	p1 := trie.AllocPositionForWord([]byte{13, 20})
@@ -28,9 +25,7 @@ func TestEnterSimple(t *testing.T) {
 }
 
 func TestEnterZero(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "uax.bidi")
-	defer teardown()
-	tracing.Select("uax.bidi").SetTraceLevel(tracing.LevelError)
+	tracing.SetTestingLog(t)
 	//
 	trie, _ := NewTinyHashTrie(139, 46)
 	p1 := trie.AllocPositionForWord([]byte{0, 0})
@@ -41,9 +36,7 @@ func TestEnterZero(t *testing.T) {
 }
 
 func TestIterator(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "uax.bidi")
-	defer teardown()
-	tracing.Select("uax.bidi").SetTraceLevel(tracing.LevelError)
+	tracing.SetTestingLog(t)
 	//
 	trie, _ := NewTinyHashTrie(139, 46)
 	word := []byte{13, 20}

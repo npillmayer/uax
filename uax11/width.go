@@ -7,6 +7,7 @@ import (
 	"github.com/npillmayer/uax"
 	"github.com/npillmayer/uax/emoji"
 	"github.com/npillmayer/uax/grapheme"
+	"github.com/npillmayer/uax/internal/tracing"
 	"golang.org/x/text/language"
 	"golang.org/x/text/width"
 )
@@ -216,11 +217,11 @@ var eaMatch = language.NewMatcher([]language.Tag{
 func ContextFromEnvironment() *Context {
 	userLocale, err := jj.DetectIETF()
 	if err != nil {
-		tracer().Errorf(err.Error())
+		tracing.Errorf(err.Error())
 		userLocale = "en-US"
-		tracer().Infof("UAX#11 sets default user locale %v", userLocale)
+		tracing.Infof("UAX#11 sets default user locale %v", userLocale)
 	} else {
-		tracer().Infof("UAX#11 detected user locale %v", userLocale)
+		tracing.Infof("UAX#11 detected user locale %v", userLocale)
 	}
 	lang := language.Make(userLocale)
 	script, _ := lang.Script()

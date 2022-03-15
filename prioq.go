@@ -1,6 +1,10 @@
 package uax
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/npillmayer/uax/internal/tracing"
+)
 
 // DefaultRunePublisher is a type to organize RuneSubscribers.
 //
@@ -53,7 +57,7 @@ func (pq *DefaultRunePublisher) Fix(at int) {
 		}
 		for i := 0; i < pq.gap; i++ {
 			if pq.q[i].Done() {
-				tracer().Errorf("prioq.Fix(%d) failed", at)
+				tracing.Errorf("prioq.Fix(%d) failed", at)
 				pq.print()
 				panic("internal queue order compromised")
 			}

@@ -6,8 +6,8 @@ import (
 	"io"
 	"sync"
 
-	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/uax/bidi/trie"
+	"github.com/npillmayer/uax/internal/tracing"
 	"golang.org/x/text/unicode/bidi"
 )
 
@@ -99,7 +99,7 @@ func (p *parser) ResolveLevels() *ResolvedLevels {
 	p.pipe = make(chan scrap, 0)
 	go p.sc.Scan(p.pipe)                    // start the scanner which will process input characters
 	initial := p.sc.initialOuterScrap(true) // initial pseudo-IRS delimiter
-	tracer().Infof("bidi resolver: initial run starts with %v, context = %v", initial, initial.context)
+	tracing.Infof("bidi resolver: initial run starts with %v, context = %v", initial, initial.context)
 	p.stack = append(p.stack, initial) // start outer-most stack with syntetic IRS delimiter
 	runs, _, _, _ := p.parseIRS(0)     // parse paragraph as outer isolating run sequence
 	end := runs[len(runs)-1].r         // we append a PDI at the end of the result
@@ -117,9 +117,9 @@ func (p *parser) ResolveLevels() *ResolvedLevels {
 // nextInputScrap reads the next scrap from the scanner pipe. It returns a
 // new scrap and false if this is the EOF scrap, true otherwise.
 func (p *parser) nextInputScrap(pipe <-chan scrap) (scrap, bool) {
-	tracer().Debugf("==> reading from pipe")
+	tracing.Debugf("==> reading from pipe")
 	s := <-pipe
-	tracer().Debugf("    read %s from pipe", s)
+	tracing.Debugf("    read %s from pipe", s)
 	if s.bidiclz == cNULL {
 		return s, false
 	}
@@ -143,8 +143,8 @@ func (p *parser) read(n int) (int, bool) {
 		}
 		p.stack = append(p.stack, s)
 	}
-	tracer().Debugf("bidi parser: have read %d scraps", i)
-	tracer().Debugf("bidi parser: stack now %v", p.stack)
+	tracing.Debugf("bidi parser: have read %d scraps", i)
+	tracing.Debugf("bidi parser: stack now %v", p.stack)
 	return i, true
 }
 
@@ -152,14 +152,14 @@ func (p *parser) read(n int) (int, bool) {
 // not necessarily be the top scraps, and replaces them with the right-hand-side (RHS)
 // of the applied rule.
 func (p *parser) reduce(n int, rhs []scrap, startIRS int) {
-	tracer().Debugf("REDUCE at %d: %d ⇒ %v", p.sp, n, rhs)
+	tracing.Debugf("REDUCE at %d: %d ⇒ %v", p.sp, n, rhs)
 	diff := len(rhs) - n
 	for i, s := range rhs {
 		p.stack[p.sp+i] = s
 	}
 	pos := max(startIRS, p.sp+len(rhs))
 	p.stack = append(p.stack[:pos], p.stack[pos-diff:]...)
-	tracer().Debugf("sp=%d, stack-LA is now %v", p.sp, p.stack[p.sp:])
+	tracing.Debugf("sp=%d, stack-LA is now %v", p.sp, p.stack[p.sp:])
 }
 
 // pass1 scans the complete input (character-)sequence, creating an scraps for each
@@ -190,11 +190,11 @@ func (p *parser) pass1(startIRS int) bool {
 			}
 			break
 		}
-		tracer().Debugf("bidi parser: trying to match %v at %d", p.stack[p.sp:len(p.stack)], p.sp)
+		tracing.Debugf("bidi parser: trying to match %v at %d", p.stack[p.sp:len(p.stack)], p.sp)
 		if walk {
 			rule = shortrule
 			if rule == nil || rule.pass > 1 {
-				tracer().Debugf("walking over %s", p.stack[p.sp])
+				tracing.Debugf("walking over %s", p.stack[p.sp])
 				if p.stack[p.sp].bidiclz == bidi.PDI {
 					p.sp++ // walk over PDI
 					pdi = true
@@ -214,7 +214,7 @@ func (p *parser) pass1(startIRS int) bool {
 				continue
 			}
 		}
-		tracer().Debugf("applying UAX#9 rule %s", rule.name)
+		tracing.Debugf("applying UAX#9 rule %s", rule.name)
 		rhs, jmp, newL := rule.action(p.stack[p.sp:len(p.stack)])
 		p.reduce(rule.lhsLen, rhs, startIRS)
 		if newL {
@@ -232,8 +232,8 @@ func (p *parser) applySubIRS(startIRS int) int {
 	if !ok {
 		// we do not repair and backtrack if unclosed IRS
 		irs := p.stack[startSubIRS]
-		tracer().Infof("bidi resolver detected an unclosed isolate run sequence at %d", irs.l)
-		tracer().Errorf("bidi resolver won't adhere to UAX#9 for unclosed isolate run sequences")
+		tracing.Infof("bidi resolver detected an unclosed isolate run sequence at %d", irs.l)
+		tracing.Errorf("bidi resolver won't adhere to UAX#9 for unclosed isolate run sequences")
 		if runlen == 0 { // should at least contain IRS start delimiter
 			panic("sub-IRS is void; internal inconsistency")
 		}
@@ -264,7 +264,7 @@ func (p *parser) pass2(startIRS int) {
 	p.sp = startIRS
 	for !p.passed(bidi.PDI) && p.sp < len(p.stack) {
 		e := min(len(p.stack), p.sp+3)
-		tracer().Debugf("trying to match %v at %d", p.stack[p.sp:e], p.sp)
+		tracing.Debugf("trying to match %v at %d", p.stack[p.sp:e], p.sp)
 		//if p.stack[p.sp].bidiclz == cBRACKC {
 		if isbracket(p.stack[p.sp]) {
 			jmp := p.performRuleN0()
@@ -279,7 +279,7 @@ func (p *parser) pass2(startIRS int) {
 			}
 			rule = shortrule
 		}
-		tracer().Debugf("applying UAX#9 rule %s", rule.name)
+		tracing.Debugf("applying UAX#9 rule %s", rule.name)
 		rhs, jmp, _ := rule.action(p.stack[p.sp:len(p.stack)])
 		p.reduce(rule.lhsLen, rhs, startIRS)
 		p.sp = max(0, p.sp+jmp) // avoid jumping left of 0
@@ -303,15 +303,15 @@ func (p *parser) passed(c bidi.Class) bool {
 //
 func (p *parser) parseIRS(startIRS int) ([]scrap, int, int, bool) {
 	p.spIRS = append(p.spIRS, startIRS) // put start of isolating run sequence on IRS stack
-	tracer().Debugf("------ pass 1 (%d) ------", len(p.spIRS))
-	tracer().Debugf("starting pass 1 with stack %v", p.stack[startIRS:])
+	tracing.Debugf("------ pass 1 (%d) ------", len(p.spIRS))
+	tracing.Debugf("starting pass 1 with stack %v", p.stack[startIRS:])
 	ok := p.pass1(startIRS + 1) // start after IRS delimiter
-	tracer().Debugf("--------- (%d) ----------", len(p.spIRS))
-	tracer().Debugf("STACK = %v", p.stack)
+	tracing.Debugf("--------- (%d) ----------", len(p.spIRS))
+	tracing.Debugf("STACK = %v", p.stack)
 	if ok || len(p.spIRS) == 1 {
-		tracer().Debugf("------ pass 2 (%d) ------", len(p.spIRS))
+		tracing.Debugf("------ pass 2 (%d) ------", len(p.spIRS))
 		p.pass2(startIRS)
-		tracer().Debugf("--------- (%d) ----------", len(p.spIRS))
+		tracing.Debugf("--------- (%d) ----------", len(p.spIRS))
 	}
 	// Handling of unclosed IRSs according to UAX has been abondened.
 	// else if len(p.spIRS) > 1 { // IRS has been terminated by EOF instead of PDI
@@ -331,7 +331,7 @@ func (p *parser) parseIRS(startIRS int) ([]scrap, int, int, bool) {
 			r:        p.stack[startIRS+runlen-1].r,
 			children: [][]scrap{copyStackSegm(p.stack, startIRS, runlen)},
 		}
-		tracer().Debugf("bidi parser created NI-child %v", ni.children[0])
+		tracing.Debugf("bidi parser created NI-child %v", ni.children[0])
 		result = []scrap{ni}
 	} else {
 		result = p.stack[startIRS:]
@@ -382,10 +382,10 @@ func (p *parser) matchRulesLHS(scraps []scrap, minlen int) (*bidiRule, *bidiRule
 	}
 	rule, shortrule := rules[entry], rules[short]
 	if entry != 0 && rule != nil {
-		tracer().Debugf("FOUND MATCHing  long rule %s for LHS, pass=%d", rule.name, rule.pass)
+		tracing.Debugf("FOUND MATCHing  long rule %s for LHS, pass=%d", rule.name, rule.pass)
 	}
 	if short != 0 && shortrule != nil {
-		tracer().Debugf("FOUND MATCHing short rule %s for LHS, pass=%d", shortrule.name, shortrule.pass)
+		tracing.Debugf("FOUND MATCHing short rule %s for LHS, pass=%d", shortrule.name, shortrule.pass)
 	}
 	if entry == 0 || rule == nil {
 		if short == 0 || shortrule == nil {
@@ -405,20 +405,20 @@ func (p *parser) matchRulesLHS(scraps []scrap, minlen int) (*bidiRule, *bidiRule
 //     given below. Within this scope, bidirectional types EN and AN are treated as R.
 //
 func (p *parser) performRuleN0() (jmp int) {
-	tracer().Debugf("applying UAX#9 rule N0 (bracket pairs) with %s", p.stack[p.sp])
+	tracing.Debugf("applying UAX#9 rule N0 (bracket pairs) with %s", p.stack[p.sp])
 	jmp = 1 // default is to walk over the bracket
 	if p.stack[p.sp].bidiclz == cBRACKO {
 		// Identify the bracket pairs in the current isolating run sequence according to BD16.
 		openBr := p.stack[p.sp]
 		closeBr, found := p.findCorrespondingBracket(openBr)
 		if !found {
-			tracer().Debugf("Did not find closing bracket for %s", openBr)
+			tracing.Debugf("Did not find closing bracket for %s", openBr)
 			closeBr.bidiclz = cNI
 			return
 		}
-		tracer().Debugf("closing bracket for %s is %s", openBr, closeBr)
-		tracer().Debugf("closing bracket has context=%v", closeBr.context)
-		tracer().Debugf("closing bracket has match pos=%d", closeBr.context.matchPos)
+		tracing.Debugf("closing bracket for %s is %s", openBr, closeBr)
+		tracing.Debugf("closing bracket has context=%v", closeBr.context)
+		tracing.Debugf("closing bracket has match pos=%d", closeBr.context.matchPos)
 		// a. Inspect the bidirectional types of the characters enclosed within the
 		//    bracket pair.
 		if closeBr.HasEmbeddingMatchAfter(openBr) {
@@ -444,7 +444,7 @@ func (p *parser) performRuleN0() (jmp int) {
 			}
 			jmp = -2
 		} else {
-			tracer().Debugf("no strong types found within bracket pair")
+			tracing.Debugf("no strong types found within bracket pair")
 			// d. Otherwise, there are no strong types within the bracket pair.
 			//    Therefore, do not set the type for that bracket pair.
 			openBr.bidiclz = cNI
@@ -496,12 +496,10 @@ func prepareRulesTrie() *trie.TinyHashTrie {
 	prepareTrieOnce.Do(func() {
 		trie, err := trie.NewTinyHashTrie(dictsize, int8(cMAX))
 		if err != nil {
-			tracer().Errorf(err.Error())
+			tracing.Errorf(err.Error())
 			panic(err.Error())
 		}
 		var r *bidiRule
-		tracelevel := tracer().GetTraceLevel()
-		tracer().SetTraceLevel(tracing.LevelInfo)
 		var lhs []byte
 		// --- allocate all the rules ---
 		r, lhs = ruleW4_1()
@@ -554,8 +552,7 @@ func prepareRulesTrie() *trie.TinyHashTrie {
 		allocRule(trie, r, lhs)
 		// ------------------------------
 		trie.Freeze()
-		tracer().SetTraceLevel(tracelevel)
-		tracer().Debugf("--- freeze trie -------------")
+		tracing.Debugf("--- freeze trie -------------")
 		trie.Stats()
 		rulesTrie = trie
 	})
@@ -563,7 +560,7 @@ func prepareRulesTrie() *trie.TinyHashTrie {
 }
 
 func allocRule(trie *trie.TinyHashTrie, rule *bidiRule, lhs []byte) {
-	tracer().Debugf("storing rule %s for LHS=%v", rule.name, lhs)
+	tracing.Debugf("storing rule %s for LHS=%v", rule.name, lhs)
 	pointer := trie.AllocPositionForWord(lhs)
 	//T().Debugf("  -> %d", pointer)
 	rules[pointer] = rule

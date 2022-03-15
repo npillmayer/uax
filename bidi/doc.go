@@ -64,15 +64,6 @@ Copyright © 2021 Norbert Pillmayer <norbert@pillmayer.com>
 */
 package bidi
 
-import (
-	"github.com/npillmayer/schuko/tracing"
-)
-
-// tracer traces to uax.bidi
-func tracer() tracing.Trace {
-	return tracing.Select("uax.bidi")
-}
-
 // UnicodeVersion is the UAX#9 version this implementation follows.
 const UnicodeVersion = "13.0.0"
 

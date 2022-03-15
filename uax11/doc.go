@@ -51,12 +51,3 @@ Copyright © 2021 Norbert Pillmayer <norbert@pillmayer.com>
 
 */
 package uax11
-
-import (
-	"github.com/npillmayer/schuko/tracing"
-)
-
-// tracer traces to uax.segment .
-func tracer() tracing.Trace {
-	return tracing.Select("uax.segment")
-}

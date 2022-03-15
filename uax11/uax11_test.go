@@ -4,16 +4,15 @@ import (
 	"testing"
 	"unicode/utf8"
 
-	"github.com/npillmayer/schuko/tracing/gotestingadapter"
 	"github.com/npillmayer/uax/emoji"
 	"github.com/npillmayer/uax/grapheme"
+	"github.com/npillmayer/uax/internal/tracing"
 	"golang.org/x/text/width"
 )
 
 /*
 func TestTables(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "uax.segment")
-	defer teardown()
+	tracing.SetTestingLog(t)
 	//
 	chars := [...]rune{
 		'A',    // LATIN CAPITAL LETTER A           => Na
@@ -33,8 +32,7 @@ func TestTables(t *testing.T) {
 */
 
 func TestEnvLocale(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "uax.segment")
-	defer teardown()
+	tracing.SetTestingLog(t)
 	//
 	ctx := ContextFromEnvironment()
 	if ctx == nil {
@@ -45,8 +43,7 @@ func TestEnvLocale(t *testing.T) {
 }
 
 func TestWidth(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "uax.segment")
-	defer teardown()
+	tracing.SetTestingLog(t)
 	//
 	emoji.SetupEmojisClasses()
 	chars := [...]rune{
@@ -74,8 +71,7 @@ func TestWidth(t *testing.T) {
 }
 
 func TestContext(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "uax.segment")
-	defer teardown()
+	tracing.SetTestingLog(t)
 	//
 	grapheme.SetupGraphemeClasses()
 	//context := &Context{Locale: "zh-uig"}
@@ -86,8 +82,7 @@ func TestContext(t *testing.T) {
 }
 
 func TestString(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "uax.segment")
-	defer teardown()
+	tracing.SetTestingLog(t)
 	//
 	grapheme.SetupGraphemeClasses()
 	input := "A (世). "
@@ -105,8 +100,7 @@ func TestString(t *testing.T) {
 }
 
 func TestScripts(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "uax.segment")
-	defer teardown()
+	tracing.SetTestingLog(t)
 	//
 	grapheme.SetupGraphemeClasses()
 	input := []struct {
