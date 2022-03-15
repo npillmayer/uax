@@ -1,10 +1,8 @@
 package uax
 
 import (
-	"context"
 	"fmt"
-
-	pool "github.com/jolestar/go-commons-pool"
+	"sync"
 )
 
 // UnicodeBreaker represents a logic to split up
@@ -70,35 +68,16 @@ func NewRecognizer(codePointClass int, next NfaStateFn) *Recognizer {
 	return rec
 }
 
-// Recognizers are short-lived objects. To avoid multiple allocation of
-// small objects we will pool them.
-type recognizerPool struct {
-	opool *pool.ObjectPool
-	ctx   context.Context
-}
-
-var globalRecognizerPool *recognizerPool
-
-func init() {
-	globalRecognizerPool = &recognizerPool{}
-	factory := pool.NewPooledObjectFactorySimple(
-		func(context.Context) (interface{}, error) {
-			rec := &Recognizer{}
-			return rec, nil
-		})
-	globalRecognizerPool.ctx = context.Background()
-	config := pool.NewDefaultPoolConfig()
-	//config.LIFO = false
-	config.MaxTotal = -1 // infinity
-	config.BlockWhenExhausted = false
-	globalRecognizerPool.opool = pool.NewObjectPool(globalRecognizerPool.ctx, factory, config)
+var globalRecognizerPool = sync.Pool{
+	New: func() interface{} {
+		return &Recognizer{}
+	},
 }
 
 // NewPooledRecognizer returns a new Recognizer, pre-filled with an expected code-point class
 // and a state function. The Recognizer is pooled for efficiency.
 func NewPooledRecognizer(cpClass int, stateFn NfaStateFn) *Recognizer {
-	o, _ := globalRecognizerPool.opool.BorrowObject(globalRecognizerPool.ctx)
-	rec := o.(*Recognizer)
+	rec := globalRecognizerPool.Get().(*Recognizer)
 	rec.Expect = cpClass
 	rec.nextStep = stateFn
 	return rec
@@ -110,7 +89,7 @@ func (rec *Recognizer) releaseIntoPool() {
 	rec.Expect = 0
 	rec.MatchLen = 0
 	rec.nextStep = nil
-	_ = globalRecognizerPool.opool.ReturnObject(globalRecognizerPool.ctx, rec)
+	globalRecognizerPool.Put(rec)
 }
 
 // Simple stringer for debugging purposes.
