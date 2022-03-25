@@ -149,7 +149,7 @@ func (bs bracketStack) push(r rune, s scrap) (bool, bracketStack) {
 			return true, append(bs, b)
 		}
 	}
-	tracing.Errorf("Push of %c failed, not found as opening bracket")
+	tracing.Errorf("Push of %v failed, not found as opening bracket", r)
 	return false, bs
 }
 

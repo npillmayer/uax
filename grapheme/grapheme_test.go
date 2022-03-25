@@ -116,7 +116,7 @@ func TestGraphemesTestFile(t *testing.T) {
 		}
 	}
 	if err := scan.Err(); err != nil {
-		tracing.Infof("reading input:", err)
+		tracing.Infof("reading input: %v", err)
 	}
 	if failcnt > 11 {
 		t.Errorf("%d TEST CASES OUT of %d FAILED", failcnt, i-from+1)
