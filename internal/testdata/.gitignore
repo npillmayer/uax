@@ -1,9 +1,15 @@
 ucd/**
 !ucd/auxiliary
 ucd/auxiliary/*
+!ucd/emoji
+ucd/emoji/*
 
+!ucd/auxiliary/GraphemeBreakProperty.txt
+!ucd/auxiliary/GraphemeBreakTest.txt
+!ucd/LineBreak.txt
+!ucd/auxiliary/LineBreakTest.txt
+!ucd/auxiliary/WordBreakProperty.txt
+!ucd/auxiliary/WordBreakTest.txt
 !ucd/BidiBrackets.txt
 !ucd/BidiCharacterTest.txt
-!ucd/auxiliary/GraphemeBreakTest.txt
-!ucd/auxiliary/LineBreakTest.txt
-!ucd/auxiliary/WordBreakTest.txt
+!ucd/emoji/emoji-data.txt

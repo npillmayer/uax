@@ -7,8 +7,7 @@ Generator for Unicode UAX#29 grapheme code-point classes.
 For more information see https://unicode.org/reports/tr29/.
 
 Classes are generated from a companion file: "GraphemeBreakProperty.txt".
-This is the definite source for UAX#29 code-point classes. The
-generator looks for it in a directory "$GOPATH/etc/".
+This is the definite source for UAX#29 code-point classes.
 
 
 Usage
@@ -33,15 +32,17 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"flag"
 	"fmt"
 	"log"
+	"os"
 	"runtime"
+	"strings"
 	"text/template"
 	"time"
 
-	"os"
-
+	"github.com/npillmayer/uax/internal/testdata"
 	"github.com/npillmayer/uax/internal/ucdparse"
 )
 
@@ -72,18 +73,12 @@ func loadUnicodeGraphemeBreakFile() (map[string][]rune, error) {
 		logger.Printf("reading GraphemeBreakProperty.txt")
 	}
 	defer timeTrack(time.Now(), "loading GraphemeBreakProperty.txt")
-	gopath := os.Getenv("GOPATH")
-	f, err := os.Open(gopath + "/etc/GraphemeBreakProperty.txt")
-	if err != nil {
-		fmt.Printf("ERROR loading " + gopath + "/etc/GraphemeBreakProperty.txt\n")
-		return nil, err
-	}
-	defer f.Close()
-	parser, err := ucdparse.New(f)
+
+	parser, err := ucdparse.New(bytes.NewReader(testdata.GraphemeBreakProperty))
 	runeranges := make(map[string][]rune, len(graphemeClassnames))
 	for parser.Next() {
 		from, to := parser.Token.Range()
-		clstr := parser.Token.Field(1)
+		clstr := strings.TrimSpace(parser.Token.Field(1))
 		list := runeranges[clstr]
 		for r := from; r <= to; r++ {
 			list = append(list, r)
@@ -211,7 +206,12 @@ func generateRanges(w *bufio.Writer, codePointLists map[string][]rune) {
 	w.WriteString("\nfunc setupGraphemeClasses() {\n")
 	w.WriteString("    rangeFromGraphemeClass = make([]*unicode.RangeTable, int(ZWJClass)+1)\n")
 	t := makeTemplate("Grapheme range", templateRangeForClass)
-	for key, codepoints := range codePointLists {
+	lastWriteOrder := []string{
+		"CR", "LF", "Extend", "Regional_Indicator", "L", "T", "Control",
+		"SpacingMark", "LV", "ZWJ", "Prepend", "V", "LVT",
+	}
+	for _, key := range lastWriteOrder {
+		codepoints := codePointLists[key]
 		w.WriteString(fmt.Sprintf("\n    // Range for Grapheme class %s\n", key))
 		w.WriteString(fmt.Sprintf("    %s = rangetable.New(", key))
 		checkFatal(t.Execute(w, codepoints))

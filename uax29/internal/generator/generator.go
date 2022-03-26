@@ -12,8 +12,7 @@ This is a generator for Unicode UAX#29 word breaking code-point classes.
 For more information see http://unicode.org/reports/tr29/
 
 Classes are generated from a UAX#29 companion file: "WordBreakProberty.txt".
-This is the definite source for UAX#29 code-point classes. The
-generator looks for it in a directory "$GOPATH/etc/".
+This is the definite source for UAX#29 code-point classes.
 
 
 Usage
@@ -38,15 +37,18 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"flag"
 	"fmt"
 	"log"
 	"runtime"
+	"strings"
 	"text/template"
 	"time"
 
 	"os"
 
+	"github.com/npillmayer/uax/internal/testdata"
 	"github.com/npillmayer/uax/internal/ucdparse"
 )
 
@@ -66,21 +68,15 @@ func loadUnicodeLineBreakFile() (map[string][]rune, error) {
 		logger.Printf("reading WordBreakProperty.txt")
 	}
 	defer timeTrack(time.Now(), "loading WordBreakProperty.txt")
-	gopath := os.Getenv("GOPATH")
-	f, err := os.Open(gopath + "/etc/WordBreakProperty.txt")
-	if err != nil {
-		fmt.Printf("ERROR loading " + gopath + "/etc/WordBreakProperty.txt\n")
-		return nil, err
-	}
-	defer f.Close()
-	p, err := ucdparse.New(f)
+
+	p, err := ucdparse.New(bytes.NewReader(testdata.WordBreakProperty))
 	if err != nil {
 		return nil, err
 	}
 	runeranges := make(map[string][]rune, len(uax29classnames))
 	for p.Next() {
 		from, to := p.Token.Range()
-		brclzstr := p.Token.Field(1)
+		brclzstr := strings.TrimSpace(p.Token.Field(1))
 		list := runeranges[brclzstr]
 		for r := from; r <= to; r++ {
 			list = append(list, r)
@@ -206,7 +202,19 @@ func generateRanges(w *bufio.Writer, codePointLists map[string][]rune) {
 	w.WriteString("\nfunc setupUAX29Classes() {\n")
 	w.WriteString("    rangeFromUAX29Class = make([]*unicode.RangeTable, int(ZWJClass)+1)\n")
 	t := makeTemplate("UAX#29 range", templateRangeForClass)
-	for key, codepoints := range codePointLists {
+
+	// use the same order as before so we can verify that generator works as before
+	lastWriteOrder := []string{
+		"CR", "ExtendNumLet", "LF", "Regional_Indicator", "Hebrew_Letter", "Numeric", "ZWJ",
+		"MidNum", "Extend", "Double_Quote", "ALetter", "WSegSpace", "Single_Quote", "Newline",
+		"Katakana", "MidLetter", "Format", "MidNumLet",
+	}
+
+	for _, key := range lastWriteOrder {
+		codepoints, ok := codePointLists[key]
+		if !ok {
+			panic("key missing: " + key)
+		}
 		w.WriteString(fmt.Sprintf("\n    // Range for UAX#29 class %s\n", key))
 		w.WriteString(fmt.Sprintf("    %s = rangetable.New(", key))
 		checkFatal(t.Execute(w, codepoints))

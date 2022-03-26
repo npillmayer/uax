@@ -7,7 +7,6 @@ Generator for Unicode Emoji code-point classes. For more information
 see http://www.unicode.org/reports/tr51/#Emoji_Properties_and_Data_Files
 
 Classes are generated from a companion file: "emoji-data.txt".
-The generator looks for it in a directory "$GOPATH/etc/".
 
 
 Usage
@@ -32,15 +31,18 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"flag"
 	"fmt"
 	"log"
 	"runtime"
+	"strings"
 	"text/template"
 	"time"
 
 	"os"
 
+	"github.com/npillmayer/uax/internal/testdata"
 	"github.com/npillmayer/uax/internal/ucdparse"
 )
 
@@ -64,21 +66,15 @@ func loadUnicodeEmojiBreakFile() (map[string][]rune, error) {
 		logger.Printf("reading EmojiBreakProperty.txt")
 	}
 	defer timeTrack(time.Now(), "loading emoji-data.txt")
-	gopath := os.Getenv("GOPATH")
-	f, err := os.Open(gopath + "/etc/emoji-data.txt")
-	if err != nil {
-		fmt.Printf("ERROR loading " + gopath + "/etc/emoji-data.txt\n")
-		return nil, err
-	}
-	defer f.Close()
-	parser, err := ucdparse.New(f)
+
+	parser, err := ucdparse.New(bytes.NewReader(testdata.EmojiBreakProperty))
 	if err != nil {
 		return nil, err
 	}
 	runeranges := make(map[string][]rune, len(emojiClassnames))
 	for parser.Next() {
 		from, to := parser.Token.Range()
-		clstr := parser.Token.Field(1)
+		clstr := strings.TrimSpace(parser.Token.Field(1))
 		list := runeranges[clstr]
 		for r := from; r <= to; r++ {
 			list = append(list, r)
@@ -196,7 +192,18 @@ func generateRanges(w *bufio.Writer, codePointLists map[string][]rune) {
 	w.WriteString("\nfunc setupEmojisClasses() {\n")
 	w.WriteString("    rangeFromEmojisClass = make([]*unicode.RangeTable, int(Extended_PictographicClass)+1)\n")
 	t := makeTemplate("Emoji range", templateRangeForClass)
-	for key, codepoints := range codePointLists {
+
+	lastWriteOrder := []string{
+		"Emoji",
+		"Emoji_Presentation",
+		"Emoji_Modifier",
+		"Emoji_Modifier_Base",
+		"Emoji_Component",
+		"Extended_Pictographic",
+	}
+
+	for _, key := range lastWriteOrder {
+		codepoints := codePointLists[key]
 		w.WriteString(fmt.Sprintf("\n    // Range for Emoji class %s\n", key))
 		w.WriteString(fmt.Sprintf("    %s = rangetable.New(", key))
 		checkFatal(t.Execute(w, codepoints))

@@ -6,8 +6,7 @@ UAX#14 is about line break/wrap. For more information see
 http://unicode.org/reports/tr14/
 
 Classes are generated from a UAX#14 companion file: "LineBreak.txt".
-This is the definite source for UAX#14 code-point classes. The
-generator looks for it in a directory "$GOPATH/etc/".
+This is the definite source for UAX#14 code-point classes.
 
 
 Usage
@@ -32,6 +31,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"flag"
 	"fmt"
 	"log"
@@ -41,6 +41,7 @@ import (
 
 	"os"
 
+	"github.com/npillmayer/uax/internal/testdata"
 	"github.com/npillmayer/uax/internal/ucdparse"
 )
 
@@ -60,14 +61,8 @@ func loadUnicodeLineBreakFile() (map[string][]rune, error) {
 		logger.Printf("reading LineBreak.txt")
 	}
 	defer timeTrack(time.Now(), "loading LineBreak.txt")
-	gopath := os.Getenv("GOPATH")
-	f, err := os.Open(gopath + "/etc/LineBreak.txt")
-	if err != nil {
-		fmt.Printf("ERROR loading " + gopath + "/etc/LineBreak.txt\n")
-		return nil, err
-	}
-	defer f.Close()
-	p, err := ucdparse.New(f)
+
+	p, err := ucdparse.New(bytes.NewReader(testdata.LineBreak))
 	if err != nil {
 		return nil, err
 	}
@@ -196,7 +191,22 @@ func generateRanges(w *bufio.Writer, codePointLists map[string][]rune) {
 	w.WriteString("\nfunc setupUAX14Classes() {\n")
 	w.WriteString("    rangeFromUAX14Class = make([]*unicode.RangeTable, int(ZWJClass)+1)\n")
 	t := makeTemplate("UAX#14 range", templateRangeForClass)
-	for key, codepoints := range codePointLists {
+
+	// use the same order as before so we can verify that generator works as before
+	lastWriteOrder := []string{
+		"BA", "HY", "NU", "BK", "WJ", "B2", "AL", "JL", "CJ", "XX", "H2", "CB",
+		"NL", "OP", "HL", "CL", "QU", "ZWJ", "H3", "BB", "PO", "CM", "ZW", "IN",
+		"AI", "EX", "SA", "RI", "PR", "SG", "JV", "IS", "LF", "EM", "JT", "SY",
+		"GL", "EB", "SP", "CP", "NS", "ID", "CR",
+	}
+	// keys := []string{}
+	// for key := range codePointLists {
+	// 	keys = append(keys, key)
+	// }
+	// sort.Strings(keys)
+
+	for _, key := range lastWriteOrder {
+		codepoints := codePointLists[key]
 		w.WriteString(fmt.Sprintf("\n    // Range for UAX#14 class %s\n", key))
 		w.WriteString(fmt.Sprintf("    %s = rangetable.New(", key))
 		checkFatal(t.Execute(w, codepoints))
