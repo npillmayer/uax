@@ -50,13 +50,14 @@ Copyright © 2021 Norbert Pillmayer <norbert@pillmayer.com>
 package uax29
 
 import (
-	"sync"
 	"unicode"
 
 	"github.com/npillmayer/uax"
 	"github.com/npillmayer/uax/emoji"
 	"github.com/npillmayer/uax/internal/tracing"
 )
+
+//go:generate go run ./internal/gen
 
 // ClassForRune gets the Unicode #UAX29 word class for a Unicode code-point.
 func ClassForRune(r rune) UAX29Class {
@@ -72,8 +73,6 @@ func ClassForRune(r rune) UAX29Class {
 	return Other
 }
 
-var setupOnce sync.Once
-
 // SetupUAX29Classes is the top-level preparation function:
 // Create code-point classes for word breaking.
 // Will in turn set up emoji classes as well.
@@ -81,7 +80,6 @@ var setupOnce sync.Once
 //
 // The word breaker will call this transparently if it has not been called beforehand.
 func SetupUAX29Classes() {
-	setupOnce.Do(setupUAX29Classes)
 	emoji.SetupEmojisClasses()
 }
 
