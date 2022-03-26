@@ -58,18 +58,13 @@ package uax14
 
 import (
 	"math"
-	"sync"
 	"unicode"
 
 	"github.com/npillmayer/uax"
 	"github.com/npillmayer/uax/internal/tracing"
 )
 
-const (
-	sot       UAX14Class = 1000 // pseudo class
-	eot       UAX14Class = 1001 // pseudo class
-	optSpaces UAX14Class = 1002 // pseudo class
-)
+//go:generate go run ./internal/gen
 
 // ClassForRune gets the line breaking/wrap class for a Unicode code-point
 func ClassForRune(r rune) UAX14Class {
@@ -85,15 +80,6 @@ func ClassForRune(r rune) UAX14Class {
 		}
 	}
 	return XXClass
-}
-
-var setupOnce sync.Once
-
-// SetupClasses is the top-level preparation function:
-// Create code-point classes for UAX#14 line breaking/wrap.
-// (Concurrency-safe).
-func SetupClasses() {
-	setupOnce.Do(setupUAX14Classes)
 }
 
 // === UAX#14 Line Breaker ==============================================
@@ -167,7 +153,6 @@ func NewLineWrap() *LineWrap {
 	if rangeFromUAX14Class == nil {
 		tracing.Infof("UAX#14 classes not yet initialized -> initializing")
 	}
-	SetupClasses()
 	uax14.lastClass = sot
 	return uax14
 }
