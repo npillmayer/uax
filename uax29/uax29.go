@@ -22,16 +22,6 @@ breaking engine for a segmenter.
   segmenter.Init(...)
   for segmenter.Next() ...
 
-Attention
-
-Before using word breakers, clients usually should initialize the classes and rules:
-
-  SetupUAX29Classes()
-
-This initializes all the code-point range tables. Initialization is
-not done beforehand, as it consumes quite some memory. However, the
-word breaker will call it if range tables are not yet initialized.
-
 ______________________________________________________________________
 
 License
@@ -71,16 +61,6 @@ func ClassForRune(r rune) UAX29Class {
 		}
 	}
 	return Other
-}
-
-// SetupUAX29Classes is the top-level preparation function:
-// Create code-point classes for word breaking.
-// Will in turn set up emoji classes as well.
-// (Concurrency-safe).
-//
-// The word breaker will call this transparently if it has not been called beforehand.
-func SetupUAX29Classes() {
-	emoji.SetupEmojisClasses()
 }
 
 // === Word Breaker ==============================================
@@ -131,7 +111,6 @@ func NewWordBreaker(weight int) *WordBreaker {
 	if rangeFromUAX29Class == nil {
 		tracing.Infof("UAX#29 classes not yet initialized -> initializing")
 	}
-	SetupUAX29Classes()
 	return gb
 }
 

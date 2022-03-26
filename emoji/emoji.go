@@ -25,9 +25,10 @@ not done beforehand, as it consumes quite some memory. */
 package emoji
 
 import (
-	"sync"
 	"unicode"
 )
+
+//go:generate go run ./internal/gen
 
 // EmojisClassForRune is the top-level client function:
 // Get the emoji class for a Unicode code-point
@@ -40,13 +41,4 @@ func EmojisClassForRune(r rune) EmojisClass {
 		}
 	}
 	return -1
-}
-
-var setupOnce sync.Once
-
-// SetupEmojisClasses is the top-level preparation function:
-// Create code-point classes for emojis.
-// (Concurrency-safe).
-func SetupEmojisClasses() {
-	setupOnce.Do(setupEmojisClasses)
 }

@@ -66,7 +66,6 @@ var setupOnce sync.Once
 // (Concurrency-safe).
 func SetupGraphemeClasses() {
 	setupOnce.Do(setupGraphemeClasses)
-	emoji.SetupEmojisClasses()
 }
 
 // === Grapheme Breaker ==============================================
