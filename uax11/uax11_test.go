@@ -70,8 +70,7 @@ func TestWidth(t *testing.T) {
 
 func TestContext(t *testing.T) {
 	tracing.SetTestingLog(t)
-	//
-	grapheme.SetupGraphemeClasses()
+
 	//context := &Context{Locale: "zh-uig"}
 	context := &Context{Locale: "zh-HK"}
 	_ = Width([]byte("世"), context)
@@ -81,8 +80,7 @@ func TestContext(t *testing.T) {
 
 func TestString(t *testing.T) {
 	tracing.SetTestingLog(t)
-	//
-	grapheme.SetupGraphemeClasses()
+
 	input := "A (世). "
 	buf := make([]byte, 10)
 	len := utf8.EncodeRune(buf, 0x1f600)
@@ -99,8 +97,7 @@ func TestString(t *testing.T) {
 
 func TestScripts(t *testing.T) {
 	tracing.SetTestingLog(t)
-	//
-	grapheme.SetupGraphemeClasses()
+
 	input := []struct {
 		S    string
 		N, W int

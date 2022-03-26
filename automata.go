@@ -128,7 +128,7 @@ func (rec *Recognizer) MatchLength() int {
 
 // RuneEvent is part  of interface RuneSubscriber.
 func (rec *Recognizer) RuneEvent(r rune, codePointClass int) []int {
-	//fmt.Printf("received rune event: %+q / %d\n", r, codePointClass)
+	//fmt.Printf("received rune event: %x / %d\n", r, codePointClass)
 	var penalties []int
 	if rec.nextStep != nil {
 		//CT.Infof("  calling func = %v", rec.nextStep)

@@ -250,7 +250,7 @@ func substitueSomeClasses(c UAX14Class, lastClass UAX14Class) (UAX14Class, UAX14
 		}
 	}
 	if shadow != c {
-		tracing.Debugf("subst %+q -> %+q", shadow, c)
+		tracing.Debugf("subst %v -> %v", shadow, c)
 	}
 	return c, shadow
 }

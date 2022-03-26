@@ -72,7 +72,7 @@ func executeSingleTest(t *testing.T, seg *segment.Segmenter, tno int, in string,
 			t.Logf("test #%d: number of segments too large: %d > %d", tno, i+1, len(out))
 			ok = false
 		} else if out[i] != seg.Text() {
-			t.Logf("test #%d: '%+q' should be '%+q'", tno, seg.Bytes(), out[i])
+			t.Logf("test #%d: '%x' should be '%x'", tno, seg.Bytes(), out[i])
 			ok = false
 		}
 		i++

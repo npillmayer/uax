@@ -34,8 +34,6 @@ func TestRuneReader(t *testing.T) {
 func TestString(t *testing.T) {
 	tracing.SetTestingLog(t)
 	//
-	SetupGraphemeClasses()
-	//
 	input := "Hello World"
 	s := StringFromString(input)
 	if s == nil {
@@ -55,8 +53,6 @@ func TestString(t *testing.T) {
 
 func TestChineseString(t *testing.T) {
 	tracing.SetTestingLog(t)
-	//
-	SetupGraphemeClasses()
 	//
 	input := "世界"
 	s := StringFromString(input)

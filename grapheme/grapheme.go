@@ -36,13 +36,14 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 import (
-	"sync"
 	"unicode"
 
 	"github.com/npillmayer/uax"
 	"github.com/npillmayer/uax/emoji"
 	"github.com/npillmayer/uax/internal/tracing"
 )
+
+//go:generate go run ./internal/gen
 
 // ClassForRune gets the line grapheme class for a Unicode code-point.
 func ClassForRune(r rune) GraphemeClass {
@@ -56,16 +57,6 @@ func ClassForRune(r rune) GraphemeClass {
 		}
 	}
 	return Any
-}
-
-var setupOnce sync.Once
-
-// SetupGraphemeClasses is the top-level preparation function:
-// Create code-point classes for grapheme breaking.
-// Will in turn set up emoji classes as well.
-// (Concurrency-safe).
-func SetupGraphemeClasses() {
-	setupOnce.Do(setupGraphemeClasses)
 }
 
 // === Grapheme Breaker ==============================================
@@ -171,7 +162,7 @@ func (gb *Breaker) unblock(c GraphemeClass) {
 // (Interface uax.UnicodeBreaker)
 func (gb *Breaker) ProceedWithRune(r rune, cpClass int) {
 	c := GraphemeClass(cpClass)
-	tracing.P("class", c).Debugf("proceeding with rune %+q", r)
+	tracing.P("class", c).Debugf("proceeding with rune %x", r)
 	gb.longestMatch, gb.penalties = gb.publisher.PublishRuneEvent(r, int(c))
 	tracing.P("class", c).Debugf("...done with |match|=%d and %v", gb.longestMatch, gb.penalties)
 	/*
