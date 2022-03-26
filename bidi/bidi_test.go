@@ -2,12 +2,13 @@ package bidi
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"log"
-	"os"
 	"strings"
 	"testing"
 
+	"github.com/npillmayer/uax/internal/testdata"
 	"github.com/npillmayer/uax/internal/tracing"
 	"golang.org/x/text/unicode/bidi"
 )
@@ -494,12 +495,6 @@ func TestOrderCar3(t *testing.T) {
 	}
 }
 
-func NoTestUAXFile(t *testing.T) {
-	tracing.SetTestingLog(t)
-	//
-	readBidiTests("./uaxbiditest/BidiCharacterTest.txt")
-}
-
 func TestTest(t *testing.T) {
 	input := "he said “<car MEANS CAR=.” “<IT DOES=,” she agreed."
 	s := []byte(input[:11])
@@ -549,14 +544,11 @@ func display(b []byte) string {
 
 const batchsize = 1
 
-func readBidiTests(path string) {
-	file, err := os.Open(path)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer file.Close()
+func NoTestUAXFile(t *testing.T) {
+	tracing.SetTestingLog(t)
+	//
 
-	scanner := bufio.NewScanner(file)
+	scanner := bufio.NewScanner(bytes.NewReader(testdata.BidiCharacterTest))
 	header := true
 	cnt := batchsize
 	for cnt > 0 && scanner.Scan() {

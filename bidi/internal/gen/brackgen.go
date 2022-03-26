@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"io"
@@ -8,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/npillmayer/uax/internal/testdata"
 	"github.com/npillmayer/uax/internal/ucdparse"
 )
 
@@ -50,15 +52,11 @@ type bracketPair struct {
 }
 
 func readBrackets() []bracketPair {
-	file, err := os.Open("./BidiBrackets.txt")
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-	defer file.Close()
+	file := bytes.NewReader(testdata.BidiBrackets)
+
 	Infof("Found file BidiBrackets.txt ...")
 	bracketList := make([]bracketPair, 0, 65)
-	err = ucdparse.Parse(file, func(t *ucdparse.Token) {
+	err := ucdparse.Parse(file, func(t *ucdparse.Token) {
 		if typ := strings.TrimSpace(t.Field(2)); typ != "o" {
 			return
 		}

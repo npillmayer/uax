@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -30,6 +31,12 @@ func OpenTestFile(filename string, t *testing.T) *ucdTestFile {
 	tf := &ucdTestFile{}
 	tf.in = f
 	tf.scanner = bufio.NewScanner(f)
+	return tf
+}
+
+func OpenTestReader(r io.Reader) *ucdTestFile {
+	tf := &ucdTestFile{}
+	tf.scanner = bufio.NewScanner(r)
 	return tf
 }
 
@@ -71,7 +78,9 @@ func (tf *ucdTestFile) Err() error {
 }
 
 func (tf *ucdTestFile) Close() {
-	tf.in.Close()
+	if tf.in != nil {
+		tf.in.Close()
+	}
 }
 
 func BreakTestInput(ti string) (string, []string) {

@@ -1,0 +1,9 @@
+ucd/**
+!ucd/auxiliary
+ucd/auxiliary/*
+
+!ucd/BidiBrackets.txt
+!ucd/BidiCharacterTest.txt
+!ucd/auxiliary/GraphemeBreakTest.txt
+!ucd/auxiliary/LineBreakTest.txt
+!ucd/auxiliary/WordBreakTest.txt

@@ -3,12 +3,12 @@ package grapheme
 import (
 	"bufio"
 	"bytes"
-	"os"
 	"strconv"
 	"strings"
 	"testing"
 	"unicode"
 
+	"github.com/npillmayer/uax/internal/testdata"
 	"github.com/npillmayer/uax/internal/tracing"
 	"github.com/npillmayer/uax/segment"
 )
@@ -81,18 +81,9 @@ func TestGraphemesTestFile(t *testing.T) {
 	onGraphemes := NewBreaker(5)
 	seg := segment.NewSegmenter(onGraphemes)
 	//seg.BreakOnZero(true, false)
-	//gopath := os.Getenv("GOPATH")
-	//f, err := os.Open(gopath + "/etc/GraphemeBreakTest.txt")
-	//f, err := os.Open(gopath + "/etc/GraphemeBreakTest.txt")
-	f, err := os.Open("./testfile/GraphemeBreakTest.txt")
-	if err != nil {
-		//t.Errorf("ERROR loading " + gopath + "/etc/GraphemeBreakTest.txt\n")
-		t.Errorf("ERROR loading ./testfile/GraphemeBreakTest.txt\n")
-	}
-	defer f.Close()
 	//failcnt, i, from, to := 0, 0, 1, 1000
 	failcnt, i, from, to := 0, 0, 1, 1000
-	scan := bufio.NewScanner(f)
+	scan := bufio.NewScanner(bytes.NewReader(testdata.GraphemeBreakTest))
 	for scan.Scan() {
 		line := scan.Text()
 		line = strings.TrimSpace(line)

@@ -1,9 +1,11 @@
 package uax14_test
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 
+	"github.com/npillmayer/uax/internal/testdata"
 	"github.com/npillmayer/uax/internal/tracing"
 	"github.com/npillmayer/uax/internal/ucdparse"
 	"github.com/npillmayer/uax/segment"
@@ -32,7 +34,7 @@ func TestWordBreakTestFile(t *testing.T) {
 	//
 	linewrap := uax14.NewLineWrap()
 	seg := segment.NewSegmenter(linewrap)
-	tf := ucdparse.OpenTestFile("./LineBreakTest.txt", t)
+	tf := ucdparse.OpenTestReader(bytes.NewReader(testdata.LineBreakTest))
 	defer tf.Close()
 	//failcnt, i, from, to := 0, 0, 6263, 7000
 	failcnt, i, from, to := 0, 0, 0, 7000
