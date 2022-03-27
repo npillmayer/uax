@@ -30,15 +30,14 @@ import (
 
 //go:generate go run ./internal/gen
 
-// EmojisClassForRune is the top-level client function:
+// ClassForRune is the top-level client function:
 // Get the emoji class for a Unicode code-point
 // Will return -1 if the code-point has no emoji-class.
-func EmojisClassForRune(r rune) EmojisClass {
-	for c := EmojisClass(0); c <= Extended_PictographicClass; c++ {
-		urange := rangeFromEmojisClass[c]
-		if urange != nil && unicode.Is(urange, r) {
-			return c
+func ClassForRune(r rune) Class {
+	for class, rt := range rangeFromClass {
+		if unicode.Is(rt, r) {
+			return Class(class)
 		}
 	}
-	return -1
+	return Other
 }

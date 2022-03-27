@@ -68,7 +68,7 @@ func StringWidth(s grapheme.String, context *Context) int {
 func graphemeWidth(grphm []byte, context *Context) int {
 	r, _ := utf8.DecodeRune(grphm)
 	//T().Debugf("grapheme '%v' => rune %#U", grphm, r)
-	if emoji.EmojisClassForRune(r) >= 0 {
+	if emoji.ClassForRune(r) >= 0 {
 		//T().Debugf("%#U is emoji", r)
 		return 2
 	}
