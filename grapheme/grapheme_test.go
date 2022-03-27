@@ -72,12 +72,17 @@ func TestGraphemes2(t *testing.T) {
 func TestGraphemesTestFile(t *testing.T) {
 	tracing.SetTestingLog(t)
 
+	file, err := testdata.UCDReader("auxiliary/GraphemeBreakTest.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	onGraphemes := NewBreaker(5)
 	seg := segment.NewSegmenter(onGraphemes)
 	//seg.BreakOnZero(true, false)
 	//failcnt, i, from, to := 0, 0, 1, 1000
 	failcnt, i, from, to := 0, 0, 1, 1000
-	scan := bufio.NewScanner(bytes.NewReader(testdata.GraphemeBreakTest))
+	scan := bufio.NewScanner(file)
 	for scan.Scan() {
 		line := scan.Text()
 		line = strings.TrimSpace(line)

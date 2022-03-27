@@ -1,7 +1,6 @@
 package uax29_test
 
 import (
-	"bytes"
 	"fmt"
 	"strings"
 	"testing"
@@ -67,7 +66,13 @@ func TestWordBreakTestFile(t *testing.T) {
 	onWordBreak := uax29.NewWordBreaker(1)
 	seg := segment.NewSegmenter(onWordBreak)
 	//seg.BreakOnZero(true, false)
-	tf := ucdparse.OpenTestReader(bytes.NewReader(testdata.WordBreakTest))
+
+	file, err := testdata.UCDReader("auxiliary/WordBreakTest.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tf := ucdparse.OpenTestReader(file)
 	defer tf.Close()
 	failcnt, i, from, to := 0, 0, 1, 1900
 	for tf.Scan() {

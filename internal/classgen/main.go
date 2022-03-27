@@ -26,14 +26,13 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"path/filepath"
-	"runtime"
 	"sort"
 	"strings"
 	"text/template"
 	"unicode"
 	"unsafe"
 
+	"github.com/npillmayer/uax/internal/testdata"
 	"github.com/npillmayer/uax/internal/ucdparse"
 	"golang.org/x/text/unicode/rangetable"
 )
@@ -79,17 +78,8 @@ func main() {
 	checkFatal(err)
 }
 
-func ucdFromTestdata(ucdfile string) string {
-	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		panic("no debug info")
-	}
-
-	return filepath.Join(filepath.Dir(file), "..", "testdata", "ucd", ucdfile)
-}
-
 func parseRanges(ucdfile string, categoryField int) (map[string][]rune, error) {
-	ucddata, err := os.ReadFile(ucdFromTestdata(ucdfile))
+	ucddata, err := os.ReadFile(testdata.UCDPath(ucdfile))
 	if err != nil {
 		return nil, fmt.Errorf("failed to read %q: %w", ucdfile, err)
 	}

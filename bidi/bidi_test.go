@@ -2,7 +2,6 @@ package bidi
 
 import (
 	"bufio"
-	"bytes"
 	"fmt"
 	"log"
 	"strings"
@@ -546,9 +545,13 @@ const batchsize = 1
 
 func NoTestUAXFile(t *testing.T) {
 	tracing.SetTestingLog(t)
-	//
 
-	scanner := bufio.NewScanner(bytes.NewReader(testdata.BidiCharacterTest))
+	file, err := testdata.UCDReader("BidiCharacterTest.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scanner := bufio.NewScanner(file)
 	header := true
 	cnt := batchsize
 	for cnt > 0 && scanner.Scan() {
