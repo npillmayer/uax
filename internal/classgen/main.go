@@ -3,6 +3,8 @@ classgen is a tool for generating classes based on Unicode Character Data.
 
 classgen has the following flags:
 
+	-noclass          : disable `type Class` generation
+	-x <prefix>       : prefix to categories, used for table naming
     -f <n>            : field index of the character category
     -o <filename>     : output file (default tables.go)
     -u <filename>     : ucd data file name in ./internal/testdata/ucd
@@ -37,6 +39,8 @@ import (
 )
 
 func main() {
+	noClass := flag.Bool("noclass", false, "disable class generator")
+	prefix := flag.String("x", "", "prefix to categories, used for class and table naming")
 	categoryField := flag.Int("f", 2, "field position of category field, 1…n")
 	outName := flag.String("o", "tables.go", "name of output source file")
 	ucdFile := flag.String("u", "", "UCD filename")
@@ -59,10 +63,12 @@ func main() {
 
 	var w bytes.Buffer
 	terr := T.Execute(&w, map[string]interface{}{
-		"PackageName": os.Getenv("GOPACKAGE"),
-		"Classes":     classes,
-		"RangeTables": rangeTables,
-		"Codepoints":  codePointLists,
+		"GenerateClass": !*noClass,
+		"Prefix":        *prefix,
+		"PackageName":   os.Getenv("GOPACKAGE"),
+		"Classes":       classes,
+		"RangeTables":   rangeTables,
+		"Codepoints":    codePointLists,
 	})
 	checkFatal(terr)
 
@@ -122,7 +128,7 @@ var T = template.Must(template.New("").Funcs(template.FuncMap{
 		sz := int(unsafe.Sizeof(*rt))
 		sz += int(unsafe.Sizeof(rt.R16[0])) * len(rt.R16)
 		sz += int(unsafe.Sizeof(rt.R32[0])) * len(rt.R32)
-		return fmt.Sprintf("size %d bytes (%d KiB)", sz, sz/1024)
+		return fmt.Sprintf("size %d bytes (%.2f KiB)", sz, float64(sz)/1024)
 	},
 	"pretty": func(rt *unicode.RangeTable) string {
 		s := "&unicode.RangeTable{\n"
@@ -153,55 +159,57 @@ var T = template.Must(template.New("").Funcs(template.FuncMap{
 // BSD License, Copyright (c) 2018, Norbert Pillmayer (norbert@pillmayer.com)
 
 import (
-    "strconv"
+    {{ if .GenerateClass }}"strconv"{{ end }}
     "unicode"
 )
-
-// Class for {{.PackageName}}.
+{{ $prefix := .Prefix }}
+{{ if .GenerateClass }}
+// {{.Prefix}}Class for {{.PackageName}}.
 // Must be convertable to int.
-type Class int
+type {{$prefix}}Class int
 
 const (
 {{ range $i, $class := .Classes }}
-	{{$class}}Class Class = {{$i}}
+	{{$class}}{{$prefix}}Class {{$prefix}}Class = {{$i}}
 {{- end }}
 
-	Other Class = -1 // pseudo class for any other
-	sot   Class = -2 // pseudo class "start of text"
-	eot   Class = -3 // pseudo class "end of text"
+	{{$prefix}}Other {{$prefix}}Class = -1 // pseudo class for any other
+	{{$prefix}}sot   {{$prefix}}Class = -2 // pseudo class "start of text"
+	{{$prefix}}eot   {{$prefix}}Class = -3 // pseudo class "end of text"
 )
+
+// String returns the Class name.
+func (c {{$prefix}}Class) String() string {
+	switch c {
+	case {{$prefix}}Other: return "Other"
+	case {{$prefix}}sot: return "sot"
+	case {{$prefix}}eot: return "eot"
+	default:
+		return "{{$prefix}}Class(" + strconv.Itoa(int(c)) + ")"
+{{- range $i, $class := .Classes }}
+	case {{$class}}{{$prefix}}Class: return "{{ $class }}Class"
+{{- end }}
+	}
+}
+
+var rangeFrom{{$prefix}}Class = []*unicode.RangeTable{
+{{- range $i, $class := .Classes }}
+	{{$class}}{{$prefix}}Class: {{$class}},
+{{- end }}
+}
+{{ end }}
 
 // Range tables for {{.PackageName}} classes.
 // Clients can check with unicode.Is(..., rune)
 var (
 {{ range $i, $class := .Classes }}
-	{{$class}} = _{{$class}}
+	{{$prefix}}{{$class}} = _{{$prefix}}{{$class}}
 {{- end }}
 )
 
-// String returns the Class name.
-func (c Class) String() string {
-	switch c {
-	case Other: return "Other"
-	case sot: return "sot"
-	case eot: return "eot"
-	default:
-		return "Class(" + strconv.Itoa(int(c)) + ")"
-{{- range $i, $class := .Classes }}
-	case {{$class}}Class: return "{{ $class }}Class"
-{{- end }}
-	}
-}
-
-var rangeFromClass = []*unicode.RangeTable{
-{{- range $i, $class := .Classes }}
-	{{$class}}Class: {{$class}},
-{{- end }}
-}
-
 {{ range $class, $rt := .RangeTables }}
 // {{ size $rt }}
-var _{{ $class }} = {{ pretty $rt }}
+var _{{$prefix}}{{ $class }} = {{ pretty $rt }}
 {{ end }}
 `))
 

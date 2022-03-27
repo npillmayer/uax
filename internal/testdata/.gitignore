@@ -13,3 +13,6 @@ ucd/emoji/*
 !ucd/BidiBrackets.txt
 !ucd/BidiCharacterTest.txt
 !ucd/emoji/emoji-data.txt
+!ucd/ArabicShaping.txt
+!ucd/IndicPositionalCategory.txt
+!ucd/IndicSyllabicCategory.txt

@@ -38,29 +38,6 @@ const (
 	eot   Class = -3 // pseudo class "end of text"
 )
 
-// Range tables for uax29 classes.
-// Clients can check with unicode.Is(..., rune)
-var (
-	ALetter            = _ALetter
-	CR                 = _CR
-	Double_Quote       = _Double_Quote
-	Extend             = _Extend
-	ExtendNumLet       = _ExtendNumLet
-	Format             = _Format
-	Hebrew_Letter      = _Hebrew_Letter
-	Katakana           = _Katakana
-	LF                 = _LF
-	MidLetter          = _MidLetter
-	MidNum             = _MidNum
-	MidNumLet          = _MidNumLet
-	Newline            = _Newline
-	Numeric            = _Numeric
-	Regional_Indicator = _Regional_Indicator
-	Single_Quote       = _Single_Quote
-	WSegSpace          = _WSegSpace
-	ZWJ                = _ZWJ
-)
-
 // String returns the Class name.
 func (c Class) String() string {
 	switch c {
@@ -132,7 +109,30 @@ var rangeFromClass = []*unicode.RangeTable{
 	ZWJClass:                ZWJ,
 }
 
-// size 4172 bytes (4 KiB)
+// Range tables for uax29 classes.
+// Clients can check with unicode.Is(..., rune)
+var (
+	ALetter            = _ALetter
+	CR                 = _CR
+	Double_Quote       = _Double_Quote
+	Extend             = _Extend
+	ExtendNumLet       = _ExtendNumLet
+	Format             = _Format
+	Hebrew_Letter      = _Hebrew_Letter
+	Katakana           = _Katakana
+	LF                 = _LF
+	MidLetter          = _MidLetter
+	MidNum             = _MidNum
+	MidNumLet          = _MidNumLet
+	Newline            = _Newline
+	Numeric            = _Numeric
+	Regional_Indicator = _Regional_Indicator
+	Single_Quote       = _Single_Quote
+	WSegSpace          = _WSegSpace
+	ZWJ                = _ZWJ
+)
+
+// size 4172 bytes (4.07 KiB)
 var _ALetter = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x41, 0x5a, 1},
@@ -631,7 +631,7 @@ var _ALetter = &unicode.RangeTable{
 	LatinOffset: 6,
 }
 
-// size 62 bytes (0 KiB)
+// size 62 bytes (0.06 KiB)
 var _CR = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0xd, 0xd, 1},
@@ -639,7 +639,7 @@ var _CR = &unicode.RangeTable{
 	LatinOffset: 1,
 }
 
-// size 62 bytes (0 KiB)
+// size 62 bytes (0.06 KiB)
 var _Double_Quote = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x22, 0x22, 1},
@@ -647,7 +647,7 @@ var _Double_Quote = &unicode.RangeTable{
 	LatinOffset: 1,
 }
 
-// size 2204 bytes (2 KiB)
+// size 2204 bytes (2.15 KiB)
 var _Extend = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x300, 0x36f, 1},
@@ -925,7 +925,7 @@ var _Extend = &unicode.RangeTable{
 	},
 }
 
-// size 92 bytes (0 KiB)
+// size 92 bytes (0.09 KiB)
 var _ExtendNumLet = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x5f, 0x202f, 8144},
@@ -937,7 +937,7 @@ var _ExtendNumLet = &unicode.RangeTable{
 	},
 }
 
-// size 170 bytes (0 KiB)
+// size 170 bytes (0.17 KiB)
 var _Format = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0xad, 0x600, 1363},
@@ -960,7 +960,7 @@ var _Format = &unicode.RangeTable{
 	},
 }
 
-// size 116 bytes (0 KiB)
+// size 116 bytes (0.11 KiB)
 var _Hebrew_Letter = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x5d0, 0x5ea, 1},
@@ -976,7 +976,7 @@ var _Hebrew_Letter = &unicode.RangeTable{
 	},
 }
 
-// size 116 bytes (0 KiB)
+// size 116 bytes (0.11 KiB)
 var _Katakana = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x3031, 0x3035, 1},
@@ -993,7 +993,7 @@ var _Katakana = &unicode.RangeTable{
 	},
 }
 
-// size 62 bytes (0 KiB)
+// size 62 bytes (0.06 KiB)
 var _LF = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0xa, 0xa, 1},
@@ -1001,7 +1001,7 @@ var _LF = &unicode.RangeTable{
 	LatinOffset: 1,
 }
 
-// size 80 bytes (0 KiB)
+// size 80 bytes (0.08 KiB)
 var _MidLetter = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x3a, 0xb7, 125},
@@ -1012,7 +1012,7 @@ var _MidLetter = &unicode.RangeTable{
 	LatinOffset: 1,
 }
 
-// size 104 bytes (0 KiB)
+// size 104 bytes (0.10 KiB)
 var _MidNum = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x2c, 0x3b, 15},
@@ -1027,7 +1027,7 @@ var _MidNum = &unicode.RangeTable{
 	LatinOffset: 1,
 }
 
-// size 80 bytes (0 KiB)
+// size 80 bytes (0.08 KiB)
 var _MidNumLet = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x2e, 0x2018, 8170},
@@ -1037,7 +1037,7 @@ var _MidNumLet = &unicode.RangeTable{
 	},
 }
 
-// size 74 bytes (0 KiB)
+// size 74 bytes (0.07 KiB)
 var _Newline = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0xb, 0xc, 1},
@@ -1047,7 +1047,7 @@ var _Newline = &unicode.RangeTable{
 	LatinOffset: 1,
 }
 
-// size 518 bytes (0 KiB)
+// size 518 bytes (0.51 KiB)
 var _Numeric = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x30, 0x39, 1},
@@ -1113,14 +1113,14 @@ var _Numeric = &unicode.RangeTable{
 	LatinOffset: 1,
 }
 
-// size 68 bytes (0 KiB)
+// size 68 bytes (0.07 KiB)
 var _Regional_Indicator = &unicode.RangeTable{
 	R32: []unicode.Range32{
 		{0x1f1e6, 0x1f1ff, 1},
 	},
 }
 
-// size 62 bytes (0 KiB)
+// size 62 bytes (0.06 KiB)
 var _Single_Quote = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x27, 0x27, 1},
@@ -1128,7 +1128,7 @@ var _Single_Quote = &unicode.RangeTable{
 	LatinOffset: 1,
 }
 
-// size 80 bytes (0 KiB)
+// size 80 bytes (0.08 KiB)
 var _WSegSpace = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x20, 0x1680, 5728},
@@ -1138,7 +1138,7 @@ var _WSegSpace = &unicode.RangeTable{
 	},
 }
 
-// size 62 bytes (0 KiB)
+// size 62 bytes (0.06 KiB)
 var _ZWJ = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x200d, 0x200d, 1},

@@ -26,17 +26,6 @@ const (
 	eot   Class = -3 // pseudo class "end of text"
 )
 
-// Range tables for emoji classes.
-// Clients can check with unicode.Is(..., rune)
-var (
-	Emoji                 = _Emoji
-	Emoji_Component       = _Emoji_Component
-	Emoji_Modifier        = _Emoji_Modifier
-	Emoji_Modifier_Base   = _Emoji_Modifier_Base
-	Emoji_Presentation    = _Emoji_Presentation
-	Extended_Pictographic = _Extended_Pictographic
-)
-
 // String returns the Class name.
 func (c Class) String() string {
 	switch c {
@@ -72,7 +61,18 @@ var rangeFromClass = []*unicode.RangeTable{
 	Extended_PictographicClass: Extended_Pictographic,
 }
 
-// size 1118 bytes (1 KiB)
+// Range tables for emoji classes.
+// Clients can check with unicode.Is(..., rune)
+var (
+	Emoji                 = _Emoji
+	Emoji_Component       = _Emoji_Component
+	Emoji_Modifier        = _Emoji_Modifier
+	Emoji_Modifier_Base   = _Emoji_Modifier_Base
+	Emoji_Presentation    = _Emoji_Presentation
+	Extended_Pictographic = _Extended_Pictographic
+)
+
+// size 1118 bytes (1.09 KiB)
 var _Emoji = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x23, 0x2a, 7},
@@ -202,7 +202,7 @@ var _Emoji = &unicode.RangeTable{
 	LatinOffset: 3,
 }
 
-// size 128 bytes (0 KiB)
+// size 128 bytes (0.12 KiB)
 var _Emoji_Component = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x23, 0x2a, 7},
@@ -219,14 +219,14 @@ var _Emoji_Component = &unicode.RangeTable{
 	LatinOffset: 2,
 }
 
-// size 68 bytes (0 KiB)
+// size 68 bytes (0.07 KiB)
 var _Emoji_Modifier = &unicode.RangeTable{
 	R32: []unicode.Range32{
 		{0x1f3fb, 0x1f3ff, 1},
 	},
 }
 
-// size 428 bytes (0 KiB)
+// size 428 bytes (0.42 KiB)
 var _Emoji_Modifier_Base = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x261d, 0x26f9, 220},
@@ -266,7 +266,7 @@ var _Emoji_Modifier_Base = &unicode.RangeTable{
 	},
 }
 
-// size 740 bytes (0 KiB)
+// size 740 bytes (0.72 KiB)
 var _Emoji_Presentation = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x231a, 0x231b, 1},
@@ -343,7 +343,7 @@ var _Emoji_Presentation = &unicode.RangeTable{
 	},
 }
 
-// size 596 bytes (0 KiB)
+// size 596 bytes (0.58 KiB)
 var _Extended_Pictographic = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0xa9, 0xae, 5},

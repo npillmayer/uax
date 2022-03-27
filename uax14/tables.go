@@ -63,54 +63,6 @@ const (
 	eot   Class = -3 // pseudo class "end of text"
 )
 
-// Range tables for uax14 classes.
-// Clients can check with unicode.Is(..., rune)
-var (
-	AI  = _AI
-	AL  = _AL
-	B2  = _B2
-	BA  = _BA
-	BB  = _BB
-	BK  = _BK
-	CB  = _CB
-	CJ  = _CJ
-	CL  = _CL
-	CM  = _CM
-	CP  = _CP
-	CR  = _CR
-	EB  = _EB
-	EM  = _EM
-	EX  = _EX
-	GL  = _GL
-	H2  = _H2
-	H3  = _H3
-	HL  = _HL
-	HY  = _HY
-	ID  = _ID
-	IN  = _IN
-	IS  = _IS
-	JL  = _JL
-	JT  = _JT
-	JV  = _JV
-	LF  = _LF
-	NL  = _NL
-	NS  = _NS
-	NU  = _NU
-	OP  = _OP
-	PO  = _PO
-	PR  = _PR
-	QU  = _QU
-	RI  = _RI
-	SA  = _SA
-	SG  = _SG
-	SP  = _SP
-	SY  = _SY
-	WJ  = _WJ
-	XX  = _XX
-	ZW  = _ZW
-	ZWJ = _ZWJ
-)
-
 // String returns the Class name.
 func (c Class) String() string {
 	switch c {
@@ -257,7 +209,55 @@ var rangeFromClass = []*unicode.RangeTable{
 	ZWJClass: ZWJ,
 }
 
-// size 620 bytes (0 KiB)
+// Range tables for uax14 classes.
+// Clients can check with unicode.Is(..., rune)
+var (
+	AI  = _AI
+	AL  = _AL
+	B2  = _B2
+	BA  = _BA
+	BB  = _BB
+	BK  = _BK
+	CB  = _CB
+	CJ  = _CJ
+	CL  = _CL
+	CM  = _CM
+	CP  = _CP
+	CR  = _CR
+	EB  = _EB
+	EM  = _EM
+	EX  = _EX
+	GL  = _GL
+	H2  = _H2
+	H3  = _H3
+	HL  = _HL
+	HY  = _HY
+	ID  = _ID
+	IN  = _IN
+	IS  = _IS
+	JL  = _JL
+	JT  = _JT
+	JV  = _JV
+	LF  = _LF
+	NL  = _NL
+	NS  = _NS
+	NU  = _NU
+	OP  = _OP
+	PO  = _PO
+	PR  = _PR
+	QU  = _QU
+	RI  = _RI
+	SA  = _SA
+	SG  = _SG
+	SP  = _SP
+	SY  = _SY
+	WJ  = _WJ
+	XX  = _XX
+	ZW  = _ZW
+	ZWJ = _ZWJ
+)
+
+// size 620 bytes (0.61 KiB)
 var _AI = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0xa7, 0xa8, 1},
@@ -356,7 +356,7 @@ var _AI = &unicode.RangeTable{
 	LatinOffset: 6,
 }
 
-// size 5768 bytes (5 KiB)
+// size 5768 bytes (5.63 KiB)
 var _AL = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x23, 0x26, 3},
@@ -1056,7 +1056,7 @@ var _AL = &unicode.RangeTable{
 	LatinOffset: 11,
 }
 
-// size 68 bytes (0 KiB)
+// size 68 bytes (0.07 KiB)
 var _B2 = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x2014, 0x2e3a, 3622},
@@ -1064,7 +1064,7 @@ var _B2 = &unicode.RangeTable{
 	},
 }
 
-// size 728 bytes (0 KiB)
+// size 728 bytes (0.71 KiB)
 var _BA = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x9, 0x7c, 115},
@@ -1153,7 +1153,7 @@ var _BA = &unicode.RangeTable{
 	LatinOffset: 1,
 }
 
-// size 188 bytes (0 KiB)
+// size 188 bytes (0.18 KiB)
 var _BB = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0xb4, 0x2c8, 532},
@@ -1177,7 +1177,7 @@ var _BB = &unicode.RangeTable{
 	},
 }
 
-// size 68 bytes (0 KiB)
+// size 68 bytes (0.07 KiB)
 var _BK = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0xb, 0xc, 1},
@@ -1186,14 +1186,14 @@ var _BK = &unicode.RangeTable{
 	LatinOffset: 1,
 }
 
-// size 62 bytes (0 KiB)
+// size 62 bytes (0.06 KiB)
 var _CB = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0xfffc, 0xfffc, 1},
 	},
 }
 
-// size 128 bytes (0 KiB)
+// size 128 bytes (0.12 KiB)
 var _CJ = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x3041, 0x3049, 2},
@@ -1211,7 +1211,7 @@ var _CJ = &unicode.RangeTable{
 	},
 }
 
-// size 266 bytes (0 KiB)
+// size 266 bytes (0.26 KiB)
 var _CL = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x7d, 0xf3b, 3774},
@@ -1250,7 +1250,7 @@ var _CL = &unicode.RangeTable{
 	},
 }
 
-// size 2102 bytes (2 KiB)
+// size 2102 bytes (2.05 KiB)
 var _CM = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x0, 0x8, 1},
@@ -1513,7 +1513,7 @@ var _CM = &unicode.RangeTable{
 	LatinOffset: 4,
 }
 
-// size 62 bytes (0 KiB)
+// size 62 bytes (0.06 KiB)
 var _CP = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x29, 0x5d, 52},
@@ -1521,7 +1521,7 @@ var _CP = &unicode.RangeTable{
 	LatinOffset: 1,
 }
 
-// size 62 bytes (0 KiB)
+// size 62 bytes (0.06 KiB)
 var _CR = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0xd, 0xd, 1},
@@ -1529,7 +1529,7 @@ var _CR = &unicode.RangeTable{
 	LatinOffset: 1,
 }
 
-// size 416 bytes (0 KiB)
+// size 416 bytes (0.41 KiB)
 var _EB = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x261d, 0x26f9, 220},
@@ -1568,14 +1568,14 @@ var _EB = &unicode.RangeTable{
 	},
 }
 
-// size 68 bytes (0 KiB)
+// size 68 bytes (0.07 KiB)
 var _EM = &unicode.RangeTable{
 	R32: []unicode.Range32{
 		{0x1f3fb, 0x1f3ff, 1},
 	},
 }
 
-// size 176 bytes (0 KiB)
+// size 176 bytes (0.17 KiB)
 var _EX = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x21, 0x3f, 30},
@@ -1602,7 +1602,7 @@ var _EX = &unicode.RangeTable{
 	LatinOffset: 1,
 }
 
-// size 98 bytes (0 KiB)
+// size 98 bytes (0.10 KiB)
 var _GL = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0xa0, 0x34f, 687},
@@ -1615,14 +1615,14 @@ var _GL = &unicode.RangeTable{
 	},
 }
 
-// size 62 bytes (0 KiB)
+// size 62 bytes (0.06 KiB)
 var _H2 = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0xac00, 0xd788, 28},
 	},
 }
 
-// size 2450 bytes (2 KiB)
+// size 2450 bytes (2.39 KiB)
 var _H3 = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0xac01, 0xac1b, 1},
@@ -2027,7 +2027,7 @@ var _H3 = &unicode.RangeTable{
 	},
 }
 
-// size 116 bytes (0 KiB)
+// size 116 bytes (0.11 KiB)
 var _HL = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x5d0, 0x5ea, 1},
@@ -2043,7 +2043,7 @@ var _HL = &unicode.RangeTable{
 	},
 }
 
-// size 62 bytes (0 KiB)
+// size 62 bytes (0.06 KiB)
 var _HY = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x2d, 0x2d, 1},
@@ -2051,7 +2051,7 @@ var _HY = &unicode.RangeTable{
 	LatinOffset: 1,
 }
 
-// size 1322 bytes (1 KiB)
+// size 1322 bytes (1.29 KiB)
 var _ID = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x231a, 0x231b, 1},
@@ -2207,7 +2207,7 @@ var _ID = &unicode.RangeTable{
 	},
 }
 
-// size 80 bytes (0 KiB)
+// size 80 bytes (0.08 KiB)
 var _IN = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x2024, 0x2026, 1},
@@ -2218,7 +2218,7 @@ var _IN = &unicode.RangeTable{
 	},
 }
 
-// size 98 bytes (0 KiB)
+// size 98 bytes (0.10 KiB)
 var _IS = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x2c, 0x2e, 2},
@@ -2232,7 +2232,7 @@ var _IS = &unicode.RangeTable{
 	LatinOffset: 2,
 }
 
-// size 68 bytes (0 KiB)
+// size 68 bytes (0.07 KiB)
 var _JL = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x1100, 0x115f, 1},
@@ -2240,7 +2240,7 @@ var _JL = &unicode.RangeTable{
 	},
 }
 
-// size 68 bytes (0 KiB)
+// size 68 bytes (0.07 KiB)
 var _JT = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x11a8, 0x11ff, 1},
@@ -2248,7 +2248,7 @@ var _JT = &unicode.RangeTable{
 	},
 }
 
-// size 68 bytes (0 KiB)
+// size 68 bytes (0.07 KiB)
 var _JV = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x1160, 0x11a7, 1},
@@ -2256,7 +2256,7 @@ var _JV = &unicode.RangeTable{
 	},
 }
 
-// size 62 bytes (0 KiB)
+// size 62 bytes (0.06 KiB)
 var _LF = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0xa, 0xa, 1},
@@ -2264,7 +2264,7 @@ var _LF = &unicode.RangeTable{
 	LatinOffset: 1,
 }
 
-// size 62 bytes (0 KiB)
+// size 62 bytes (0.06 KiB)
 var _NL = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x85, 0x85, 1},
@@ -2272,7 +2272,7 @@ var _NL = &unicode.RangeTable{
 	LatinOffset: 1,
 }
 
-// size 152 bytes (0 KiB)
+// size 152 bytes (0.15 KiB)
 var _NS = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x17d6, 0x203c, 2150},
@@ -2294,7 +2294,7 @@ var _NS = &unicode.RangeTable{
 	},
 }
 
-// size 518 bytes (0 KiB)
+// size 518 bytes (0.51 KiB)
 var _NU = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x30, 0x39, 1},
@@ -2360,7 +2360,7 @@ var _NU = &unicode.RangeTable{
 	LatinOffset: 1,
 }
 
-// size 260 bytes (0 KiB)
+// size 260 bytes (0.25 KiB)
 var _OP = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x28, 0x5b, 51},
@@ -2399,7 +2399,7 @@ var _OP = &unicode.RangeTable{
 	LatinOffset: 2,
 }
 
-// size 146 bytes (0 KiB)
+// size 146 bytes (0.14 KiB)
 var _PO = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x25, 0xa2, 125},
@@ -2422,7 +2422,7 @@ var _PO = &unicode.RangeTable{
 	LatinOffset: 1,
 }
 
-// size 158 bytes (0 KiB)
+// size 158 bytes (0.15 KiB)
 var _PR = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x24, 0x2b, 7},
@@ -2446,7 +2446,7 @@ var _PR = &unicode.RangeTable{
 	LatinOffset: 3,
 }
 
-// size 128 bytes (0 KiB)
+// size 128 bytes (0.12 KiB)
 var _QU = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x22, 0x27, 5},
@@ -2466,14 +2466,14 @@ var _QU = &unicode.RangeTable{
 	LatinOffset: 2,
 }
 
-// size 68 bytes (0 KiB)
+// size 68 bytes (0.07 KiB)
 var _RI = &unicode.RangeTable{
 	R32: []unicode.Range32{
 		{0x1f1e6, 0x1f1ff, 1},
 	},
 }
 
-// size 320 bytes (0 KiB)
+// size 320 bytes (0.31 KiB)
 var _SA = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0xe01, 0xe3a, 1},
@@ -2521,14 +2521,14 @@ var _SA = &unicode.RangeTable{
 	},
 }
 
-// size 62 bytes (0 KiB)
+// size 62 bytes (0.06 KiB)
 var _SG = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0xd800, 0xdfff, 1},
 	},
 }
 
-// size 62 bytes (0 KiB)
+// size 62 bytes (0.06 KiB)
 var _SP = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x20, 0x20, 1},
@@ -2536,7 +2536,7 @@ var _SP = &unicode.RangeTable{
 	LatinOffset: 1,
 }
 
-// size 62 bytes (0 KiB)
+// size 62 bytes (0.06 KiB)
 var _SY = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x2f, 0x2f, 1},
@@ -2544,14 +2544,14 @@ var _SY = &unicode.RangeTable{
 	LatinOffset: 1,
 }
 
-// size 62 bytes (0 KiB)
+// size 62 bytes (0.06 KiB)
 var _WJ = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x2060, 0xfeff, 56991},
 	},
 }
 
-// size 86 bytes (0 KiB)
+// size 86 bytes (0.08 KiB)
 var _XX = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0xe000, 0xf8ff, 1},
@@ -2562,14 +2562,14 @@ var _XX = &unicode.RangeTable{
 	},
 }
 
-// size 62 bytes (0 KiB)
+// size 62 bytes (0.06 KiB)
 var _ZW = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x200b, 0x200b, 1},
 	},
 }
 
-// size 62 bytes (0 KiB)
+// size 62 bytes (0.06 KiB)
 var _ZWJ = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x200d, 0x200d, 1},
