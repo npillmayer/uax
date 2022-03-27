@@ -11,56 +11,57 @@ import (
 
 // Type for UAX#14 code-point classes.
 // Must be convertable to int.
-type UAX14Class int
+type Class int
 
 // These are all the UAX#14 breaking classes.
 const (
-	AIClass  UAX14Class = 0
-	ALClass  UAX14Class = 1
-	B2Class  UAX14Class = 2
-	BAClass  UAX14Class = 3
-	BBClass  UAX14Class = 4
-	BKClass  UAX14Class = 5
-	CBClass  UAX14Class = 6
-	CJClass  UAX14Class = 7
-	CLClass  UAX14Class = 8
-	CMClass  UAX14Class = 9
-	CPClass  UAX14Class = 10
-	CRClass  UAX14Class = 11
-	EBClass  UAX14Class = 12
-	EMClass  UAX14Class = 13
-	EXClass  UAX14Class = 14
-	GLClass  UAX14Class = 15
-	H2Class  UAX14Class = 16
-	H3Class  UAX14Class = 17
-	HLClass  UAX14Class = 18
-	HYClass  UAX14Class = 19
-	IDClass  UAX14Class = 20
-	INClass  UAX14Class = 21
-	ISClass  UAX14Class = 22
-	JLClass  UAX14Class = 23
-	JTClass  UAX14Class = 24
-	JVClass  UAX14Class = 25
-	LFClass  UAX14Class = 26
-	NLClass  UAX14Class = 27
-	NSClass  UAX14Class = 28
-	NUClass  UAX14Class = 29
-	OPClass  UAX14Class = 30
-	POClass  UAX14Class = 31
-	PRClass  UAX14Class = 32
-	QUClass  UAX14Class = 33
-	RIClass  UAX14Class = 34
-	SAClass  UAX14Class = 35
-	SGClass  UAX14Class = 36
-	SPClass  UAX14Class = 37
-	SYClass  UAX14Class = 38
-	WJClass  UAX14Class = 39
-	XXClass  UAX14Class = 40
-	ZWClass  UAX14Class = 41
-	ZWJClass UAX14Class = 42
+	AIClass  Class = 0
+	ALClass  Class = 1
+	B2Class  Class = 2
+	BAClass  Class = 3
+	BBClass  Class = 4
+	BKClass  Class = 5
+	CBClass  Class = 6
+	CJClass  Class = 7
+	CLClass  Class = 8
+	CMClass  Class = 9
+	CPClass  Class = 10
+	CRClass  Class = 11
+	EBClass  Class = 12
+	EMClass  Class = 13
+	EXClass  Class = 14
+	GLClass  Class = 15
+	H2Class  Class = 16
+	H3Class  Class = 17
+	HLClass  Class = 18
+	HYClass  Class = 19
+	IDClass  Class = 20
+	INClass  Class = 21
+	ISClass  Class = 22
+	JLClass  Class = 23
+	JTClass  Class = 24
+	JVClass  Class = 25
+	LFClass  Class = 26
+	NLClass  Class = 27
+	NSClass  Class = 28
+	NUClass  Class = 29
+	OPClass  Class = 30
+	POClass  Class = 31
+	PRClass  Class = 32
+	QUClass  Class = 33
+	RIClass  Class = 34
+	SAClass  Class = 35
+	SGClass  Class = 36
+	SPClass  Class = 37
+	SYClass  Class = 38
+	WJClass  Class = 39
+	XXClass  Class = 40
+	ZWClass  Class = 41
+	ZWJClass Class = 42
 
-	sot UAX14Class = 1000 // pseudo class "start of text"
-	eot UAX14Class = 1001 // pseudo class "end of text"
+	Other Class = -1 // pseudo class for any other
+	sot   Class = -2 // pseudo class "start of text"
+	eot   Class = -3 // pseudo class "end of text"
 )
 
 // Range tables for UAX#14 code-point classes.
@@ -111,15 +112,17 @@ var (
 	ZWJ = _ZWJ
 )
 
-// Stringer for type UAX14Class
-func (c UAX14Class) String() string {
+// Stringer for type Class
+func (c Class) String() string {
 	switch c {
+	case Other:
+		return "Other"
 	case sot:
 		return "sot"
 	case eot:
 		return "eot"
 	default:
-		return "UAX14Class(" + strconv.Itoa(int(c)) + ")"
+		return "Class(" + strconv.Itoa(int(c)) + ")"
 	case AIClass:
 		return "AIClass"
 	case ALClass:
@@ -209,7 +212,7 @@ func (c UAX14Class) String() string {
 	}
 }
 
-var rangeFromUAX14Class = []*unicode.RangeTable{
+var rangeFromClass = []*unicode.RangeTable{
 	AIClass:  AI,
 	ALClass:  AL,
 	B2Class:  B2,

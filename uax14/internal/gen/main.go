@@ -109,16 +109,17 @@ import (
 
 // Type for UAX#14 code-point classes.
 // Must be convertable to int.
-type UAX14Class int
+type Class int
 
 // These are all the UAX#14 breaking classes.
 const (
 {{ range $i, $class := .Classes }}
-	{{$class}}Class UAX14Class = {{$i}}
+	{{$class}}Class Class = {{$i}}
 {{- end }}
 
-    sot UAX14Class = 1000 // pseudo class "start of text"
-    eot UAX14Class = 1001 // pseudo class "end of text"
+	Other Class = -1 // pseudo class for any other
+	sot   Class = -2 // pseudo class "start of text"
+	eot   Class = -3 // pseudo class "end of text"
 )
 
 // Range tables for UAX#14 code-point classes.
@@ -129,20 +130,21 @@ var (
 {{- end }}
 )
 
-// Stringer for type UAX14Class
-func (c UAX14Class) String() string {
+// Stringer for type Class
+func (c Class) String() string {
 	switch c {
+	case Other: return "Other"
 	case sot: return "sot"
 	case eot: return "eot"
 	default:
-		return "UAX14Class(" + strconv.Itoa(int(c)) + ")"
+		return "Class(" + strconv.Itoa(int(c)) + ")"
 {{- range $i, $class := .Classes }}
 	case {{$class}}Class: return "{{ $class }}Class"
 {{- end }}
 	}
 }
 
-var rangeFromUAX14Class = []*unicode.RangeTable{
+var rangeFromClass = []*unicode.RangeTable{
 {{- range $i, $class := .Classes }}
 	{{$class}}Class: {{$class}},
 {{- end }}

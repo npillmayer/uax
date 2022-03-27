@@ -67,16 +67,13 @@ import (
 //go:generate go run ./internal/gen
 
 // ClassForRune gets the line breaking/wrap class for a Unicode code-point
-func ClassForRune(r rune) UAX14Class {
+func ClassForRune(r rune) Class {
 	if r == rune(0) {
 		return eot
 	}
-	for lbc := UAX14Class(0); lbc <= ZWJClass; lbc++ {
-		urange := rangeFromUAX14Class[lbc]
-		if urange == nil {
-			tracing.Errorf("-- no range for class %s\n", lbc)
-		} else if unicode.Is(urange, r) {
-			return lbc
+	for class, rt := range rangeFromClass {
+		if unicode.Is(rt, r) {
+			return Class(class)
 		}
 	}
 	return XXClass
@@ -90,11 +87,11 @@ type LineWrap struct {
 	publisher    uax.RunePublisher
 	longestMatch int   // longest active match of a rule
 	penalties    []int // returned to the segmenter: penalties to insert
-	rules        map[UAX14Class][]uax.NfaStateFn
-	lastClass    UAX14Class // we have to remember the last code-point class
-	blockedRI    bool       // are rules for Regional_Indicator currently blocked?
-	substituted  bool       // has the code-point class been substituted?
-	shadow       UAX14Class // class before substitution
+	rules        map[Class][]uax.NfaStateFn
+	lastClass    Class // we have to remember the last code-point class
+	blockedRI    bool  // are rules for Regional_Indicator currently blocked?
+	substituted  bool  // has the code-point class been substituted?
+	shadow       Class // class before substitution
 }
 
 // NewLineWrap creates a new UAX#14 line breaker.
@@ -109,7 +106,7 @@ type LineWrap struct {
 func NewLineWrap() *LineWrap {
 	uax14 := &LineWrap{}
 	uax14.publisher = uax.NewRunePublisher()
-	uax14.rules = map[UAX14Class][]uax.NfaStateFn{
+	uax14.rules = map[Class][]uax.NfaStateFn{
 		//sot:      {rule_LB2},
 		eot:      {rule_LB3},
 		NLClass:  {rule_05_NewLine, rule_06_HardBreak},
@@ -150,9 +147,6 @@ func NewLineWrap() *LineWrap {
 		H3Class:  {rule_LB26_3, rule_LB27},
 		ZWJClass: {rule_LB8a},
 	}
-	if rangeFromUAX14Class == nil {
-		tracing.Infof("UAX#14 classes not yet initialized -> initializing")
-	}
 	uax14.lastClass = sot
 	return uax14
 }
@@ -174,7 +168,7 @@ func (uax14 *LineWrap) CodePointClassFor(r rune) int {
 //
 // Interface unicode.UnicodeBreaker
 func (uax14 *LineWrap) StartRulesFor(r rune, cpClass int) {
-	c := UAX14Class(cpClass)
+	c := Class(cpClass)
 	if c != RIClass || !uax14.blockedRI {
 		if rules := uax14.rules[c]; len(rules) > 0 {
 			tracing.P("class", c).Debugf("starting %d rule(s) for class %s", len(rules), c)
@@ -214,7 +208,7 @@ func (uax14 *LineWrap) StartRulesFor(r rune, cpClass int) {
 //   AL         SA          Any except Mn and Mc
 //   NS         CJ          Any
 //
-func resolveSomeClasses(r rune, c UAX14Class) UAX14Class {
+func resolveSomeClasses(r rune, c Class) Class {
 	if c == AIClass || c == SGClass || c == XXClass {
 		return ALClass
 	} else if c == SAClass {
@@ -237,7 +231,7 @@ func resolveSomeClasses(r rune, c UAX14Class) UAX14Class {
 // where X is any line break class except BK, CR, LF, NL, SP, or ZW.
 //
 // LB10: Treat any remaining combining mark or ZWJ as AL.
-func substitueSomeClasses(c UAX14Class, lastClass UAX14Class) (UAX14Class, UAX14Class) {
+func substitueSomeClasses(c Class, lastClass Class) (Class, Class) {
 	shadow := c
 	switch lastClass {
 	case sot, BKClass, CRClass, LFClass, NLClass, SPClass, ZWClass:
@@ -289,7 +283,7 @@ const (
 // A new code-point has been read and this breaker receives a message to
 // consume it.
 func (uax14 *LineWrap) ProceedWithRune(r rune, cpClass int) {
-	c := UAX14Class(cpClass)
+	c := Class(cpClass)
 	uax14.longestMatch, uax14.penalties = uax14.publisher.PublishRuneEvent(r, int(c))
 	x := uax14.penalties
 	//fmt.Printf("   x = %v\n", x)
