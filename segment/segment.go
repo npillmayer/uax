@@ -272,7 +272,7 @@ func (s *Segmenter) Penalties() (int, int) {
 // For the latter case Err() will return nil.
 //
 func (s *Segmenter) Next() bool {
-	return s.next(math.MaxInt64)
+	return s.next(math.MaxInt)
 }
 
 // BoundedNext gets the next segment, together with the accumulated penalty for this break.
@@ -465,7 +465,7 @@ func (s *Segmenter) readEnoughInputAndFindBreak(bound int) (err error) {
 		// we have to scan from the start of the Q to the new position of active match.
 		// If we find a breaking opportunity, we're done.
 		boundDist := bound
-		if bound < math.MaxInt64 {
+		if bound < math.MaxInt {
 			//boundDist = bound - s.pos + s.deque.Len()
 			boundDist = bound - s.pos + qlen
 		}
@@ -599,7 +599,7 @@ func (s *Segmenter) getFrontSegment(bound int) (int, bool) {
 	// There may be further break opportunities between this break and the start of the
 	// current longest match. Advance the pointer to the next break opportunity, if any.
 	boundDist := bound
-	if bound < math.MaxInt64 {
+	if bound < math.MaxInt {
 		boundDist = bound - s.pos + s.deque.Len()
 	}
 	s.positionOfBreakOpportunity = s.findBreakOpportunity(s.deque.Len()-s.longestActiveMatch,
