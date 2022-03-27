@@ -42,10 +42,6 @@ func downloadUCDZip(url, dir string) error {
 		if file.FileInfo().IsDir() {
 			continue
 		}
-		if file.Name == "auxiliary/LineBreakTest.txt" {
-			// LineBreakTest.txt has skipped tests.
-			continue
-		}
 
 		rc, err := file.Open()
 		if err != nil {
