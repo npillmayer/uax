@@ -7,6 +7,8 @@ import (
 	"github.com/npillmayer/uax/internal/tracing"
 )
 
+//go:generate go run ./internal/gen
+
 // BD16MaxNesting is the maximum stack depth for rule BS16 as defined in UAX#9.
 const BD16MaxNesting = 63
 
@@ -103,7 +105,7 @@ func makeBracketPairHandler(first charpos, previous *bracketPairHandler) *bracke
 }
 
 func (pr pairing) String() string {
-	return fmt.Sprintf("[%#U,%#U] at %d → %s", pr.pair.o, pr.pair.c, pr.opening.l, pr.closing)
+	return fmt.Sprintf("[%#U,%#U] at %d → %s", pr.pair.open, pr.pair.close, pr.opening.l, pr.closing)
 }
 
 // pushOpening pushes an opening bracket and its position onto the stack.
@@ -143,8 +145,8 @@ func (bs bracketStack) push(r rune, s scrap) (bool, bracketStack) {
 		return false, bs
 	}
 	// TODO put bracket list in sutable data structure (map like) ?
-	for _, pair := range uax9BracketPairs { // double check for UAX#9 brackets
-		if pair.o == r {
+	for _, pair := range bracketPairs { // double check for UAX#9 brackets
+		if pair.open == r {
 			b := brktpos{opening: s, pair: pair}
 			return true, append(bs, b)
 		}
@@ -162,7 +164,7 @@ func (bs bracketStack) popWith(b rune, pos charpos) (bool, brktpos, bracketStack
 	}
 	i := len(bs) - 1
 	for i >= 0 { // start at TOS, possible skip unclosed opening brackets
-		if bs[i].pair.c == b {
+		if bs[i].pair.close == b {
 			open := bs[i] //.pos
 			bs = bs[:i]
 			return true, open, bs
