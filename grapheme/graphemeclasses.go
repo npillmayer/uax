@@ -11,27 +11,27 @@ import (
 
 // Type for UAX#29 grapheme classes.
 // Must be convertable to int.
-type GraphemeClass int
+type Class int
 
 // These are all the UAX#29 breaking classes.
 const (
-	CRClass                 GraphemeClass = 0
-	ControlClass            GraphemeClass = 1
-	ExtendClass             GraphemeClass = 2
-	LClass                  GraphemeClass = 3
-	LFClass                 GraphemeClass = 4
-	LVClass                 GraphemeClass = 5
-	LVTClass                GraphemeClass = 6
-	PrependClass            GraphemeClass = 7
-	Regional_IndicatorClass GraphemeClass = 8
-	SpacingMarkClass        GraphemeClass = 9
-	TClass                  GraphemeClass = 10
-	VClass                  GraphemeClass = 11
-	ZWJClass                GraphemeClass = 12
+	CRClass                 Class = 0
+	ControlClass            Class = 1
+	ExtendClass             Class = 2
+	LClass                  Class = 3
+	LFClass                 Class = 4
+	LVClass                 Class = 5
+	LVTClass                Class = 6
+	PrependClass            Class = 7
+	Regional_IndicatorClass Class = 8
+	SpacingMarkClass        Class = 9
+	TClass                  Class = 10
+	VClass                  Class = 11
+	ZWJClass                Class = 12
 
-	Any GraphemeClass = 999
-	sot GraphemeClass = 1000 // pseudo class "start of text"
-	eot GraphemeClass = 1001 // pseudo class "end of text"
+	Other Class = -1 // pseudo class for any other
+	sot   Class = -2 // pseudo class "start of text"
+	eot   Class = -3 // pseudo class "end of text"
 )
 
 // Range tables for UAX#29 grapheme classes.
@@ -52,17 +52,17 @@ var (
 	ZWJ                = _ZWJ
 )
 
-// Stringer for type GraphemeClass
-func (c GraphemeClass) String() string {
+// Stringer for type Class
+func (c Class) String() string {
 	switch c {
 	case sot:
 		return "sot"
 	case eot:
 		return "eot"
-	case Any:
-		return "Any"
+	case Other:
+		return "Other"
 	default:
-		return "GraphemeClass(" + strconv.Itoa(int(c)) + ")"
+		return "Class(" + strconv.Itoa(int(c)) + ")"
 	case CRClass:
 		return "CRClass"
 	case ControlClass:
@@ -92,7 +92,7 @@ func (c GraphemeClass) String() string {
 	}
 }
 
-var rangeFromGraphemeClass = []*unicode.RangeTable{
+var rangeFromClass = []*unicode.RangeTable{
 	CRClass:                 CR,
 	ControlClass:            Control,
 	ExtendClass:             Extend,

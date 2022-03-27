@@ -107,17 +107,17 @@ import (
 
 // Type for UAX#29 grapheme classes.
 // Must be convertable to int.
-type GraphemeClass int
+type Class int
 
 // These are all the UAX#29 breaking classes.
 const (
 {{ range $i, $class := .Classes }}
-	{{$class}}Class GraphemeClass = {{$i}}
+	{{$class}}Class Class = {{$i}}
 {{- end }}
 
-	Any GraphemeClass = 999
-    sot GraphemeClass = 1000 // pseudo class "start of text"
-    eot GraphemeClass = 1001 // pseudo class "end of text"
+	Other Class = -1 // pseudo class for any other
+	sot   Class = -2 // pseudo class "start of text"
+	eot   Class = -3 // pseudo class "end of text"
 )
 
 // Range tables for UAX#29 grapheme classes.
@@ -128,21 +128,21 @@ var (
 {{- end }}
 )
 
-// Stringer for type GraphemeClass
-func (c GraphemeClass) String() string {
+// Stringer for type Class
+func (c Class) String() string {
 	switch c {
 	case sot: return "sot"
 	case eot: return "eot"
-	case Any: return "Any"
+	case Other: return "Other"
 	default:
-		return "GraphemeClass(" + strconv.Itoa(int(c)) + ")"
+		return "Class(" + strconv.Itoa(int(c)) + ")"
 {{- range $i, $class := .Classes }}
 	case {{$class}}Class: return "{{ $class }}Class"
 {{- end }}
 	}
 }
 
-var rangeFromGraphemeClass = []*unicode.RangeTable{
+var rangeFromClass = []*unicode.RangeTable{
 {{- range $i, $class := .Classes }}
 	{{$class}}Class: {{$class}},
 {{- end }}
