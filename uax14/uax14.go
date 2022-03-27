@@ -21,11 +21,6 @@ breaking engine for a segmenter.
     ... // do something with segmenter.Text() or segmenter.Bytes()
   }
 
-Before using line breakers, clients usually will want to initialize the UAX#14
-classes and rules.
-
-  SetupClasses()
-
 This initializes all the code-point range tables. Initialization is
 not done beforehand, as it consumes quite some memory, and using UAX#14
 is not mandatory. SetupClasses() is called automatically, however,
@@ -64,7 +59,7 @@ import (
 	"github.com/npillmayer/uax/internal/tracing"
 )
 
-//go:generate go run ./internal/gen
+//go:generate go run ../internal/classgen -u LineBreak.txt
 
 // ClassForRune gets the line breaking/wrap class for a Unicode code-point
 func ClassForRune(r rune) Class {

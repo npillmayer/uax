@@ -47,7 +47,7 @@ import (
 	"github.com/npillmayer/uax/internal/tracing"
 )
 
-//go:generate go run ./internal/gen
+//go:generate go run ../internal/classgen -u auxiliary/WordBreakProperty.txt
 
 // ClassForRune gets the Unicode #UAX29 word class for a Unicode code-point.
 func ClassForRune(r rune) Class {

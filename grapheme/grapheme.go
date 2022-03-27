@@ -43,7 +43,7 @@ import (
 	"github.com/npillmayer/uax/internal/tracing"
 )
 
-//go:generate go run ./internal/gen
+//go:generate go run ../internal/classgen -u auxiliary/GraphemeBreakProperty.txt
 
 // ClassForRune gets the line grapheme class for a Unicode code-point.
 func ClassForRune(r rune) Class {
