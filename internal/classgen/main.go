@@ -30,6 +30,7 @@ import (
 	"strings"
 	"text/template"
 	"unicode"
+	"unsafe"
 
 	"github.com/npillmayer/uax/internal/ucdparse"
 	"golang.org/x/text/unicode/rangetable"
@@ -51,10 +52,16 @@ func main() {
 	}
 	sort.Strings(classes)
 
+	rangeTables := map[string]*unicode.RangeTable{}
+	for class, runes := range codePointLists {
+		rangeTables[class] = rangetable.New(runes...)
+	}
+
 	var w bytes.Buffer
 	terr := T.Execute(&w, map[string]interface{}{
 		"PackageName": os.Getenv("GOPACKAGE"),
 		"Classes":     classes,
+		"RangeTables": rangeTables,
 		"Codepoints":  codePointLists,
 	})
 	checkFatal(terr)
@@ -111,8 +118,33 @@ func parseRanges(ucdfile string, categoryField int) (map[string][]rune, error) {
 }
 
 var T = template.Must(template.New("").Funcs(template.FuncMap{
-	"rangetable": func(runes []rune) *unicode.RangeTable {
-		return rangetable.New(runes...)
+	"size": func(rt *unicode.RangeTable) string {
+		sz := int(unsafe.Sizeof(*rt))
+		sz += int(unsafe.Sizeof(rt.R16[0])) * len(rt.R16)
+		sz += int(unsafe.Sizeof(rt.R32[0])) * len(rt.R32)
+		return fmt.Sprintf("size %d bytes (%d KiB)", sz, sz/1024)
+	},
+	"pretty": func(rt *unicode.RangeTable) string {
+		s := "&unicode.RangeTable{\n"
+		if len(rt.R16) > 0 {
+			s += "\tR16: []unicode.Range16{\n"
+			for _, r := range rt.R16 {
+				s += fmt.Sprintf("\t\t{%#x, %#x, %d},\n", r.Lo, r.Hi, r.Stride)
+			}
+			s += "\t},\n"
+		}
+		if len(rt.R32) > 0 {
+			s += "\tR32: []unicode.Range32{\n"
+			for _, r := range rt.R32 {
+				s += fmt.Sprintf("\t\t{%#x, %#x, %d},\n", r.Lo, r.Hi, r.Stride)
+			}
+			s += "\t},\n"
+		}
+		if rt.LatinOffset > 0 {
+			s += fmt.Sprintf("\tLatinOffset: %d,\n", rt.LatinOffset)
+		}
+		s += "}"
+		return s
 	},
 }).Parse(`package {{.PackageName}}
 
@@ -167,14 +199,10 @@ var rangeFromClass = []*unicode.RangeTable{
 {{- end }}
 }
 
-
-// range table definitions, these are separate from the public definitions
-// to make documentation readable.
-var (
-{{- range $class, $runes := .Codepoints }}
-	_{{ $class }} = {{ printf "%#v" (rangetable $runes) }}
-{{- end }}
-)
+{{ range $class, $rt := .RangeTables }}
+// {{ size $rt }}
+var _{{ $class }} = {{ pretty $rt }}
+{{ end }}
 `))
 
 func checkFatal(err error) {
