@@ -52,6 +52,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/npillmayer/uax/internal/ucdparse"
@@ -91,11 +92,12 @@ func main() {
 		if t == "" {
 			return
 		}
-		append(ranges, t, l, r)
+		appendRange(ranges, t, l, r)
 	})
 
 	// output range information per category
-	for _, rt := range ranges {
+	for _, class := range sortedKeys(ranges) {
+		rt := ranges[class]
 		rt.Output(buf)
 	}
 	printVarSection(buf, ranges)
@@ -109,9 +111,9 @@ func main() {
 	}
 }
 
-// append a character-range [l…r| to a table collector for category cat.
+// appendRange a character-range [l…r| to a table collector for category cat.
 // l and r may be identical.
-func append(ranges map[string]*ucdparse.RangeTableCollector, cat string, l, r rune) {
+func appendRange(ranges map[string]*ucdparse.RangeTableCollector, cat string, l, r rune) {
 	var t *ucdparse.RangeTableCollector
 	if *prefix != "" {
 		cat = *prefix + "_" + cat
@@ -152,8 +154,17 @@ import "unicode"
 //
 func printVarSection(buf *bytes.Buffer, ranges map[string]*ucdparse.RangeTableCollector) {
 	fmt.Fprintf(buf, "var (\n")
-	for k, _ := range ranges {
-		fmt.Fprintf(buf, "    %s *unicode.RangeTable = _%s\n", k, k)
+	for _, class := range sortedKeys(ranges) {
+		fmt.Fprintf(buf, "    %s *unicode.RangeTable = _%s\n", class, class)
 	}
 	fmt.Fprintf(buf, ")\n")
+}
+
+func sortedKeys(ranges map[string]*ucdparse.RangeTableCollector) []string {
+	classes := []string{}
+	for class := range ranges {
+		classes = append(classes, class)
+	}
+	sort.Strings(classes)
+	return classes
 }

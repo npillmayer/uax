@@ -4,6 +4,16 @@ package shaping
 
 import "unicode"
 
+var _ARAB_C = &unicode.RangeTable{ // 4 entries
+	R16: []unicode.Range16{
+		{0x0000, 0x0000, 1},
+		{0x0640, 0x0640, 1},
+		{0x07fa, 0x07fa, 1},
+		{0x180a, 0x180a, 1},
+	},
+	LatinOffset: 1,
+}
+
 var _ARAB_D = &unicode.RangeTable{ // 72 entries
 	R16: []unicode.Range16{
 		{0x0000, 0x0000, 1},
@@ -84,6 +94,19 @@ var _ARAB_D = &unicode.RangeTable{ // 72 entries
 	LatinOffset: 1,
 }
 
+var _ARAB_L = &unicode.RangeTable{ // 5 entries
+	R16: []unicode.Range16{
+		{0x0000, 0x0000, 1},
+		{0xa872, 0xa872, 1},
+	},
+	R32: []unicode.Range32{
+		{0x10acd, 0x10acd, 1},
+		{0x10ad7, 0x10ad7, 1},
+		{0x10d00, 0x10d00, 1},
+	},
+	LatinOffset: 1,
+}
+
 var _ARAB_R = &unicode.RangeTable{ // 62 entries
 	R16: []unicode.Range16{
 		{0x0000, 0x0000, 1},
@@ -154,34 +177,11 @@ var _ARAB_R = &unicode.RangeTable{ // 62 entries
 	LatinOffset: 1,
 }
 
-var _ARAB_C = &unicode.RangeTable{ // 4 entries
-	R16: []unicode.Range16{
-		{0x0000, 0x0000, 1},
-		{0x0640, 0x0640, 1},
-		{0x07fa, 0x07fa, 1},
-		{0x180a, 0x180a, 1},
-	},
-	LatinOffset: 1,
-}
-
 var _ARAB_T = &unicode.RangeTable{ // 3 entries
 	R16: []unicode.Range16{
 		{0x0000, 0x0000, 1},
 		{0x070f, 0x070f, 1},
 		{0x1885, 0x1886, 1},
-	},
-	LatinOffset: 1,
-}
-
-var _ARAB_L = &unicode.RangeTable{ // 5 entries
-	R16: []unicode.Range16{
-		{0x0000, 0x0000, 1},
-		{0xa872, 0xa872, 1},
-	},
-	R32: []unicode.Range32{
-		{0x10acd, 0x10acd, 1},
-		{0x10ad7, 0x10ad7, 1},
-		{0x10d00, 0x10d00, 1},
 	},
 	LatinOffset: 1,
 }
@@ -224,10 +224,10 @@ var _ARAB_U = &unicode.RangeTable{ // 29 entries
 }
 
 var (
-    ARAB_U *unicode.RangeTable = _ARAB_U
-    ARAB_D *unicode.RangeTable = _ARAB_D
-    ARAB_R *unicode.RangeTable = _ARAB_R
     ARAB_C *unicode.RangeTable = _ARAB_C
-    ARAB_T *unicode.RangeTable = _ARAB_T
+    ARAB_D *unicode.RangeTable = _ARAB_D
     ARAB_L *unicode.RangeTable = _ARAB_L
+    ARAB_R *unicode.RangeTable = _ARAB_R
+    ARAB_T *unicode.RangeTable = _ARAB_T
+    ARAB_U *unicode.RangeTable = _ARAB_U
 )

@@ -39,3 +39,7 @@ Copyright © 2021 Norbert Pillmayer <norbert@pillmayer.com>
 
 */
 package shaping
+
+//go:generate go run ../internal/tablegen -f 3 -p shaping -o arabictables.go -x ARAB -u https://www.unicode.org/Public/13.0.0/ucd/ArabicShaping.txt
+//go:generate go run ../internal/tablegen -f 2 -p shaping -o uipctables.go -x UIPC -u https://www.unicode.org/Public/13.0.0/ucd/IndicPositionalCategory.txt
+//go:generate go run ../internal/tablegen -f 2 -p shaping -o uisctables.go -x UISC -u https://www.unicode.org/Public/13.0.0/ucd/IndicSyllabicCategory.txt
