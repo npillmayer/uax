@@ -117,17 +117,17 @@ import (
 
 // Type for UAX#29 code-point classes.
 // Must be convertable to int.
-type UAX29Class int
+type Class int
 
 // These are all the UAX#29 breaking classes.
 const (
 {{ range $i, $class := .Classes }}
-	{{$class}}Class UAX29Class = {{$i}}
+	{{$class}}Class Class = {{$i}}
 {{- end }}
 
-	Other UAX29Class = 999
-    sot UAX29Class = 1000 // pseudo class "start of text"
-    eot UAX29Class = 1001 // pseudo class "end of text"
+	Other Class = 999
+    sot Class = 1000 // pseudo class "start of text"
+    eot Class = 1001 // pseudo class "end of text"
 )
 
 // Range tables for UAX#29 code-point classes.
@@ -138,21 +138,21 @@ var (
 {{- end }}
 )
 
-// Stringer for type UAX29Class
-func (c UAX29Class) String() string {
+// Stringer for type Class
+func (c Class) String() string {
 	switch c {
 	case sot: return "sot"
 	case eot: return "eot"
 	case Other: return "Other"
 	default:
-		return "UAX29Class(" + strconv.Itoa(int(c)) + ")"
+		return "Class(" + strconv.Itoa(int(c)) + ")"
 {{- range $i, $class := .Classes }}
 	case {{$class}}Class: return "{{ $class }}Class"
 {{- end }}
 	}
 }
 
-var rangeFromUAX29Class = []*unicode.RangeTable{
+var rangeFromClass = []*unicode.RangeTable{
 {{- range $i, $class := .Classes }}
 	{{$class}}Class: {{$class}},
 {{- end }}

@@ -11,32 +11,32 @@ import (
 
 // Type for UAX#29 code-point classes.
 // Must be convertable to int.
-type UAX29Class int
+type Class int
 
 // These are all the UAX#29 breaking classes.
 const (
-	ALetterClass            UAX29Class = 0
-	CRClass                 UAX29Class = 1
-	Double_QuoteClass       UAX29Class = 2
-	ExtendClass             UAX29Class = 3
-	ExtendNumLetClass       UAX29Class = 4
-	FormatClass             UAX29Class = 5
-	Hebrew_LetterClass      UAX29Class = 6
-	KatakanaClass           UAX29Class = 7
-	LFClass                 UAX29Class = 8
-	MidLetterClass          UAX29Class = 9
-	MidNumClass             UAX29Class = 10
-	MidNumLetClass          UAX29Class = 11
-	NewlineClass            UAX29Class = 12
-	NumericClass            UAX29Class = 13
-	Regional_IndicatorClass UAX29Class = 14
-	Single_QuoteClass       UAX29Class = 15
-	WSegSpaceClass          UAX29Class = 16
-	ZWJClass                UAX29Class = 17
+	ALetterClass            Class = 0
+	CRClass                 Class = 1
+	Double_QuoteClass       Class = 2
+	ExtendClass             Class = 3
+	ExtendNumLetClass       Class = 4
+	FormatClass             Class = 5
+	Hebrew_LetterClass      Class = 6
+	KatakanaClass           Class = 7
+	LFClass                 Class = 8
+	MidLetterClass          Class = 9
+	MidNumClass             Class = 10
+	MidNumLetClass          Class = 11
+	NewlineClass            Class = 12
+	NumericClass            Class = 13
+	Regional_IndicatorClass Class = 14
+	Single_QuoteClass       Class = 15
+	WSegSpaceClass          Class = 16
+	ZWJClass                Class = 17
 
-	Other UAX29Class = 999
-	sot   UAX29Class = 1000 // pseudo class "start of text"
-	eot   UAX29Class = 1001 // pseudo class "end of text"
+	Other Class = 999
+	sot   Class = 1000 // pseudo class "start of text"
+	eot   Class = 1001 // pseudo class "end of text"
 )
 
 // Range tables for UAX#29 code-point classes.
@@ -62,8 +62,8 @@ var (
 	ZWJ                = _ZWJ
 )
 
-// Stringer for type UAX29Class
-func (c UAX29Class) String() string {
+// Stringer for type Class
+func (c Class) String() string {
 	switch c {
 	case sot:
 		return "sot"
@@ -72,7 +72,7 @@ func (c UAX29Class) String() string {
 	case Other:
 		return "Other"
 	default:
-		return "UAX29Class(" + strconv.Itoa(int(c)) + ")"
+		return "Class(" + strconv.Itoa(int(c)) + ")"
 	case ALetterClass:
 		return "ALetterClass"
 	case CRClass:
@@ -112,7 +112,7 @@ func (c UAX29Class) String() string {
 	}
 }
 
-var rangeFromUAX29Class = []*unicode.RangeTable{
+var rangeFromClass = []*unicode.RangeTable{
 	ALetterClass:            ALetter,
 	CRClass:                 CR,
 	Double_QuoteClass:       Double_Quote,
