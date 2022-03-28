@@ -15,7 +15,7 @@ import (
 )
 
 func main() {
-	err := downloadUCDZip("https://www.unicode.org/Public/11.0.0/ucd/UCD.zip", "ucd")
+	err := downloadUCDZip("https://www.unicode.org/Public/14.0.0/ucd/UCD.zip", "ucd")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to download: %v\n", err)
 		os.Exit(1)

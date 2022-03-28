@@ -48,7 +48,7 @@ var (
 	UISC_Vowel_Independent           = _UISC_Vowel_Independent
 )
 
-// size 122 bytes (0.12 KiB)
+// size 134 bytes (0.13 KiB)
 var _UISC_Avagraha = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x93d, 0x9bd, 128},
@@ -60,11 +60,12 @@ var _UISC_Avagraha = &unicode.RangeTable{
 	R32: []unicode.Range32{
 		{0x111c1, 0x1133d, 380},
 		{0x11447, 0x114c4, 125},
-		{0x11a9d, 0x11c40, 419},
+		{0x119e1, 0x11a9d, 188},
+		{0x11c40, 0x11c40, 1},
 	},
 }
 
-// size 410 bytes (0.40 KiB)
+// size 440 bytes (0.43 KiB)
 var _UISC_Bindu = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x900, 0x902, 1},
@@ -75,9 +76,10 @@ var _UISC_Bindu = &unicode.RangeTable{
 		{0xb01, 0xb02, 1},
 		{0xb82, 0xc00, 126},
 		{0xc01, 0xc02, 1},
-		{0xc04, 0xc81, 125},
-		{0xc82, 0xd00, 126},
-		{0xd01, 0xd02, 1},
+		{0xc04, 0xc80, 124},
+		{0xc81, 0xc82, 1},
+		{0xd00, 0xd02, 1},
+		{0xd04, 0xd81, 125},
 		{0xd82, 0xe4d, 203},
 		{0xecd, 0xf7e, 177},
 		{0xf82, 0xf83, 1},
@@ -96,15 +98,17 @@ var _UISC_Bindu = &unicode.RangeTable{
 		{0x11001, 0x11080, 127},
 		{0x11081, 0x11100, 127},
 		{0x11101, 0x11180, 127},
-		{0x11181, 0x11234, 179},
-		{0x112df, 0x11300, 33},
-		{0x11301, 0x11302, 1},
+		{0x11181, 0x111cf, 78},
+		{0x11234, 0x112df, 171},
+		{0x11300, 0x11302, 1},
 		{0x1135e, 0x1135f, 1},
 		{0x11443, 0x11444, 1},
-		{0x114bf, 0x114c0, 1},
-		{0x115bc, 0x115bd, 1},
-		{0x1163d, 0x116ab, 110},
-		{0x11837, 0x11a35, 510},
+		{0x1145f, 0x114bf, 96},
+		{0x114c0, 0x115bc, 252},
+		{0x115bd, 0x1163d, 128},
+		{0x116ab, 0x11837, 396},
+		{0x1193b, 0x1193c, 1},
+		{0x119de, 0x11a35, 87},
 		{0x11a36, 0x11a38, 1},
 		{0x11a96, 0x11c3c, 422},
 		{0x11c3d, 0x11cb5, 120},
@@ -120,7 +124,7 @@ var _UISC_Brahmi_Joining_Number = &unicode.RangeTable{
 	},
 }
 
-// size 140 bytes (0.14 KiB)
+// size 146 bytes (0.14 KiB)
 var _UISC_Cantillation_Mark = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x951, 0x952, 1},
@@ -130,7 +134,8 @@ var _UISC_Cantillation_Mark = &unicode.RangeTable{
 		{0x1cd4, 0x1ce1, 1},
 		{0x1cf4, 0x1cf7, 3},
 		{0x1cf8, 0x1cf9, 1},
-		{0xa8e0, 0xa8f1, 1},
+		{0x20f0, 0xa8e0, 34800},
+		{0xa8e1, 0xa8f1, 1},
 	},
 	R32: []unicode.Range32{
 		{0x1123e, 0x11366, 296},
@@ -139,7 +144,7 @@ var _UISC_Cantillation_Mark = &unicode.RangeTable{
 	},
 }
 
-// size 1166 bytes (1.14 KiB)
+// size 1226 bytes (1.20 KiB)
 var _UISC_Consonant = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x915, 0x939, 1},
@@ -190,15 +195,11 @@ var _UISC_Consonant = &unicode.RangeTable{
 		{0xdc1, 0xdc6, 1},
 		{0xe01, 0xe2e, 1},
 		{0xe81, 0xe82, 1},
-		{0xe84, 0xe87, 3},
-		{0xe88, 0xe8a, 2},
-		{0xe8d, 0xe94, 7},
-		{0xe95, 0xe97, 1},
-		{0xe99, 0xe9f, 1},
-		{0xea1, 0xea3, 1},
+		{0xe84, 0xe86, 2},
+		{0xe87, 0xe8a, 1},
+		{0xe8c, 0xea3, 1},
 		{0xea5, 0xea7, 2},
-		{0xeaa, 0xeab, 1},
-		{0xead, 0xeae, 1},
+		{0xea8, 0xeae, 1},
 		{0xedc, 0xedf, 1},
 		{0xf40, 0xf47, 1},
 		{0xf49, 0xf6c, 1},
@@ -211,9 +212,9 @@ var _UISC_Consonant = &unicode.RangeTable{
 		{0x106f, 0x1070, 1},
 		{0x1075, 0x1081, 1},
 		{0x108e, 0x1703, 1653},
-		{0x1704, 0x170c, 1},
-		{0x170e, 0x1711, 1},
-		{0x1723, 0x1731, 1},
+		{0x1704, 0x1711, 1},
+		{0x171f, 0x1723, 4},
+		{0x1724, 0x1731, 1},
 		{0x1743, 0x1751, 1},
 		{0x1763, 0x176c, 1},
 		{0x176e, 0x1770, 1},
@@ -225,7 +226,7 @@ var _UISC_Consonant = &unicode.RangeTable{
 		{0x1a20, 0x1a4c, 1},
 		{0x1a53, 0x1a54, 1},
 		{0x1b13, 0x1b33, 1},
-		{0x1b45, 0x1b4b, 1},
+		{0x1b45, 0x1b4c, 1},
 		{0x1b8a, 0x1ba0, 1},
 		{0x1bae, 0x1baf, 1},
 		{0x1bbb, 0x1bbd, 1},
@@ -262,10 +263,11 @@ var _UISC_Consonant = &unicode.RangeTable{
 		{0x10a15, 0x10a17, 1},
 		{0x10a19, 0x10a35, 1},
 		{0x11013, 0x11037, 1},
-		{0x1108d, 0x110af, 1},
+		{0x11075, 0x1108d, 24},
+		{0x1108e, 0x110af, 1},
 		{0x11107, 0x11126, 1},
-		{0x11144, 0x11155, 17},
-		{0x11156, 0x11172, 1},
+		{0x11144, 0x11147, 3},
+		{0x11155, 0x11172, 1},
 		{0x11191, 0x111b2, 1},
 		{0x11208, 0x11211, 1},
 		{0x11213, 0x1122b, 1},
@@ -284,8 +286,14 @@ var _UISC_Consonant = &unicode.RangeTable{
 		{0x1158e, 0x115ae, 1},
 		{0x1160e, 0x1162f, 1},
 		{0x1168a, 0x116aa, 1},
-		{0x11700, 0x1171a, 1},
+		{0x116b8, 0x11700, 72},
+		{0x11701, 0x1171a, 1},
+		{0x11740, 0x11746, 1},
 		{0x1180a, 0x1182b, 1},
+		{0x1190c, 0x11913, 1},
+		{0x11915, 0x11916, 1},
+		{0x11918, 0x1192f, 1},
+		{0x119ae, 0x119d0, 1},
 		{0x11a0b, 0x11a32, 1},
 		{0x11a5c, 0x11a83, 1},
 		{0x11c0e, 0x11c2e, 1},
@@ -296,27 +304,31 @@ var _UISC_Consonant = &unicode.RangeTable{
 	},
 }
 
-// size 74 bytes (0.07 KiB)
+// size 86 bytes (0.08 KiB)
 var _UISC_Consonant_Dead = &unicode.RangeTable{
 	R16: []unicode.Range16{
-		{0x9ce, 0xd54, 902},
+		{0x9ce, 0xc5d, 655},
+		{0xcdd, 0xd54, 119},
 		{0xd55, 0xd56, 1},
 		{0xd7a, 0xd7f, 1},
+		{0x1cf2, 0x1cf3, 1},
 	},
 }
 
-// size 128 bytes (0.12 KiB)
+// size 140 bytes (0.14 KiB)
 var _UISC_Consonant_Final = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x1930, 0x1931, 1},
 		{0x1933, 0x1939, 1},
 		{0x19c1, 0x19c7, 1},
 		{0x1a58, 0x1a59, 1},
+		{0x1b03, 0x1b81, 126},
 		{0x1bbe, 0x1bbf, 1},
 		{0x1bf0, 0x1bf1, 1},
 		{0x1c2d, 0x1c33, 1},
 		{0xa94f, 0xa952, 1},
-		{0xaa40, 0xaa4d, 1},
+		{0xa982, 0xaa40, 190},
+		{0xaa41, 0xaa4d, 1},
 		{0xabdb, 0xabe2, 1},
 	},
 	R32: []unicode.Range32{
@@ -345,7 +357,7 @@ var _UISC_Consonant_Killer = &unicode.RangeTable{
 	},
 }
 
-// size 140 bytes (0.14 KiB)
+// size 152 bytes (0.15 KiB)
 var _UISC_Consonant_Medial = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0xa75, 0xebc, 1095},
@@ -354,11 +366,12 @@ var _UISC_Consonant_Medial = &unicode.RangeTable{
 		{0x105e, 0x1060, 1},
 		{0x1082, 0x1a55, 2515},
 		{0x1a56, 0xa8b4, 36446},
-		{0xa9be, 0xa9bf, 1},
+		{0xa9bd, 0xa9bf, 1},
 		{0xaa33, 0xaa36, 1},
 	},
 	R32: []unicode.Range32{
 		{0x1171d, 0x1171f, 1},
+		{0x11940, 0x11942, 2},
 		{0x11a3b, 0x11a3e, 1},
 		{0x11d47, 0x11d47, 1},
 	},
@@ -371,8 +384,8 @@ var _UISC_Consonant_Placeholder = &unicode.RangeTable{
 		{0xd7, 0x980, 2217},
 		{0xa72, 0xa73, 1},
 		{0x104b, 0x104e, 3},
-		{0x1900, 0x2010, 1808},
-		{0x2011, 0x2014, 1},
+		{0x1900, 0x1cfa, 1018},
+		{0x2010, 0x2014, 1},
 		{0x25cc, 0xaa74, 33960},
 		{0xaa75, 0xaa76, 1},
 	},
@@ -389,7 +402,7 @@ var _UISC_Consonant_Preceding_Repha = &unicode.RangeTable{
 		{0xd4e, 0xd4e, 1},
 	},
 	R32: []unicode.Range32{
-		{0x11d46, 0x11d46, 1},
+		{0x11941, 0x11d46, 1029},
 	},
 }
 
@@ -397,8 +410,8 @@ var _UISC_Consonant_Preceding_Repha = &unicode.RangeTable{
 var _UISC_Consonant_Prefixed = &unicode.RangeTable{
 	R32: []unicode.Range32{
 		{0x111c2, 0x111c3, 1},
-		{0x11a3a, 0x11a86, 76},
-		{0x11a87, 0x11a89, 1},
+		{0x1193f, 0x11a3a, 251},
+		{0x11a84, 0x11a89, 1},
 	},
 }
 
@@ -414,7 +427,7 @@ var _UISC_Consonant_Subjoined = &unicode.RangeTable{
 		{0x1bac, 0x1bad, 1},
 		{0x1c24, 0x1c25, 1},
 		{0xa867, 0xa868, 1},
-		{0xa871, 0xa9bd, 332},
+		{0xa871, 0xa871, 1},
 	},
 	R32: []unicode.Range32{
 		{0x11c92, 0x11ca7, 1},
@@ -422,15 +435,14 @@ var _UISC_Consonant_Subjoined = &unicode.RangeTable{
 	},
 }
 
-// size 68 bytes (0.07 KiB)
+// size 62 bytes (0.06 KiB)
 var _UISC_Consonant_Succeeding_Repha = &unicode.RangeTable{
 	R16: []unicode.Range16{
-		{0x17cc, 0x1b03, 823},
-		{0x1b81, 0xa982, 36353},
+		{0x17cc, 0x17cc, 1},
 	},
 }
 
-// size 80 bytes (0.08 KiB)
+// size 92 bytes (0.09 KiB)
 var _UISC_Consonant_With_Stacker = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0xcf1, 0xcf2, 1},
@@ -438,6 +450,7 @@ var _UISC_Consonant_With_Stacker = &unicode.RangeTable{
 	},
 	R32: []unicode.Range32{
 		{0x11003, 0x11004, 1},
+		{0x11460, 0x11461, 1},
 	},
 }
 
@@ -451,7 +464,7 @@ var _UISC_Gemination_Mark = &unicode.RangeTable{
 	},
 }
 
-// size 110 bytes (0.11 KiB)
+// size 122 bytes (0.12 KiB)
 var _UISC_Invisible_Stacker = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x1039, 0x17d2, 1945},
@@ -460,8 +473,9 @@ var _UISC_Invisible_Stacker = &unicode.RangeTable{
 	},
 	R32: []unicode.Range32{
 		{0x10a3f, 0x11133, 1780},
-		{0x11a47, 0x11a99, 82},
-		{0x11d45, 0x11d97, 82},
+		{0x1193e, 0x11a47, 265},
+		{0x11a99, 0x11d45, 684},
+		{0x11d97, 0x11d97, 1},
 	},
 }
 
@@ -491,10 +505,10 @@ var _UISC_Nukta = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x93c, 0xabc, 128},
 		{0xafd, 0xaff, 1},
-		{0xb3c, 0xcbc, 384},
-		{0xf39, 0x1b34, 3067},
-		{0x1be6, 0x1c37, 81},
-		{0xa9b3, 0xa9b3, 1},
+		{0xb3c, 0xc3c, 256},
+		{0xcbc, 0xf39, 637},
+		{0x1b34, 0x1be6, 178},
+		{0x1c37, 0xa9b3, 36220},
 	},
 	R32: []unicode.Range32{
 		{0x10a38, 0x10a3a, 1},
@@ -504,11 +518,11 @@ var _UISC_Nukta = &unicode.RangeTable{
 		{0x1133c, 0x11446, 266},
 		{0x114c3, 0x115c0, 253},
 		{0x116b7, 0x1183a, 387},
-		{0x11d42, 0x11d42, 1},
+		{0x11943, 0x11d42, 1023},
 	},
 }
 
-// size 404 bytes (0.39 KiB)
+// size 416 bytes (0.41 KiB)
 var _UISC_Number = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x30, 0x39, 1},
@@ -529,7 +543,7 @@ var _UISC_Number = &unicode.RangeTable{
 		{0x1090, 0x1099, 1},
 		{0x17e0, 0x17e9, 1},
 		{0x1946, 0x194f, 1},
-		{0x19d0, 0x19d9, 1},
+		{0x19d0, 0x19da, 1},
 		{0x1a80, 0x1a89, 1},
 		{0x1a90, 0x1a99, 1},
 		{0x1b50, 0x1b59, 1},
@@ -554,6 +568,7 @@ var _UISC_Number = &unicode.RangeTable{
 		{0x11650, 0x11659, 1},
 		{0x116c0, 0x116c9, 1},
 		{0x11730, 0x1173b, 1},
+		{0x11950, 0x11959, 1},
 		{0x11c50, 0x11c6c, 1},
 		{0x11d50, 0x11d59, 1},
 		{0x11da0, 0x11da9, 1},
@@ -568,21 +583,23 @@ var _UISC_Number_Joiner = &unicode.RangeTable{
 	},
 }
 
-// size 140 bytes (0.14 KiB)
+// size 158 bytes (0.15 KiB)
 var _UISC_Pure_Killer = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0xd3b, 0xd3c, 1},
 		{0xe3a, 0xe4e, 20},
-		{0xf84, 0x103a, 182},
-		{0x1714, 0x1734, 32},
+		{0xeba, 0xf84, 202},
+		{0x103a, 0x1714, 1754},
+		{0x1715, 0x1734, 31},
 		{0x17d1, 0x1a7a, 681},
 		{0x1baa, 0x1bf2, 72},
-		{0x1bf3, 0xa806, 35859},
+		{0x1bf3, 0xa82c, 35897},
 		{0xa953, 0xabed, 666},
 	},
 	R32: []unicode.Range32{
-		{0x11134, 0x112ea, 438},
-		{0x1172b, 0x11a34, 777},
+		{0x11070, 0x11134, 196},
+		{0x112ea, 0x1172b, 1089},
+		{0x1193d, 0x11a34, 247},
 		{0x11d44, 0x11d44, 1},
 	},
 }
@@ -644,12 +661,13 @@ var _UISC_Tone_Mark = &unicode.RangeTable{
 	},
 }
 
-// size 146 bytes (0.14 KiB)
+// size 164 bytes (0.16 KiB)
 var _UISC_Virama = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x94d, 0xd4d, 128},
 		{0xdca, 0x1b44, 3450},
-		{0xa8c4, 0xa9c0, 252},
+		{0xa806, 0xa8c4, 190},
+		{0xa9c0, 0xa9c0, 1},
 	},
 	R32: []unicode.Range32{
 		{0x11046, 0x110b9, 115},
@@ -657,19 +675,19 @@ var _UISC_Virama = &unicode.RangeTable{
 		{0x1134d, 0x11442, 245},
 		{0x114c2, 0x115bf, 253},
 		{0x1163f, 0x116b6, 119},
-		{0x11839, 0x11c3f, 1030},
+		{0x11839, 0x119e0, 423},
+		{0x11c3f, 0x11c3f, 1},
 	},
 }
 
-// size 194 bytes (0.19 KiB)
+// size 200 bytes (0.20 KiB)
 var _UISC_Visarga = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x903, 0xb03, 128},
 		{0xc03, 0xd83, 128},
 		{0xf7f, 0x1038, 185},
 		{0x17c7, 0x1b04, 829},
-		{0x1b82, 0x1cf2, 368},
-		{0x1cf3, 0xa881, 35726},
+		{0x1b82, 0xa881, 36095},
 		{0xa983, 0xaaf5, 370},
 	},
 	R32: []unicode.Range32{
@@ -678,9 +696,10 @@ var _UISC_Visarga = &unicode.RangeTable{
 		{0x11303, 0x11445, 322},
 		{0x114c1, 0x115be, 253},
 		{0x1163e, 0x116ac, 110},
-		{0x11838, 0x11a39, 513},
-		{0x11a97, 0x11c3e, 423},
-		{0x11d41, 0x11d96, 85},
+		{0x11838, 0x119df, 423},
+		{0x11a39, 0x11a97, 94},
+		{0x11c3e, 0x11d41, 259},
+		{0x11d96, 0x11d96, 1},
 	},
 }
 
@@ -697,7 +716,7 @@ var _UISC_Vowel = &unicode.RangeTable{
 	},
 }
 
-// size 1034 bytes (1.01 KiB)
+// size 1136 bytes (1.11 KiB)
 var _UISC_Vowel_Dependent = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x93a, 0x93b, 1},
@@ -720,7 +739,7 @@ var _UISC_Vowel_Dependent = &unicode.RangeTable{
 		{0xb3e, 0xb44, 1},
 		{0xb47, 0xb48, 1},
 		{0xb4b, 0xb4c, 1},
-		{0xb56, 0xb57, 1},
+		{0xb55, 0xb57, 1},
 		{0xb62, 0xb63, 1},
 		{0xbbe, 0xbc2, 1},
 		{0xbc6, 0xbc8, 1},
@@ -775,7 +794,8 @@ var _UISC_Vowel_Dependent = &unicode.RangeTable{
 		{0x1ba4, 0x1ba9, 1},
 		{0x1be7, 0x1bef, 1},
 		{0x1c26, 0x1c2c, 1},
-		{0xa823, 0xa827, 1},
+		{0xa802, 0xa823, 33},
+		{0xa824, 0xa827, 1},
 		{0xa8b5, 0xa8c3, 1},
 		{0xa8ff, 0xa947, 72},
 		{0xa948, 0xa94e, 1},
@@ -791,12 +811,15 @@ var _UISC_Vowel_Dependent = &unicode.RangeTable{
 		{0x10a05, 0x10a06, 1},
 		{0x10a0c, 0x10a0d, 1},
 		{0x11038, 0x11045, 1},
+		{0x11073, 0x11074, 1},
 		{0x110b0, 0x110b8, 1},
-		{0x11127, 0x11132, 1},
+		{0x110c2, 0x11127, 101},
+		{0x11128, 0x11132, 1},
 		{0x11145, 0x11146, 1},
 		{0x111b3, 0x111bf, 1},
 		{0x111cb, 0x111cc, 1},
-		{0x1122c, 0x11233, 1},
+		{0x111ce, 0x1122c, 94},
+		{0x1122d, 0x11233, 1},
 		{0x112e0, 0x112e8, 1},
 		{0x1133e, 0x11344, 1},
 		{0x11347, 0x11348, 1},
@@ -813,7 +836,12 @@ var _UISC_Vowel_Dependent = &unicode.RangeTable{
 		{0x116ae, 0x116b5, 1},
 		{0x11720, 0x1172a, 1},
 		{0x1182c, 0x11836, 1},
-		{0x11a01, 0x11a0a, 1},
+		{0x11930, 0x11935, 1},
+		{0x11937, 0x11938, 1},
+		{0x119d1, 0x119d7, 1},
+		{0x119da, 0x119dd, 1},
+		{0x119e4, 0x11a01, 29},
+		{0x11a02, 0x11a0a, 1},
 		{0x11a51, 0x11a5b, 1},
 		{0x11c2f, 0x11c36, 1},
 		{0x11c38, 0x11c3b, 1},
@@ -829,7 +857,7 @@ var _UISC_Vowel_Dependent = &unicode.RangeTable{
 	},
 }
 
-// size 710 bytes (0.69 KiB)
+// size 770 bytes (0.75 KiB)
 var _UISC_Vowel_Independent = &unicode.RangeTable{
 	R16: []unicode.Range16{
 		{0x904, 0x914, 1},
@@ -890,6 +918,7 @@ var _UISC_Vowel_Independent = &unicode.RangeTable{
 	},
 	R32: []unicode.Range32{
 		{0x11005, 0x11012, 1},
+		{0x11071, 0x11072, 1},
 		{0x11083, 0x1108c, 1},
 		{0x11103, 0x11106, 1},
 		{0x11183, 0x11190, 1},
@@ -907,6 +936,10 @@ var _UISC_Vowel_Independent = &unicode.RangeTable{
 		{0x11600, 0x1160d, 1},
 		{0x11680, 0x11689, 1},
 		{0x11800, 0x11809, 1},
+		{0x11900, 0x11906, 1},
+		{0x11909, 0x119a0, 151},
+		{0x119a1, 0x119a7, 1},
+		{0x119aa, 0x119ad, 1},
 		{0x11a00, 0x11a50, 80},
 		{0x11c00, 0x11c08, 1},
 		{0x11c0a, 0x11c0d, 1},

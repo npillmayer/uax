@@ -116,6 +116,7 @@ func TestGraphemesTestFile(t *testing.T) {
 	if failcnt > 0 {
 		t.Errorf("%d TEST CASES OUT of %d FAILED", failcnt, i-from+1)
 	}
+	t.Logf("%d TEST CASES IGNORED", len(knownFailure))
 }
 
 var knownFailure = map[string]struct{}{
