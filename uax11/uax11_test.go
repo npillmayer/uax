@@ -30,17 +30,6 @@ func TestTables(t *testing.T) {
 }
 */
 
-func TestEnvLocale(t *testing.T) {
-	tracing.SetTestingLog(t)
-	//
-	ctx := ContextFromEnvironment()
-	if ctx == nil {
-		t.Fatalf("context from environment is nil, should not")
-	}
-	t.Logf("user environment has locale '%s'", ctx.Locale)
-	//t.Fail()
-}
-
 func TestWidth(t *testing.T) {
 	tracing.SetTestingLog(t)
 	//
