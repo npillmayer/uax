@@ -70,14 +70,5 @@ Copyright © 2021 Norbert Pillmayer <norbert@pillmayer.com>
 */
 package grapheme
 
-import (
-	"github.com/npillmayer/schuko/tracing"
-)
-
-// tracer traces to uax.segment .
-func tracer() tracing.Trace {
-	return tracing.Select("uax.segment")
-}
-
 // Version is the Unicode version this package conforms to.
 const Version = "11.0.0"

@@ -3,7 +3,6 @@ package uax11
 import (
 	"unicode/utf8"
 
-	jj "github.com/cloudfoundry/jibber_jabber"
 	"github.com/npillmayer/uax"
 	"github.com/npillmayer/uax/emoji"
 	"github.com/npillmayer/uax/grapheme"
@@ -67,7 +66,7 @@ func StringWidth(s grapheme.String, context *Context) int {
 func graphemeWidth(grphm []byte, context *Context) int {
 	r, _ := utf8.DecodeRune(grphm)
 	//T().Debugf("grapheme '%v' => rune %#U", grphm, r)
-	if emoji.EmojisClassForRune(r) >= 0 {
+	if emoji.ClassForRune(r) >= 0 {
 		//T().Debugf("%#U is emoji", r)
 		return 2
 	}
@@ -97,9 +96,6 @@ func graphemeWidth(grphm []byte, context *Context) int {
 //    context := &Context{Locale: "zh"}   // unspecified Chinese
 //    _ = Width([]byte("世"), context)
 //    fmt.Printf("%v", context.Script)    ⇒    “Hans”  (simplified Chinese script)
-//
-// Alternatively, clients may use one of the pre-defined contexts or use
-// `ContextFromEnvironment` to get a client-machine dependent one.
 //
 type Context struct {
 	ForceEastAsian bool            // force East Asian context
@@ -207,27 +203,3 @@ var eaMatch = language.NewMatcher([]language.Tag{
 	language.Burmese,
 	language.Khmer,
 })
-
-// ContextFromEnvironment creates a Context from the operating system environment,
-// i.e. either from environment variables on *nix sytems of from a kernel call
-// on Windows systems.
-// (We rely on http://github.com/cloudfoundry/jibber_jabber for this).
-//
-func ContextFromEnvironment() *Context {
-	userLocale, err := jj.DetectIETF()
-	if err != nil {
-		tracer().Errorf(err.Error())
-		userLocale = "en-US"
-		tracer().Infof("UAX#11 sets default user locale %v", userLocale)
-	} else {
-		tracer().Infof("UAX#11 detected user locale %v", userLocale)
-	}
-	lang := language.Make(userLocale)
-	script, _ := lang.Script()
-	ctx := &Context{
-		Script: script,
-		Locale: userLocale,
-	}
-	ctx = findResolver(lang, ctx)
-	return ctx
-}

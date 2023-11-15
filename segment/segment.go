@@ -54,14 +54,9 @@ import (
 	"math"
 	"strings"
 
-	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/uax"
+	"github.com/npillmayer/uax/internal/tracing"
 )
-
-// tracer traces to uax.segment .
-func tracer() tracing.Trace {
-	return tracing.Select("uax.segment")
-}
 
 // ErrBoundReached is returned from BoundedNext() if the reason for returning false
 // (and therefore stopping to iterato over the input text) is, that the bound given
@@ -277,7 +272,7 @@ func (s *Segmenter) Penalties() (int, int) {
 // For the latter case Err() will return nil.
 //
 func (s *Segmenter) Next() bool {
-	return s.next(math.MaxInt64)
+	return s.next(math.MaxInt)
 }
 
 // BoundedNext gets the next segment, together with the accumulated penalty for this break.
@@ -363,7 +358,7 @@ func (s *Segmenter) next(bound int) bool {
 			return false
 		}
 		if s.pos-s.deque.Len() > bound {
-			tracer().Debugf("exiting because of bound reached: %d-%d>%d", s.pos, s.deque.Len(), bound)
+			tracing.Debugf("exiting because of bound reached: %d-%d>%d", s.pos, s.deque.Len(), bound)
 			return false
 		}
 	}
@@ -374,8 +369,8 @@ func (s *Segmenter) next(bound int) bool {
 	}
 	//l, _ := s.getFrontSegment(bound)
 	s.getFrontSegment(bound)
-	// tracer().Debugf("s.positionOfBreakOpp=%d", s.positionOfBreakOpportunity)
-	//tracer().P("length", strconv.Itoa(l)).Debugf("Next() = \"%s\"", s.runesBuf)
+	// tracing.Debugf("s.positionOfBreakOpp=%d", s.positionOfBreakOpportunity)
+	//tracing.P("length", strconv.Itoa(l)).Debugf("Next() = \"%s\"", s.runesBuf)
 	return true
 }
 
@@ -395,7 +390,7 @@ func (s *Segmenter) readRune() error {
 	}
 	r, sz, err := s.reader.ReadRune()
 	s.pos += sz
-	//tracer().P("rune", r).Debugf("--------------------------------------")
+	//tracing.P("rune", r).Debugf("--------------------------------------")
 	if err == nil {
 		s.deque.PushBack(r, 0, 0)
 		return nil
@@ -405,7 +400,7 @@ func (s *Segmenter) readRune() error {
 		s.atEOF = true
 		err = nil
 	} else { // error case, err is non-nil
-		tracer().P("rune", r).Errorf("ReadRune() error: %s", err)
+		tracing.P("rune", r).Errorf("ReadRune() error: %s", err)
 		s.atEOF = true
 	}
 	return err
@@ -423,20 +418,20 @@ func (s *Segmenter) readRune() error {
 //
 func (s *Segmenter) readEnoughInputAndFindBreak(bound int) (err error) {
 	// if Q consists just of 0 rune (EOT), do nothing and return false
-	//tracer().Debugf("segmenter: read enough input, EOF=%v, |Q|=%d", s.atEOF, s.deque.Len())
+	//tracing.Debugf("segmenter: read enough input, EOF=%v, |Q|=%d", s.atEOF, s.deque.Len())
 	for s.positionOfBreakOpportunity < 0 {
 		if s.pos-s.longestActiveMatch > bound {
-			tracer().Infof("segmenter: bound reached")
+			tracing.Infof("segmenter: bound reached")
 			return ErrBoundReached
 		}
-		// tracer().Debugf("pos=%d - %d = %d --> %d", s.pos, s.longestActiveMatch,
+		// tracing.Debugf("pos=%d - %d = %d --> %d", s.pos, s.longestActiveMatch,
 		qlen := s.deque.Len()
 		from := max(0, qlen-1-s.longestActiveMatch) // current longest match limit, now old
 		skipRead := false
 		if from > 0 {
 			// this may happen if the previous iteration hit a bound
 			// or if a run of no-breaks was inserted by the breaker(s)
-			//tracer().Debugf("active match is short; previous iteration did not deliver (all) breakpoints")
+			//tracing.Debugf("active match is short; previous iteration did not deliver (all) breakpoints")
 			if s.positionOfBreakOpportunity >= 0 {
 				skipRead = true // we need not read in a rune if we had a breakpoint at bound
 			}
@@ -464,20 +459,20 @@ func (s *Segmenter) readEnoughInputAndFindBreak(bound int) (err error) {
 				s.insertPenalties(s.inxForBreaker(breaker), breaker.Penalties())
 			}
 			//s.printQ()
-			//tracer().Debugf("-- all breakers done --")
+			//tracing.Debugf("-- all breakers done --")
 		}
 		// The Q is updated. The longest active match may have been changed and
 		// we have to scan from the start of the Q to the new position of active match.
 		// If we find a breaking opportunity, we're done.
 		boundDist := bound
-		if bound < math.MaxInt64 {
+		if bound < math.MaxInt {
 			//boundDist = bound - s.pos + s.deque.Len()
 			boundDist = bound - s.pos + qlen
 		}
 		s.positionOfBreakOpportunity = s.findBreakOpportunity(qlen-s.longestActiveMatch,
 			boundDist)
 		//s.positionOfBreakOpportunity = s.findBreakOpportunity(qlen - 1 - s.longestActiveMatch)
-		// tracer().Debugf("segmenter: breakpos=%d, Q-len=%d, active match=%d",
+		// tracing.Debugf("segmenter: breakpos=%d, Q-len=%d, active match=%d",
 		// 	s.positionOfBreakOpportunity, s.deque.Len(), s.longestActiveMatch)
 		//s.printQ()
 	}
@@ -504,7 +499,7 @@ func (s *Segmenter) findBreakOpportunity(to int, boundDist int) int {
 	if to-1 < 0 || boundDist < 0 {
 		return -1
 	}
-	//tracer().Debugf("segmenter: searching for break opportunity from 0 to %d|%d: ", to-1, boundDist)
+	//tracing.Debugf("segmenter: searching for break opportunity from 0 to %d|%d: ", to-1, boundDist)
 	breakopp := -1
 	i := 0
 	for ; i < to && i <= boundDist; i++ {
@@ -512,18 +507,18 @@ func (s *Segmenter) findBreakOpportunity(to int, boundDist int) int {
 		q := s.deque.AtomAt(i)
 		if isPossibleBreak(q.penalty0, s.breakOnZero[0]) || (len(s.breakers) > 1 && isPossibleBreak(q.penalty1, s.breakOnZero[1])) {
 			breakopp = i
-			//tracer().Debugf("segmenter: penalties[%#U] = %d|%d   --- 8< ---", j, p0, p1)
+			//tracing.Debugf("segmenter: penalties[%#U] = %d|%d   --- 8< ---", j, p0, p1)
 			break
 		}
-		//tracer().Debugf("segmenter: penalties[%#U] = %d|%d", j, p0, p1)
+		//tracing.Debugf("segmenter: penalties[%#U] = %d|%d", j, p0, p1)
 	}
 	if breakopp >= 0 {
-		//tracer().Debugf("segmenter: break opportunity at %d", breakopp)
+		//tracing.Debugf("segmenter: break opportunity at %d", breakopp)
 	} else if i == boundDist+1 {
 		breakopp = int(boundDist)
-		//tracer().Debugf("segmenter: break at bound position %d", breakopp)
+		//tracing.Debugf("segmenter: break at bound position %d", breakopp)
 	} else {
-		//tracer().Debugf("segmenter: no break opportunity")
+		//tracing.Debugf("segmenter: no break opportunity")
 	}
 	return breakopp
 }
@@ -588,7 +583,7 @@ func (s *Segmenter) getFrontSegment(bound int) (int, bool) {
 	var isCutOff bool
 	start := s.pos - s.deque.Len()
 	if start+l >= bound { // front segment would extend bound
-		tracer().Debugf("segmenter: bound reached")
+		tracing.Debugf("segmenter: bound reached")
 		isCutOff = true // we truncate l to Q-start---->|bound
 		if l = int(bound) - int(s.pos) + s.deque.Len(); l < 0 {
 			return 0, true
@@ -600,11 +595,11 @@ func (s *Segmenter) getFrontSegment(bound int) (int, bool) {
 		seglen += written
 		s.lastPenalties[0], s.lastPenalties[1] = p0, p1
 	}
-	//tracer().Debugf("cutting front segment of length 0..%d: '%v'", l, s.runesBuf)
+	//tracing.Debugf("cutting front segment of length 0..%d: '%v'", l, s.runesBuf)
 	// There may be further break opportunities between this break and the start of the
 	// current longest match. Advance the pointer to the next break opportunity, if any.
 	boundDist := bound
-	if bound < math.MaxInt64 {
+	if bound < math.MaxInt {
 		boundDist = bound - s.pos + s.deque.Len()
 	}
 	s.positionOfBreakOpportunity = s.findBreakOpportunity(s.deque.Len()-s.longestActiveMatch,
@@ -617,9 +612,6 @@ func (s *Segmenter) getFrontSegment(bound int) (int, bool) {
 
 // Debugging helper. Print the content of the current queue to the debug log.
 func (s *Segmenter) printQ() {
-	if tracer().GetTraceLevel() < tracing.LevelDebug {
-		return
-	}
 	var sb strings.Builder
 	sb.WriteString("Q : ")
 	for i := 0; i < s.deque.Len(); i++ {
@@ -628,7 +620,7 @@ func (s *Segmenter) printQ() {
 		sb.WriteString(fmt.Sprintf(" <- %s", a.String()))
 	}
 	sb.WriteString(" .")
-	tracer().P("UAX |Q|=", s.deque.Len()).Debugf(sb.String())
+	tracing.P("UAX |Q|=", s.deque.Len()).Debugf(sb.String())
 }
 
 // --- Helpers ----------------------------------------------------------
@@ -686,7 +678,7 @@ func (rw *runewrite) WriteRune(r rune) (int, error) {
 		// we're not really writing anything, but rather just remembering the slice
 		// limits of our (future) return segment
 		// if r != rw.backing[rw.end] {
-		// 	tracer().Debugf("rune writer and backing store out of sync: %#U", r)
+		// 	tracing.Debugf("rune writer and backing store out of sync: %#U", r)
 		// 	err = fmt.Errorf("rune writer and backing store out of sync: %#U", r)
 		// }
 		rw.end++

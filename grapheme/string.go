@@ -7,6 +7,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/npillmayer/uax"
+	"github.com/npillmayer/uax/internal/tracing"
 	"github.com/npillmayer/uax/segment"
 )
 
@@ -38,7 +39,6 @@ const MaxByteLen int = 32766
 // may be of length 0 even if the input string is not.
 //
 func StringFromString(s string) String {
-	SetupGraphemeClasses()
 	if len(s) < math.MaxUint8 {
 		return makeShortString(s)
 	} else if len(s) < math.MaxUint16 {
@@ -84,11 +84,11 @@ func makeShortString(s string) String {
 	br := 0
 	for breaker.Next() {
 		br += len(breaker.Bytes())
-		tracer().Debugf("next grapheme = '%s'", breaker.Text())
+		tracing.Debugf("next grapheme = '%s'", breaker.Text())
 		gstr.breaks = append(gstr.breaks, uint8(br))
 	}
 	if breaker.Err() != nil {
-		tracer().Errorf("breaker error = %v", breaker.Err())
+		tracing.Errorf("breaker error = %v", breaker.Err())
 	}
 	return gstr
 }
@@ -133,11 +133,11 @@ func makeMidString(s string) String {
 	br := 0
 	for breaker.Next() {
 		br += len(breaker.Bytes())
-		tracer().Debugf("next grapheme = '%s'", breaker.Text())
+		tracing.Debugf("next grapheme = '%s'", breaker.Text())
 		gstr.breaks = append(gstr.breaks, uint16(br))
 	}
 	if breaker.Err() != nil {
-		tracer().Errorf("breaker error = %v", breaker.Err())
+		tracing.Errorf("breaker error = %v", breaker.Err())
 	}
 	return gstr
 }
@@ -170,7 +170,7 @@ func prepareBreaking(s string) *segment.Segmenter {
 	breaker := makeGraphemeBreaker()
 	start, _ := uax.PositionOfFirstLegalRune(s)
 	if start < 0 {
-		tracer().Errorf("cannot create grapheme string from invalid rune input")
+		tracing.Errorf("cannot create grapheme string from invalid rune input")
 	}
 	breaker.Init(&rr{input: s[start:], pos: 0})
 	return breaker
@@ -189,7 +189,7 @@ type rr struct {
 
 func (reader *rr) ReadRune() (r rune, size int, err error) {
 	r, size = utf8.DecodeRuneInString(reader.input)
-	tracer().Debugf("read rune %v with size %d", r, size)
+	tracing.Debugf("read rune %v with size %d", r, size)
 	if r == utf8.RuneError {
 		err = io.EOF
 		return

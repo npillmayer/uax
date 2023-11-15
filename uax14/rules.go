@@ -128,7 +128,7 @@ func rule_LB3(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 }
 
 func rule_05_NewLine(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
-	c := UAX14Class(cpClass)
+	c := Class(cpClass)
 	if c == BKClass || c == NLClass || c == LFClass {
 		rec.MatchLen++
 		return uax.DoAccept(rec, PenaltyForMustBreak)
@@ -140,7 +140,7 @@ func rule_05_NewLine(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 }
 
 func rule_05_CRLF(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
-	c := UAX14Class(cpClass)
+	c := Class(cpClass)
 	if c == LFClass {
 		return uax.DoAccept(rec, PenaltyForMustBreak, PenaltyToSuppressBreak, PenaltyToSuppressBreak)
 	}
@@ -148,7 +148,7 @@ func rule_05_CRLF(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 }
 
 func rule_06_HardBreak(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
-	c := UAX14Class(cpClass)
+	c := Class(cpClass)
 	if c == BKClass || c == NLClass || c == LFClass || c == CRClass {
 		//rec.MatchLen++
 		return uax.DoAccept(rec, 0, PenaltyToSuppressBreak)
@@ -172,7 +172,7 @@ func rule_LB8(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 
 // LB8 ... SP* +
 func finish_LB8(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
-	c := UAX14Class(cpClass)
+	c := Class(cpClass)
 	if c == SPClass {
 		return finish_LB8
 	}
@@ -209,7 +209,7 @@ func rule_LB12(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 //
 // [^SP BA HY] x GL
 func rule_LB12(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
-	//c := UAX14Class(cpClass)
+	//c := Class(cpClass)
 	uax14 := rec.UserData.(*LineWrap)
 	last := uax14.lastClass
 	if last == SPClass || last == BAClass || last == HYClass {
@@ -235,7 +235,7 @@ func rule_LB14(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 
 // ... SP* x
 func finish_LB14(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
-	c := UAX14Class(cpClass)
+	c := Class(cpClass)
 	if c == SPClass {
 		return finish_LB14
 	}
@@ -252,7 +252,7 @@ func rule_LB15(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 
 // ... SP* x OP
 func finish_LB15(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
-	c := UAX14Class(cpClass)
+	c := Class(cpClass)
 	if c == SPClass {
 		return finish_LB15
 	}
@@ -273,7 +273,7 @@ func rule_LB16(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 
 // ... SP* x NS
 func finish_LB16(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
-	c := UAX14Class(cpClass)
+	c := Class(cpClass)
 	if c == SPClass {
 		return finish_LB16
 	}
@@ -293,7 +293,7 @@ func rule_LB17(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 
 // ... SP* x B2
 func finish_LB17(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
-	c := UAX14Class(cpClass)
+	c := Class(cpClass)
 	if c == SPClass {
 		return finish_LB17
 	}
@@ -351,7 +351,7 @@ func rule_LB21a(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 
 // .. (HY | BA) x
 func finish_LB21a(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
-	c := UAX14Class(cpClass)
+	c := Class(cpClass)
 	if c == HYClass || c == BAClass {
 		return uax.DoAccept(rec, p(21))
 	}
@@ -368,7 +368,7 @@ func rule_LB21b(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 
 // ... x HL
 func finish_LB21b(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
-	c := UAX14Class(cpClass)
+	c := Class(cpClass)
 	if c == HLClass {
 		return uax.DoAccept(rec, 0, p(21))
 	}
@@ -390,7 +390,7 @@ func rule_LB22(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 
 // ... x IN
 func finish_LB22(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
-	c := UAX14Class(cpClass)
+	c := Class(cpClass)
 	if c == INClass {
 		return uax.DoAccept(rec, 0, p(22))
 	}
@@ -413,7 +413,7 @@ func rule_LB23_2(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 
 // ... x NU
 func finish_LB23_1(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
-	c := UAX14Class(cpClass)
+	c := Class(cpClass)
 	if c == NUClass {
 		return uax.DoAccept(rec, 0, p(23))
 	}
@@ -422,7 +422,7 @@ func finish_LB23_1(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 
 //  ... x (AL | HL)
 func finish_LB23_2(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
-	c := UAX14Class(cpClass)
+	c := Class(cpClass)
 	if c == ALClass || c == HLClass {
 		return uax.DoAccept(rec, 0, p(23))
 	}
@@ -446,7 +446,7 @@ func rule_LB23a_2(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 
 // ... x (ID | EB | EM)
 func finish_LB23a_1(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
-	c := UAX14Class(cpClass)
+	c := Class(cpClass)
 	if c == IDClass || c == EBClass || c == EMClass {
 		return uax.DoAccept(rec, 0, p(23))
 	}
@@ -455,7 +455,7 @@ func finish_LB23a_1(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 
 // ... x PO
 func finish_LB23a_2(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
-	c := UAX14Class(cpClass)
+	c := Class(cpClass)
 	if c == POClass {
 		return uax.DoAccept(rec, 0, p(23))
 	}
@@ -479,7 +479,7 @@ func rule_LB24_2(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 
 // ... x (AL | HL)
 func finish_LB24a_1(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
-	c := UAX14Class(cpClass)
+	c := Class(cpClass)
 	if c == ALClass || c == HLClass {
 		return uax.DoAccept(rec, 0, p(23))
 	}
@@ -488,7 +488,7 @@ func finish_LB24a_1(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 
 // ... x (PR | PO)
 func finish_LB24a_2(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
-	c := UAX14Class(cpClass)
+	c := Class(cpClass)
 	if c == PRClass || c == POClass {
 		return uax.DoAccept(rec, 0, p(23))
 	}
@@ -508,7 +508,7 @@ func rule_LB25(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 }
 
 func step2_LB25(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
-	c := UAX14Class(cpClass)
+	c := Class(cpClass)
 	if c == OPClass || c == HYClass {
 		rec.MatchLen++
 		return step3_LB25
@@ -520,7 +520,7 @@ func step2_LB25(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 }
 
 func step3_LB25(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
-	c := UAX14Class(cpClass)
+	c := Class(cpClass)
 	if c == NUClass {
 		rec.MatchLen++
 		return step4_LB25
@@ -529,7 +529,7 @@ func step3_LB25(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 }
 
 func step4_LB25(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
-	c := UAX14Class(cpClass)
+	c := Class(cpClass)
 	if c == NUClass || c == SYClass || c == ISClass {
 		rec.MatchLen++
 		return step4_LB25
@@ -543,7 +543,7 @@ func step4_LB25(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 }
 
 func step5_LB25(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
-	c := UAX14Class(cpClass)
+	c := Class(cpClass)
 	if c == PRClass || c == POClass {
 		return uax.DoAccept(rec, ps(25, p(25), rec.MatchLen)...)
 	}
@@ -576,7 +576,7 @@ func rule_LB26_3(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 
 // ... x (JL | JV | H2 | H3)
 func finish_LB26_1(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
-	c := UAX14Class(cpClass)
+	c := Class(cpClass)
 	if c == JLClass || c == JVClass || c == H2Class || c == H3Class {
 		return uax.DoAccept(rec, 0, p(26))
 	}
@@ -585,7 +585,7 @@ func finish_LB26_1(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 
 // ... x (JV | JT)
 func finish_LB26_2(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
-	c := UAX14Class(cpClass)
+	c := Class(cpClass)
 	if c == JVClass || c == JTClass {
 		return uax.DoAccept(rec, 0, p(26))
 	}
@@ -594,7 +594,7 @@ func finish_LB26_2(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 
 // ... x JT
 func finish_LB26_3(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
-	c := UAX14Class(cpClass)
+	c := Class(cpClass)
 	if c == JTClass {
 		return uax.DoAccept(rec, 0, p(26))
 	}
@@ -622,7 +622,7 @@ func rule_LB27_2(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 
 // ... x (IN | PO)
 func finish_LB27_1(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
-	c := UAX14Class(cpClass)
+	c := Class(cpClass)
 	if c == INClass || c == POClass {
 		return uax.DoAccept(rec, 0, p(27))
 	}
@@ -631,7 +631,7 @@ func finish_LB27_1(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 
 // ... x (JL | JV | JT | H2 | H3)
 func finish_LB27_2(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
-	c := UAX14Class(cpClass)
+	c := Class(cpClass)
 	if c == JLClass || c == JVClass || c == JTClass || c == H2Class || c == H3Class {
 		return uax.DoAccept(rec, 0, p(27))
 	}
@@ -648,7 +648,7 @@ func rule_LB28(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 
 // ... × (AL | HL)
 func finish_LB28(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
-	c := UAX14Class(cpClass)
+	c := Class(cpClass)
 	if c == ALClass || c == HLClass {
 		return uax.DoAccept(rec, 0, p(28))
 	}
@@ -665,7 +665,7 @@ func rule_LB29(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 
 // ... × (AL | HL)
 func finish_LB29(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
-	c := UAX14Class(cpClass)
+	c := Class(cpClass)
 	if c == ALClass || c == HLClass {
 		return uax.DoAccept(rec, 0, p(29))
 	}
@@ -692,7 +692,7 @@ func rule_LB30_2(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 
 // ... x OP
 func finish_LB30_1(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
-	c := UAX14Class(cpClass)
+	c := Class(cpClass)
 	if c == OPClass {
 		return uax.DoAccept(rec, 0, p(30))
 	}
@@ -701,7 +701,7 @@ func finish_LB30_1(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 
 // ... x (AL | HL | NU)
 func finish_LB30_2(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
-	c := UAX14Class(cpClass)
+	c := Class(cpClass)
 	if c == ALClass || c == HLClass || c == NUClass {
 		return uax.DoAccept(rec, 0, p(30))
 	}
@@ -723,7 +723,7 @@ func rule_LB30a(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 //
 // TODO: This will clash with rule LB 9 and 10 !
 func finish_LB30a(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
-	c := UAX14Class(cpClass)
+	c := Class(cpClass)
 	lw := rec.UserData.(*LineWrap)
 	if c == RIClass {
 		if lw.substituted {
@@ -746,7 +746,7 @@ func rule_LB30b(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
 
 // ... x EM
 func finish_LB30b(rec *uax.Recognizer, r rune, cpClass int) uax.NfaStateFn {
-	c := UAX14Class(cpClass)
+	c := Class(cpClass)
 
 	if c == EMClass {
 		return uax.DoAccept(rec, 0, p(30))

@@ -19,6 +19,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/npillmayer/uax/internal/tracing"
 	"golang.org/x/text/unicode/bidi"
 )
 
@@ -83,7 +84,7 @@ func (sc *bidiScanner) nextRune(pos charpos) (rune, int, bidi.Class, bool) {
 		sc.lastMarkup = 0
 		return 0, 0, markupToBidi(last), true
 	} else if sc.markup != nil && sc.lastMarkupPos < int64(pos) {
-		tracer().Debugf("bidi scanner: checking for markup at position %d", pos)
+		tracing.Debugf("bidi scanner: checking for markup at position %d", pos)
 		if d := sc.markup(uint64(pos)); int(d) > 0 {
 			sc.lastMarkupPos = int64(pos)
 			if d&MarkupPDI > 0 { // always handle PDI first
@@ -117,7 +118,7 @@ func (sc *bidiScanner) nextRune(pos charpos) (rune, int, bidi.Class, bool) {
 			bidiclz = cBRACKC
 		}
 	}
-	tracer().Debugf("bidi scanner rune %#U (%s)", r, classString(bidiclz))
+	tracing.Debugf("bidi scanner rune %#U (%s)", r, classString(bidiclz))
 	return r, length, bidiclz, true
 }
 
@@ -170,7 +171,7 @@ func (sc *bidiScanner) Scan(pipe chan<- scrap) {
 		bidiclz = applyRulesW1to3(r, bidiclz, current) // UAX#9 W1–3 handled by scanner
 		//lookahead = makeScrap(r, bidiclz, lapos, length)
 		lookahead = makeScrap(r, bidiclz, current.r, length)
-		tracer().Debugf("bidi scanner lookahead = %v", lookahead) // finally a new lookahead
+		tracing.Debugf("bidi scanner lookahead = %v", lookahead) // finally a new lookahead
 
 		// the current scrap is finished if the lookahead cannot extend it
 		if current.bidiclz == cNULL || current.bidiclz != lookahead.bidiclz || isbracket(current) || isisolate(current) {
@@ -194,19 +195,19 @@ func (sc *bidiScanner) Scan(pipe chan<- scrap) {
 			}
 		} else { // otherwise the current scrap grows
 			current = collapse(current, lookahead, current.bidiclz) // meld LA with current
-			tracer().Debugf("current bidi scanner scrap = %s, next iteration", current)
+			tracing.Debugf("current bidi scanner scrap = %s, next iteration", current)
 		}
 	}
-	tracer().Infof("stopped bidi scanner")
+	tracing.Infof("stopped bidi scanner")
 }
 
 func (sc *bidiScanner) post(s scrap, pipe chan<- scrap) {
-	tracer().Debugf("bidi scanner sends current scrap: %v", s)
+	tracing.Debugf("bidi scanner sends current scrap: %v", s)
 	pipe <- s
 }
 
 func (sc *bidiScanner) stop(pipe chan<- scrap) {
-	tracer().Debugf("stopping bidi scanner, sending final scrap (stopper)")
+	tracing.Debugf("stopping bidi scanner, sending final scrap (stopper)")
 	s := scrap{bidiclz: cNULL}
 	pipe <- s
 	close(pipe)
@@ -216,13 +217,13 @@ func (sc *bidiScanner) initialOuterScrap(setIRS bool) scrap {
 	var current scrap
 	current.bidiclz = cNULL
 	if sc.hasMode(optionOuterR2L) {
-		tracer().Infof("resolving paragraph with R2L embedding context")
+		tracing.Infof("resolving paragraph with R2L embedding context")
 		current.context.SetEmbedding(bidi.RightToLeft)
 		if setIRS {
 			current.bidiclz = bidi.RLI
 		}
 	} else {
-		tracer().Infof("resolving paragraph with L2R embedding context")
+		tracing.Infof("resolving paragraph with L2R embedding context")
 		current.context.SetEmbedding(bidi.LeftToRight)
 		if setIRS {
 			current.bidiclz = bidi.LRI
@@ -249,7 +250,7 @@ func applyRulesW1to3(r rune, clz bidi.Class, current scrap) bidi.Class {
 		return currclz
 	case bidi.EN: // rule W2
 		if current.context.IsAL() {
-			tracer().Errorf("========= context: %v", current.context)
+			tracing.Errorf("========= context: %v", current.context)
 			return bidi.AN
 		}
 	case bidi.AL: // rule W3
@@ -271,13 +272,13 @@ func (sc *bidiScanner) prepareRuleBD16(r rune, s scrap) scrap {
 		// is LA not just a bracket, but part of a UAX#9 bracket pair?
 		isbr := sc.bd16.pushOpening(r, s)
 		if isbr {
-			tracer().Debugf("bidi scanner pushed lookahead onto bracket stack: %s", s)
+			tracing.Debugf("bidi scanner pushed lookahead onto bracket stack: %s", s)
 			sc.bd16.dump()
 		}
 	} else {
 		found, _ := sc.bd16.findPair(r, s)
 		if found {
-			tracer().Debugf("bidi scanner popped closing bracket: %s", s)
+			tracing.Debugf("bidi scanner popped closing bracket: %s", s)
 			sc.bd16.dump()
 		}
 	}
@@ -287,7 +288,7 @@ func (sc *bidiScanner) prepareRuleBD16(r rune, s scrap) scrap {
 // lastAL is the position of the last AL character that has occured (before
 // UAX#9 rule W3 changed it)
 func inheritStrongTypes(dest, src scrap, lastAL int64) scrap {
-	tracer().Debugf("bidi scanner: inherit %s => %s     %v", src, dest, src.context)
+	tracing.Debugf("bidi scanner: inherit %s => %s     %v", src, dest, src.context)
 	dest.context = src.context
 	switch dest.bidiclz {
 	case bidi.LRI:
@@ -302,13 +303,13 @@ func inheritStrongTypes(dest, src scrap, lastAL int64) scrap {
 		switch src.bidiclz {
 		case bidi.L, bidi.LRI:
 			dest.context.SetStrongType(bidi.L, src.l)
-			tracer().Debugf("bidi scanner LA has L context=%v from %v", dest.context, src.context)
+			tracing.Debugf("bidi scanner LA has L context=%v from %v", dest.context, src.context)
 		case bidi.R, bidi.RLI:
 			dest.context.SetStrongType(bidi.R, src.l)
-			tracer().Debugf("bidi scanner LA has R context=%v from %v", dest.context, src.context)
+			tracing.Debugf("bidi scanner LA has R context=%v from %v", dest.context, src.context)
 		case bidi.AL:
 			dest.context.SetStrongType(bidi.AL, src.l)
-			tracer().Debugf("bidi scanner lA has AL context=%v from %v", dest.context, src.context)
+			tracing.Debugf("bidi scanner lA has AL context=%v from %v", dest.context, src.context)
 		}
 	}
 	return dest
@@ -328,7 +329,7 @@ func (sc *bidiScanner) handleIsolatingRunSwitch(s scrap) {
 	if s.bidiclz == bidi.PDI {
 		// re-establish outer BD16 handler
 		if len(sc.IRSStack) == 0 {
-			tracer().Debugf("bidi scanner found non-paired PDI at position %d", s.l)
+			tracing.Debugf("bidi scanner found non-paired PDI at position %d", s.l)
 			return
 		}
 		sc.bd16.lastpos = s.l
@@ -337,10 +338,10 @@ func (sc *bidiScanner) handleIsolatingRunSwitch(s scrap) {
 			tos := sc.IRSStack[len(sc.IRSStack)-1]
 			sc.bd16 = sc.IRS[tos]
 		}
-		tracer().Debugf("bidi scanner read PDI, switch back to outer IRS at %d", sc.bd16.firstpos)
+		tracing.Debugf("bidi scanner read PDI, switch back to outer IRS at %d", sc.bd16.firstpos)
 		return
 	}
-	tracer().Debugf("bidi scanner handleIsolatingRunSwitch(%v | %v)", s, s.context)
+	tracing.Debugf("bidi scanner handleIsolatingRunSwitch(%v | %v)", s, s.context)
 	// establish new BD16 handler
 	irs := sc.IRS[0]
 	for irs.next != nil { // find most rightward isolating run sequence
@@ -349,7 +350,7 @@ func (sc *bidiScanner) handleIsolatingRunSwitch(s scrap) {
 	sc.bd16 = makeBracketPairHandler(s.l, irs)
 	sc.IRS[s.l] = sc.bd16
 	sc.IRSStack = append(sc.IRSStack, s.l)
-	tracer().Debugf("bidi scanner: new IRS with position %d, nesting level is %d", sc.bd16.firstpos, len(sc.IRSStack)-1)
+	tracing.Debugf("bidi scanner: new IRS with position %d, nesting level is %d", sc.bd16.firstpos, len(sc.IRSStack)-1)
 }
 
 func (sc *bidiScanner) findBD16ForPos(pos charpos) *bracketPairHandler {

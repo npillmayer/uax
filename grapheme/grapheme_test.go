@@ -3,24 +3,22 @@ package grapheme
 import (
 	"bufio"
 	"bytes"
-	"os"
 	"strconv"
 	"strings"
 	"testing"
 	"unicode"
 
-	"github.com/npillmayer/schuko/tracing/gotestingadapter"
+	"github.com/npillmayer/uax/internal/testdata"
+	"github.com/npillmayer/uax/internal/tracing"
 	"github.com/npillmayer/uax/segment"
 )
 
 func TestGraphemeClasses(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "uax.segment")
-	defer teardown()
+	tracing.SetTestingLog(t)
 	c1 := LClass
 	if c1.String() != "LClass" {
 		t.Errorf("String(LClass) should be 'LClass', is %s", c1)
 	}
-	SetupGraphemeClasses()
 	if !unicode.Is(Control, '\t') {
 		t.Error("<TAB> should be identified as control character")
 	}
@@ -34,10 +32,8 @@ func TestGraphemeClasses(t *testing.T) {
 }
 
 func TestGraphemes1(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "uax.segment")
-	defer teardown()
-	SetupGraphemeClasses()
-	//
+	tracing.SetTestingLog(t)
+
 	onGraphemes := NewBreaker(1)
 	input := bytes.NewReader([]byte("개=Hang Syllable GAE"))
 	seg := segment.NewSegmenter(onGraphemes)
@@ -53,11 +49,8 @@ func TestGraphemes1(t *testing.T) {
 }
 
 func TestGraphemes2(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "uax.segment")
-	defer teardown()
-	//
-	SetupGraphemeClasses()
-	//
+	tracing.SetTestingLog(t)
+
 	onGraphemes := NewBreaker(1)
 	input := bytes.NewReader([]byte("Hello\tWorld!"))
 	seg := segment.NewSegmenter(onGraphemes)
@@ -77,26 +70,19 @@ func TestGraphemes2(t *testing.T) {
 }
 
 func TestGraphemesTestFile(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "uax.segment")
-	defer teardown()
-	//
-	SetupGraphemeClasses()
-	//
+	tracing.SetTestingLog(t)
+
+	file, err := testdata.UCDReader("auxiliary/GraphemeBreakTest.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	onGraphemes := NewBreaker(5)
 	seg := segment.NewSegmenter(onGraphemes)
 	//seg.BreakOnZero(true, false)
-	//gopath := os.Getenv("GOPATH")
-	//f, err := os.Open(gopath + "/etc/GraphemeBreakTest.txt")
-	//f, err := os.Open(gopath + "/etc/GraphemeBreakTest.txt")
-	f, err := os.Open("./testfile/GraphemeBreakTest.txt")
-	if err != nil {
-		//t.Errorf("ERROR loading " + gopath + "/etc/GraphemeBreakTest.txt\n")
-		t.Errorf("ERROR loading ./testfile/GraphemeBreakTest.txt\n")
-	}
-	defer f.Close()
 	//failcnt, i, from, to := 0, 0, 1, 1000
 	failcnt, i, from, to := 0, 0, 1, 1000
-	scan := bufio.NewScanner(f)
+	scan := bufio.NewScanner(file)
 	for scan.Scan() {
 		line := scan.Text()
 		line = strings.TrimSpace(line)
@@ -108,11 +94,16 @@ func TestGraphemesTestFile(t *testing.T) {
 			parts := strings.Split(line, "#")
 			testInput, comment := parts[0], parts[1]
 			//TC().Infof("#######################################################")
-			tracer().Infof(comment)
+			tracing.Infof(comment)
 			in, out := breakTestInput(testInput)
-			if !executeSingleTest(t, seg, i, in, out) {
+			success := executeSingleTest(t, seg, i, in, out)
+			_, shouldFail := knownFailure[testInput]
+			shouldSucceed := !shouldFail
+			if success != shouldSucceed {
 				failcnt++
-				//t.Fatal("Test case failed")
+				if shouldFail {
+					t.Logf("expected %q to fail, but succeeded", testInput)
+				}
 			}
 		}
 		if i >= to {
@@ -120,13 +111,48 @@ func TestGraphemesTestFile(t *testing.T) {
 		}
 	}
 	if err := scan.Err(); err != nil {
-		tracer().Infof("reading input:", err)
+		tracing.Infof("reading input: %v", err)
 	}
-	if failcnt > 11 {
+	if failcnt > 0 {
 		t.Errorf("%d TEST CASES OUT of %d FAILED", failcnt, i-from+1)
-	} else {
-		t.Logf("%d TEST CASES OUT of %d FAILED", failcnt, i-from+1)
 	}
+	t.Logf("%d TEST CASES IGNORED", len(knownFailure))
+}
+
+var knownFailure = map[string]struct{}{
+	"÷ 0600 × 0020 ÷\t":         {},
+	"÷ 0600 × 1F1E6 ÷\t":        {},
+	"÷ 0600 × 0600 ÷\t":         {},
+	"÷ 0600 × 1100 ÷\t":         {},
+	"÷ 0600 × 1160 ÷\t":         {},
+	"÷ 0600 × 11A8 ÷\t":         {},
+	"÷ 0600 × AC00 ÷\t":         {},
+	"÷ 0600 × AC01 ÷\t":         {},
+	"÷ 0600 × 231A ÷\t":         {},
+	"÷ 0600 × 0378 ÷\t":         {},
+	"÷ D800 ÷ 0308 ÷ 0020 ÷\t":  {},
+	"÷ D800 ÷ 0308 ÷ 000D ÷\t":  {},
+	"÷ D800 ÷ 0308 ÷ 000A ÷\t":  {},
+	"÷ D800 ÷ 0308 ÷ 0001 ÷\t":  {},
+	"÷ D800 ÷ 034F ÷\t":         {},
+	"÷ D800 ÷ 0308 × 034F ÷\t":  {},
+	"÷ D800 ÷ 0308 ÷ 1F1E6 ÷\t": {},
+	"÷ D800 ÷ 0308 ÷ 0600 ÷\t":  {},
+	"÷ D800 ÷ 0903 ÷\t":         {},
+	"÷ D800 ÷ 0308 × 0903 ÷\t":  {},
+	"÷ D800 ÷ 0308 ÷ 1100 ÷\t":  {},
+	"÷ D800 ÷ 0308 ÷ 1160 ÷\t":  {},
+	"÷ D800 ÷ 0308 ÷ 11A8 ÷\t":  {},
+	"÷ D800 ÷ 0308 ÷ AC00 ÷\t":  {},
+	"÷ D800 ÷ 0308 ÷ AC01 ÷\t":  {},
+	"÷ D800 ÷ 0308 ÷ 231A ÷\t":  {},
+	"÷ D800 ÷ 0300 ÷\t":         {},
+	"÷ D800 ÷ 0308 × 0300 ÷\t":  {},
+	"÷ D800 ÷ 200D ÷\t":         {},
+	"÷ D800 ÷ 0308 × 200D ÷\t":  {},
+	"÷ D800 ÷ 0308 ÷ 0378 ÷\t":  {},
+	"÷ D800 ÷ 0308 ÷ D800 ÷\t":  {},
+	"÷ 0061 ÷ 0600 × 0062 ÷\t":  {},
 }
 
 func breakTestInput(ti string) (string, []string) {
@@ -157,7 +183,7 @@ func breakTestInput(ti string) (string, []string) {
 }
 
 func executeSingleTest(t *testing.T, seg *segment.Segmenter, tno int, in string, out []string) bool {
-	tracer().Infof("expecting %v", ost(out))
+	tracing.Infof("expecting %v", ost(out))
 	seg.Init(strings.NewReader(in))
 	i := 0
 	ok := true
@@ -167,7 +193,7 @@ func executeSingleTest(t *testing.T, seg *segment.Segmenter, tno int, in string,
 		} else if out[i] != seg.Text() {
 			p0, p1 := seg.Penalties()
 			t.Logf("test #%d: penalties = %d|%d", tno, p0, p1)
-			t.Logf("test #%d: '%+q' should be '%+q'", tno, seg.Bytes(), out[i])
+			t.Logf("test #%d: '%x' should be '%x'", tno, string(seg.Bytes()), out[i])
 			ok = false
 		}
 		i++

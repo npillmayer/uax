@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/npillmayer/uax/internal/tracing"
 	"golang.org/x/text/unicode/bidi"
 )
 
@@ -54,7 +55,7 @@ func (rl *ResolvedLevels) Split(at uint64, shift0 bool) (*ResolvedLevels, *Resol
 	if shift0 {
 		//suffix = shiftzero(suffix, charpos(at))
 		shiftzero(&suffix, charpos(at))
-		tracer().Debugf("resolved levels: shifted suffix levels = %v", suffix)
+		tracing.Debugf("resolved levels: shifted suffix levels = %v", suffix)
 	}
 	return &ResolvedLevels{scraps: prefix}, &ResolvedLevels{scraps: suffix}
 }
@@ -63,7 +64,7 @@ func split(scraps []scrap, at charpos) ([]scrap, []scrap) {
 	// resulting level runs end up unbalanced, i.e. the nested IRS are
 	// split, too. In fact, we need to introduce a LRI/RLI at the beginning of
 	// the right rest and can spare PDIs in left parts.
-	tracer().Debugf("split @%d, irs = %v", at, scraps)
+	tracing.Debugf("split @%d, irs = %v", at, scraps)
 	if !irsContains(scraps, at) {
 		return scraps, []scrap{}
 	}
@@ -73,7 +74,7 @@ func split(scraps []scrap, at charpos) ([]scrap, []scrap) {
 		}
 		var restch [][]scrap
 		if len(s.children) > 0 { // TODO omit this
-			tracer().Debugf("split in %v with |ch|=%d", s, len(s.children))
+			tracing.Debugf("split in %v with |ch|=%d", s, len(s.children))
 			for j, ch := range s.children {
 				if irsContains(ch, at) {
 					prefix, suffix := split(ch, at)
@@ -103,8 +104,8 @@ func split(scraps []scrap, at charpos) ([]scrap, []scrap) {
 			scraps[i], rseg[0] = s, rest
 		}
 		prefix := scraps[:i+1]
-		tracer().Debugf("prefix=%v", prefix)
-		tracer().Debugf("suffix=%v", rseg)
+		tracing.Debugf("prefix=%v", prefix)
+		tracing.Debugf("suffix=%v", rseg)
 		return scraps[:i+1], rseg
 	}
 	panic("split iterated over all scraps, did not find cut line")
@@ -215,16 +216,16 @@ func reorder(scraps []scrap, i, j int, embedded Direction) []scrap {
 		//T().Debugf("scrap=%v, pos=%d, state=%d", s, pos, state)
 		for _, ch := range s.children {
 			dir := findEmbeddingDir(ch, embedded)
-			tracer().Debugf("scrap has child = %v", ch)
+			tracing.Debugf("scrap has child = %v", ch)
 			if dir != embedded {
-				tracer().Debugf("child dir is different from embedding")
+				tracing.Debugf("child dir is different from embedding")
 			}
 			reorder(ch, 0, len(ch), dir)
-			tracer().Debugf("reordered child = %v", ch)
+			tracing.Debugf("reordered child = %v", ch)
 			if dir != embedded {
-				tracer().Debugf("reversing total child %v", ch)
+				tracing.Debugf("reversing total child %v", ch)
 				reverseWithoutIsolates(ch, 0, len(ch))
-				tracer().Debugf("                child = %v", ch)
+				tracing.Debugf("                child = %v", ch)
 			}
 		}
 		switch state {
@@ -236,11 +237,11 @@ func reorder(scraps []scrap, i, j int, embedded Direction) []scrap {
 		case 1: // collecting o, EN, AN
 			if level(s, embedded) == 0 {
 				state = 0
-				tracer().Debugf("reverse(%d, %d)", startRunR, pos)
+				tracing.Debugf("reverse(%d, %d)", startRunR, pos)
 				reverse(scraps, startRunR, pos)
 				startRunR = 0
 			} else if pos == j {
-				tracer().Debugf("EOF reverse(%d, %d)", startRunR, pos+1)
+				tracing.Debugf("EOF reverse(%d, %d)", startRunR, pos+1)
 				reverse(scraps, startRunR, pos+1)
 			}
 		}
@@ -288,7 +289,7 @@ func reverseWithoutIsolates(scraps []scrap, i, j int) []scrap {
 	if isisolate((scraps[j-1])) {
 		j--
 	}
-	tracer().Debugf("reverse w/ isolates %d…%d : %v", i, j, scraps)
+	tracing.Debugf("reverse w/ isolates %d…%d : %v", i, j, scraps)
 	return reverse(scraps, i, j)
 }
 
@@ -312,17 +313,17 @@ func findEmbeddingDir(scraps []scrap, inherited Direction) Direction {
 }
 
 func flatten(scraps []scrap, embedding Direction) []Run {
-	tracer().Debugf("will flatten( %v ), emb=%v", scraps, embedding)
+	tracing.Debugf("will flatten( %v ), emb=%v", scraps, embedding)
 	var runs []Run
 	var last Run
 	if len(scraps) > 0 && isisolate(scraps[0]) {
 		embedding = directionFromBidiClass(scraps[0], embedding)
 	}
 	for _, s := range scraps {
-		tracer().Debugf("s=%v, |ch|=%d, last=%v", s, len(s.children), last)
+		tracing.Debugf("s=%v, |ch|=%d, last=%v", s, len(s.children), last)
 		if len(s.children) == 0 {
 			last, runs = extendRuns(s, last, runs, embedding)
-			tracer().Debugf("runs = %v", runs)
+			tracing.Debugf("runs = %v", runs)
 			continue
 		}
 		var cut scrap
@@ -330,25 +331,25 @@ func flatten(scraps []scrap, embedding Direction) []Run {
 			if len(ch) == 0 {
 				continue
 			}
-			tracer().Debugf("scrap has child = %v ------------------", ch)
+			tracing.Debugf("scrap has child = %v ------------------", ch)
 			cut, s = cutScrapAt(s, ch)
 			last, runs = extendRuns(cut, last, runs, embedding)
 			//chrun := flatten(ch, embedding) // TODO embedding -> last.Dir ?
 			chruns := flatten(ch, last.Dir) // TODO embedding -> last.Dir ?
-			tracer().Debugf("flattened child = %v", chruns)
-			tracer().Debugf("----------------------------------------------------------------")
+			tracing.Debugf("flattened child = %v", chruns)
+			tracing.Debugf("----------------------------------------------------------------")
 			last, runs = appendRuns(chruns, last, runs)
-			tracer().Debugf("runs+child=%v, last=%v", runs, last)
+			tracing.Debugf("runs+child=%v, last=%v", runs, last)
 		}
-		tracer().Debugf("after children: s=%v, runs=%v", s, runs)
+		tracing.Debugf("after children: s=%v, runs=%v", s, runs)
 		last, runs = extendRuns(s, last, runs, embedding)
-		tracer().Debugf("runs = %v", runs)
+		tracing.Debugf("runs = %v", runs)
 	}
 	return runs
 }
 
 func extendRuns(s scrap, last Run, runs []Run, embedding Direction) (Run, []Run) {
-	tracer().Debugf("extendRuns(%v), last=%v, runs=%v", s, last, runs)
+	tracing.Debugf("extendRuns(%v), last=%v, runs=%v", s, last, runs)
 	if s.len() == 0 { // important. must correlate to semantics of runappend()
 		return last, runs
 	}
@@ -363,10 +364,10 @@ func extendRuns(s scrap, last Run, runs []Run, embedding Direction) (Run, []Run)
 	} else if last.Dir == dir { // just extend last with s
 		//last.R = uint64(s.r)
 		last.concat(run(s, embedding))
-		tracer().Debugf("extending %v with %v", runs, last)
+		tracing.Debugf("extending %v with %v", runs, last)
 		runs[len(runs)-1] = last
 	} else { // have to switch directions
-		tracer().Debugf("switching dir")
+		tracing.Debugf("switching dir")
 		last = run(s, embedding)
 		// last = Run{
 		// 	// L:   uint64(s.l),
@@ -444,7 +445,7 @@ func (rl *ResolvedLevels) Reorder() *Ordering {
 		return &Ordering{}
 	}
 	rscr := reorder(rl.scraps, 0, len(rl.scraps), rl.embedding)
-	tracer().Debugf("=====reorder done, flatten ========")
+	tracing.Debugf("=====reorder done, flatten ========")
 	r := flatten(rscr, rl.embedding)
 	return &Ordering{Runs: r}
 }

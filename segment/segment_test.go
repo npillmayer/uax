@@ -6,8 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/npillmayer/schuko/tracing"
-	"github.com/npillmayer/schuko/tracing/gotestingadapter"
+	"github.com/npillmayer/uax/internal/tracing"
 )
 
 func init() {
@@ -15,9 +14,7 @@ func init() {
 }
 
 func TestWhitespace1(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "uax.segment")
-	defer teardown()
-	tracing.Select("uax.segment").SetTraceLevel(tracing.LevelError)
+	tracing.SetTestingLog(t)
 	//
 	seg := NewSegmenter()
 	seg.Init(strings.NewReader("Hello World!"))
@@ -28,9 +25,7 @@ func TestWhitespace1(t *testing.T) {
 }
 
 func TestWhitespace2(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "uax.segment")
-	defer teardown()
-	tracing.Select("uax.segment").SetTraceLevel(tracing.LevelError)
+	tracing.SetTestingLog(t)
 	//
 	seg := NewSegmenter()
 	seg.Init(strings.NewReader("	for (i=0; i<5; i++)   count += i;"))
@@ -41,9 +36,7 @@ func TestWhitespace2(t *testing.T) {
 }
 
 func TestSimpleSegmenter1(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "uax.segment")
-	defer teardown()
-	tracing.Select("uax.segment").SetTraceLevel(tracing.LevelError)
+	tracing.SetTestingLog(t)
 	//
 	seg := NewSegmenter() // will use a SimpleWordBreaker
 	seg.Init(strings.NewReader("Hello World "))
@@ -59,9 +52,7 @@ func TestSimpleSegmenter1(t *testing.T) {
 	}
 }
 func TestSimpleSegmenter2(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "uax.segment")
-	defer teardown()
-	tracing.Select("uax.segment").SetTraceLevel(tracing.LevelError)
+	tracing.SetTestingLog(t)
 	//
 	seg := NewSegmenter() // will use a SimpleWordBreaker
 	seg.Init(strings.NewReader("lime-tree"))
@@ -78,9 +69,7 @@ func TestSimpleSegmenter2(t *testing.T) {
 }
 
 func TestBounded(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "uax.segment")
-	defer teardown()
-	tracing.Select("uax.segment").SetTraceLevel(tracing.LevelError)
+	tracing.SetTestingLog(t)
 	//
 	seg := NewSegmenter(NewSimpleWordBreaker())
 	seg.Init(strings.NewReader("Hello World, how are you?"))
@@ -100,7 +89,7 @@ func TestBounded(t *testing.T) {
 		t.Fatalf("Expected 5 segments, have %d", n)
 	}
 	t.Logf("bounded: passed 1st test ")
-	tracer().Infof("======= rest =======")
+	tracing.Infof("======= rest =======")
 	for seg.Next() {
 		p1, p2 := seg.Penalties()
 		t.Logf("segment: penalty = %5d|%d for breaking after '%s'\n",
@@ -115,9 +104,7 @@ func TestBounded(t *testing.T) {
 }
 
 func TestBytesSegment(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "uax.segment")
-	defer teardown()
-	tracing.Select("uax.segment").SetTraceLevel(tracing.LevelError)
+	tracing.SetTestingLog(t)
 	//
 	seg := NewSegmenter(NewSimpleWordBreaker())
 	seg.Init(strings.NewReader("Hello World, how are you?"))
@@ -151,9 +138,7 @@ func TestRunesWriter(t *testing.T) {
 }
 
 func TestRunesSlicing(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "uax.segment")
-	defer teardown()
-	tracing.Select("uax.segment").SetTraceLevel(tracing.LevelError)
+	tracing.SetTestingLog(t)
 	//
 	seg := NewSegmenter(NewSimpleWordBreaker())
 	seg.InitFromSlice([]rune("Hello World, how are you?"))

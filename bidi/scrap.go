@@ -3,6 +3,7 @@ package bidi
 import (
 	"fmt"
 
+	"github.com/npillmayer/uax/internal/tracing"
 	"golang.org/x/text/unicode/bidi"
 )
 
@@ -211,7 +212,7 @@ func (dc *dirContext) SetStrongType(c bidi.Class, at charpos) dirContext {
 	} else if c == opposite(dc.embeddingDir) && at > dc.matchPos {
 		d := at - dc.matchPos
 		if d > 65535 {
-			tracer().Errorf("overflow for opposite-char distance: %d", d)
+			tracing.Errorf("overflow for opposite-char distance: %d", d)
 			d = 65535
 		}
 		dc.odist = uint16(d)

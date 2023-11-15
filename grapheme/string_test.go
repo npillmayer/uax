@@ -4,7 +4,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/npillmayer/schuko/tracing/gotestingadapter"
+	"github.com/npillmayer/uax/internal/tracing"
 )
 
 func TestRuneReader(t *testing.T) {
@@ -32,10 +32,7 @@ func TestRuneReader(t *testing.T) {
 }
 
 func TestString(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "uax.segment")
-	defer teardown()
-	//
-	SetupGraphemeClasses()
+	tracing.SetTestingLog(t)
 	//
 	input := "Hello World"
 	s := StringFromString(input)
@@ -55,10 +52,7 @@ func TestString(t *testing.T) {
 }
 
 func TestChineseString(t *testing.T) {
-	teardown := gotestingadapter.QuickConfig(t, "uax.segment")
-	defer teardown()
-	//
-	SetupGraphemeClasses()
+	tracing.SetTestingLog(t)
 	//
 	input := "世界"
 	s := StringFromString(input)

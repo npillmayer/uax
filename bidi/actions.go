@@ -3,6 +3,7 @@ package bidi
 import (
 	"strings"
 
+	"github.com/npillmayer/uax/internal/tracing"
 	"golang.org/x/text/unicode/bidi"
 )
 
@@ -267,7 +268,7 @@ func ruleN2() (*bidiRule, []byte) {
 		action: func(match []scrap) ([]scrap, int, bool) {
 			ni := match[0]
 			ni.bidiclz = ni.e()
-			tracer().Debugf("rule N2: produced e=%s with context=%v", ni, ni.context)
+			tracing.Debugf("rule N2: produced e=%s with context=%v", ni, ni.context)
 			return []scrap{ni}, -1, false
 		},
 	}, lhs
@@ -336,5 +337,5 @@ func makeLHS(toks ...bidi.Class) []byte {
 }
 
 func appendChildren(dest scrap, src scrap) {
-	tracer().Errorf("appendChildren(…) not yet implemented")
+	tracing.Errorf("appendChildren(…) not yet implemented")
 }

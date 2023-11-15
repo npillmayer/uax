@@ -158,15 +158,6 @@ Copyright © 2021 Norbert Pillmayer <norbert@pillmayer.com>
 */
 package uax
 
-import (
-	"github.com/npillmayer/schuko/tracing"
-)
-
-// tracer traces to uax.segment .
-func tracer() tracing.Trace {
-	return tracing.Select("uax.segment")
-}
-
 // We define constants for flagging break points as infinitely bad and
 // infinitely good, respectively.
 const (

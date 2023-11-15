@@ -1,10 +1,10 @@
 package uax
 
 import (
-	"context"
 	"fmt"
+	"sync"
 
-	pool "github.com/jolestar/go-commons-pool"
+	"github.com/npillmayer/uax/internal/tracing"
 )
 
 // UnicodeBreaker represents a logic to split up
@@ -70,35 +70,16 @@ func NewRecognizer(codePointClass int, next NfaStateFn) *Recognizer {
 	return rec
 }
 
-// Recognizers are short-lived objects. To avoid multiple allocation of
-// small objects we will pool them.
-type recognizerPool struct {
-	opool *pool.ObjectPool
-	ctx   context.Context
-}
-
-var globalRecognizerPool *recognizerPool
-
-func init() {
-	globalRecognizerPool = &recognizerPool{}
-	factory := pool.NewPooledObjectFactorySimple(
-		func(context.Context) (interface{}, error) {
-			rec := &Recognizer{}
-			return rec, nil
-		})
-	globalRecognizerPool.ctx = context.Background()
-	config := pool.NewDefaultPoolConfig()
-	//config.LIFO = false
-	config.MaxTotal = -1 // infinity
-	config.BlockWhenExhausted = false
-	globalRecognizerPool.opool = pool.NewObjectPool(globalRecognizerPool.ctx, factory, config)
+var globalRecognizerPool = sync.Pool{
+	New: func() interface{} {
+		return &Recognizer{}
+	},
 }
 
 // NewPooledRecognizer returns a new Recognizer, pre-filled with an expected code-point class
 // and a state function. The Recognizer is pooled for efficiency.
 func NewPooledRecognizer(cpClass int, stateFn NfaStateFn) *Recognizer {
-	o, _ := globalRecognizerPool.opool.BorrowObject(globalRecognizerPool.ctx)
-	rec := o.(*Recognizer)
+	rec := globalRecognizerPool.Get().(*Recognizer)
 	rec.Expect = cpClass
 	rec.nextStep = stateFn
 	return rec
@@ -106,11 +87,12 @@ func NewPooledRecognizer(cpClass int, stateFn NfaStateFn) *Recognizer {
 
 // Clears the Recognizer and puts it back into the pool.
 func (rec *Recognizer) releaseIntoPool() {
-	rec.penalties = nil
 	rec.Expect = 0
 	rec.MatchLen = 0
+	rec.UserData = nil
+	rec.penalties = rec.penalties[:0]
 	rec.nextStep = nil
-	_ = globalRecognizerPool.opool.ReturnObject(globalRecognizerPool.ctx, rec)
+	globalRecognizerPool.Put(rec)
 }
 
 // Simple stringer for debugging purposes.
@@ -146,7 +128,7 @@ func (rec *Recognizer) MatchLength() int {
 
 // RuneEvent is part  of interface RuneSubscriber.
 func (rec *Recognizer) RuneEvent(r rune, codePointClass int) []int {
-	//fmt.Printf("received rune event: %+q / %d\n", r, codePointClass)
+	//fmt.Printf("received rune event: %x / %d\n", r, codePointClass)
 	var penalties []int
 	if rec.nextStep != nil {
 		//CT.Infof("  calling func = %v", rec.nextStep)
@@ -174,7 +156,7 @@ func DoAbort(rec *Recognizer) NfaStateFn {
 func DoAccept(rec *Recognizer, penalties ...int) NfaStateFn {
 	rec.MatchLen++
 	rec.penalties = penalties
-	tracer().Debugf("ACCEPT with %v", rec.penalties)
+	tracing.Debugf("ACCEPT with %v", rec.penalties)
 	return nil
 }
 

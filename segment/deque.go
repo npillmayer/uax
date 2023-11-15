@@ -37,7 +37,7 @@ type atom struct {
 var eotAtom = atom{rune(0), uax.InfinitePenalty, uax.InfinitePenalty}
 
 func (a *atom) String() string {
-	return fmt.Sprintf("[%+q p=%d|%d]", a.r, a.penalty0, a.penalty1)
+	return fmt.Sprintf("[%x p=%d|%d]", a.r, a.penalty0, a.penalty1)
 }
 
 // minCapacity is the smallest capacity that deque may have.

@@ -67,12 +67,12 @@ func (swb *SimpleWordBreaker) ProceedWithRune(r rune, cpClass int) {
 		// close a match of length matchLen (= count of runes)
 		swb.penalties = swb.penalties[:0]
 		if swb.matchType == spaceType {
-			//tracer().Debugf("word breaker: closing spaces run")
+			//tracing.Debugf("word breaker: closing spaces run")
 			// swb.penalties = append(swb.penalties, 0)
 			// swb.penalties = append(swb.penalties, PenaltyAfterWhitespace)
 			swb.penalties = append(swb.penalties, 0, PenaltyAfterWhitespace)
 		} else {
-			//tracer().Debugf("word breaker: closing word run")
+			//tracing.Debugf("word breaker: closing word run")
 			// swb.penalties = append(swb.penalties, 0)
 			// swb.penalties = append(swb.penalties, PenaltyBeforeWhitespace)
 			swb.penalties = append(swb.penalties, 0, PenaltyBeforeWhitespace)
@@ -94,6 +94,6 @@ func (swb *SimpleWordBreaker) LongestActiveMatch() int {
 
 // Penalties is part of interface UnicodeBreaker
 func (swb *SimpleWordBreaker) Penalties() []int {
-	//tracer().Debugf("word breaker: emitting %v\n", swb.penalties)
+	//tracing.Debugf("word breaker: emitting %v\n", swb.penalties)
 	return swb.penalties
 }
