@@ -42,9 +42,11 @@ import (
 // inp should be the text of a single paragraph, but this is not enforced.
 //
 // UAX#9 lists the following phases for bidi typesetting:
-//    3.3  Resolving Embedding Levels
-//    3.4  Reordering Resolved Levels
-//    3.5  Shaping
+//
+//	3.3  Resolving Embedding Levels
+//	3.4  Reordering Resolved Levels
+//	3.5  Shaping
+//
 // Resolving means identifying runs of left-to-right or right-to-left text fragements.
 //
 // The subsequent phases (3.4 and 3.5) require the text to be segmented into lines,
@@ -54,7 +56,6 @@ import (
 //
 // markup may be provided to inform the resolver about out-of-line Bidi delimiter
 // locations; can be nil.
-//
 func ResolveParagraph(inp io.Reader, markup OutOfLineBidiMarkup, opts ...Option) *ResolvedLevels {
 	sc := newScanner(inp, markup, opts...)
 	p, err := newParser(sc) // TODO create a global one and re-use it
@@ -96,7 +97,7 @@ func newParser(sc *bidiScanner) (*parser, error) {
 
 // ResolveLevels starts the parse and returns resolved levels for the input-text.
 func (p *parser) ResolveLevels() *ResolvedLevels {
-	p.pipe = make(chan scrap, 0)
+	p.pipe = make(chan scrap)
 	go p.sc.Scan(p.pipe)                    // start the scanner which will process input characters
 	initial := p.sc.initialOuterScrap(true) // initial pseudo-IRS delimiter
 	tracer().Infof("bidi resolver: initial run starts with %v, context = %v", initial, initial.context)
@@ -168,7 +169,6 @@ func (p *parser) reduce(n int, rhs []scrap, startIRS int) {
 //
 // pass1 will return false if it has not been terminated by a PDI but rather by
 // reading a (premature) EOF.
-//
 func (p *parser) pass1(startIRS int) bool {
 	p.sp = startIRS              // start at beginning of isolating run sequence
 	la := 0                      // length of lookahead LA
@@ -259,7 +259,6 @@ func (p *parser) applySubIRS(startIRS int) int {
 // scraps remain. These are then the directional runs of an isolating run
 // sequence. If an isolating run sequence has just, say, left-to-right text,
 // there should be only a single scrap on the stack with bidi class L.
-//
 func (p *parser) pass2(startIRS int) {
 	p.sp = startIRS
 	for !p.passed(bidi.PDI) && p.sp < len(p.stack) {
@@ -300,7 +299,6 @@ func (p *parser) passed(c bidi.Class) bool {
 // loner LRI/RLI and backtrack, re-evalutating the context starting at the beginning
 // of the outer IRS. However, I will not follow the standard in this respect. For a
 // discussion of why this is, please refer to the ReadMe of the github repo.
-//
 func (p *parser) parseIRS(startIRS int) ([]scrap, int, int, bool) {
 	p.spIRS = append(p.spIRS, startIRS) // put start of isolating run sequence on IRS stack
 	tracer().Debugf("------ pass 1 (%d) ------", len(p.spIRS))
@@ -363,7 +361,6 @@ func (p *parser) parseIRS(startIRS int) ([]scrap, int, int, bool) {
 //
 // If either of the two is shorter than minlen, it is not returned. That may
 // result in only the long rule being returned.
-//
 func (p *parser) matchRulesLHS(scraps []scrap, minlen int) (*bidiRule, *bidiRule) {
 	//T().Debugf("match: %v", scraps)
 	iterator := p.trie.Iterator()
@@ -401,9 +398,9 @@ func (p *parser) matchRulesLHS(scraps []scrap, minlen int) (*bidiRule, *bidiRule
 // --- Handling of paired brackets -------------------------------------------
 
 // N0. Process bracket pairs in an isolating run sequence sequentially in the logical
-//     order of the text positions of the opening paired brackets using the logic
-//     given below. Within this scope, bidirectional types EN and AN are treated as R.
 //
+//	order of the text positions of the opening paired brackets using the logic
+//	given below. Within this scope, bidirectional types EN and AN are treated as R.
 func (p *parser) performRuleN0() (jmp int) {
 	tracer().Debugf("applying UAX#9 rule N0 (bracket pairs) with %s", p.stack[p.sp])
 	jmp = 1 // default is to walk over the bracket
@@ -572,7 +569,7 @@ func allocRule(trie *trie.TinyHashTrie, rule *bidiRule, lhs []byte) {
 // ---------------------------------------------------------------------------
 
 func copyStackSegm(a []scrap, start, runlen int) []scrap {
-	cp := make([]scrap, runlen, runlen)
+	cp := make([]scrap, runlen)
 	copy(cp, a[start:start+runlen])
 	return cp
 }

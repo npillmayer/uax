@@ -280,7 +280,7 @@ func TestScannerBrackets(t *testing.T) {
 	//
 	input := strings.NewReader("hi (YOU[])")
 	scnr := newScanner(input, nil, TestMode(true))
-	pipe := make(chan scrap, 0)
+	pipe := make(chan scrap)
 	go scnr.Scan(pipe)
 	for s := range pipe {
 		t.Logf("-> %s", s)

@@ -69,7 +69,7 @@ func (s *scrap) appendChild(ch []scrap) {
 }
 
 func (s *scrap) appendAllChildrenOf(other scrap) {
-	if other.children == nil || len(other.children) == 0 {
+	if len(other.children) == 0 {
 		return
 	}
 	for _, ch := range other.children {
@@ -155,15 +155,14 @@ func (s scrap) HasOppositeAfter(other scrap) bool {
 // speed and space efficiency. The information stored in dirContext is mainly used
 // for the following rules:
 //
-// * Rule W2, which changes numbers to arabic numbers if there is a recent strong
-//   type of AL (arabic letter)
-// * Rule W7, which changes numbers to type L if there is a recent strong type of L
-// * Rule N0, the handling of bracket pairings, which uses information about recent
-//   strong types L or R to decide the embedding level of brackets
+//   - Rule W2, which changes numbers to arabic numbers if there is a recent strong
+//     type of AL (arabic letter)
+//   - Rule W7, which changes numbers to type L if there is a recent strong type of L
+//   - Rule N0, the handling of bracket pairings, which uses information about recent
+//     strong types L or R to decide the embedding level of brackets
 //
 // Rule W2 could be handled by a boolean flag, but the combination of W7 and N0 is
 // more tricky (see the code dealing with bracket pairs).
-//
 type dirContext struct {
 	embeddingDir bidi.Class // embedding context
 	strong       bidi.Class // current strong context

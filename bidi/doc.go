@@ -20,7 +20,7 @@ as operations on “look-behinds,” or as setting properties per character (Bid
 embedding level) or as a multi-pass approach. This package employs strategies borrowed
 from parsing theory to arrive at the same results as the original UAX#9 algorithm.
 
-Deviations from the Standard
+# Deviations from the Standard
 
 This package implements UAX#9 in a way that is standards-conforming for
 “reasonable texts”, i.e. text produced by humans for humans. Deviations from the
@@ -41,7 +41,7 @@ This package will deal with isolate run sequences produced by isolate formatting
 characters (or external markup) only. The need to deal with legacy formatting
 characters may arise in the future, but currently I do not plan to implement them.
 
-API
+# API
 
 As the algorithms in this package will not copy any input characters, it leaves
 the burden to store the text to the calling client. This package will return
@@ -55,12 +55,12 @@ Attention: Work in progress, not yet fully functional.
 
 ________________________________________________________________________________
 
-License
+# License
 
 Governed by a 3-Clause BSD license. License file may be found in the root
 folder of this module.
 
-Copyright © 2021 Norbert Pillmayer <norbert@pillmayer.com>
+Copyright Norbert Pillmayer <norbert@pillmayer.com>
 */
 package bidi
 

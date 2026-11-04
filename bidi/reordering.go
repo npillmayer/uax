@@ -2,6 +2,7 @@ package bidi
 
 import (
 	"fmt"
+	"iter"
 	"strings"
 
 	"golang.org/x/text/unicode/bidi"
@@ -34,8 +35,42 @@ func (rl *ResolvedLevels) String() string {
 	var b strings.Builder
 	for _, s := range rl.scraps {
 		b.WriteString(fmt.Sprintf("[%d-%s-%d] ", s.l, classString(s.bidiclz), s.r))
+		//fmt.Fprintf(b, "[%d-%s-%d] ", s.l, classString(s.bidiclz), s.r)
 	}
 	return b.String()
+}
+
+// Level is a struct representing a resolved level run.
+//
+// See [ResolvedLevels.Range], an iterator over the resolved levels.
+type Level struct {
+	BidiClass bidi.Class
+	From, To  int
+}
+
+// Range is an iterator over the resolved levels, yielding a [Level] struct
+// for each resolved level run.
+//
+// This line (for an embedding context of LTR):
+//
+//	"Look out: זה כיף סתם לשמוע איך תנצח קרפד עץ טוב בגן"
+//
+// will produce the following levels:
+//
+//	[0-LRI-0] [0-L-10] [10-R-83] [83-PDI-83]
+func (rl *ResolvedLevels) Range() iter.Seq2[int, Level] {
+	return func(yield func(int, Level) bool) {
+		for i, s := range rl.scraps {
+			level := Level{
+				BidiClass: s.bidiclz,
+				From:      int(s.l),
+				To:        int(s.r),
+			}
+			if !yield(i, level) {
+				break
+			}
+		}
+	}
 }
 
 // Split cuts a resolved level run into 2 pieces at position at. The character
@@ -48,7 +83,6 @@ func (rl *ResolvedLevels) String() string {
 // resulting in the first level to have a left boundary of zero. This is useful for
 // cases where the clients splits the underlying text congruently to Bidi levels
 // and characters are therefore “re-positioned”.
-//
 func (rl *ResolvedLevels) Split(at uint64, shift0 bool) (*ResolvedLevels, *ResolvedLevels) {
 	prefix, suffix := split(rl.scraps, charpos(at))
 	if shift0 {
@@ -200,7 +234,6 @@ func (r *Run) concat(other Run) {
 // reorder IRS destructively, recursively.
 //
 // Not sure i…j is really necessary
-//
 func reorder(scraps []scrap, i, j int, embedded Direction) []scrap {
 	if len(scraps) <= i {
 		return scraps
@@ -476,16 +509,16 @@ type SegmentIterator struct {
 // SegmentIterator creates an interator for the text segments contained within a
 // Bidi run. Assume the output devices current direction is set to left-to-right:
 //
-//     it := run.SegmentIterator(run.IsOpposite(bidi.LeftToRight))
-//     for it.Next() {
-//         dir, from, to := it.Segment()
-//         var segment string
-//         segment = myGetSegString(from, to)  // client func to get the text-segment by positions
-//         if dir == bidi.RightToLeft {
-//             segment = reverse(segment)      // client func to reverse graphemes of a string
-//         }
-//         …                                   // visual output of segment
-//     }
+//	it := run.SegmentIterator(run.IsOpposite(bidi.LeftToRight))
+//	for it.Next() {
+//	    dir, from, to := it.Segment()
+//	    var segment string
+//	    segment = myGetSegString(from, to)  // client func to get the text-segment by positions
+//	    if dir == bidi.RightToLeft {
+//	        segment = reverse(segment)      // client func to reverse graphemes of a string
+//	    }
+//	    …                                   // visual output of segment
+//	}
 //
 // Clients of this package should proceed like this for every Run of an Ordering.
 //
@@ -493,7 +526,6 @@ type SegmentIterator struct {
 // the run in reverse order. This will be the case in situations where the direction
 // of the run is opposite to the visual direction of an output device and the
 // application has to handle visual re-ordering.
-//
 func (r *Run) SegmentIterator(reverse bool) *SegmentIterator {
 	it := &SegmentIterator{
 		//run:     r,
