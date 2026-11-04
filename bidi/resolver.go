@@ -496,61 +496,27 @@ func prepareRulesTrie() *trie.TinyHashTrie {
 			tracer().Errorf(err.Error())
 			panic(err.Error())
 		}
-		var r *bidiRule
 		tracelevel := tracer().GetTraceLevel()
 		tracer().SetTraceLevel(tracing.LevelInfo)
-		var lhs []byte
-		// --- allocate all the rules ---
-		r, lhs = ruleW4_1()
-		allocRule(trie, r, lhs)
-		r, lhs = ruleW4_2()
-		allocRule(trie, r, lhs)
-		r, lhs = ruleW4_3()
-		allocRule(trie, r, lhs)
-		r, lhs = ruleW5_1()
-		allocRule(trie, r, lhs)
-		r, lhs = ruleW5_2()
-		allocRule(trie, r, lhs)
-		r, lhs = ruleW6_1()
-		allocRule(trie, r, lhs)
-		r, lhs = ruleW6_2()
-		allocRule(trie, r, lhs)
-		r, lhs = ruleW6_3()
-		allocRule(trie, r, lhs)
-		r, lhs = ruleW6x()
-		allocRule(trie, r, lhs)
-		r, lhs = ruleW7()
-		allocRule(trie, r, lhs)
-		// r, lhs = ruleN1_0()
-		// allocRule(trie, r, lhs)
-		r, lhs = ruleN1_1()
-		allocRule(trie, r, lhs)
-		r, lhs = ruleN1_2()
-		allocRule(trie, r, lhs)
-		r, lhs = ruleN1_3()
-		allocRule(trie, r, lhs)
-		r, lhs = ruleN1_4()
-		allocRule(trie, r, lhs)
-		r, lhs = ruleN1_5()
-		allocRule(trie, r, lhs)
-		r, lhs = ruleN1_6()
-		allocRule(trie, r, lhs)
-		r, lhs = ruleN1_7()
-		allocRule(trie, r, lhs)
-		r, lhs = ruleN1_8()
-		allocRule(trie, r, lhs)
-		r, lhs = ruleN1_9()
-		allocRule(trie, r, lhs)
-		r, lhs = ruleN1_10()
-		allocRule(trie, r, lhs)
-		r, lhs = ruleN2()
-		allocRule(trie, r, lhs)
-		r, lhs = ruleL()
-		allocRule(trie, r, lhs)
-		r, lhs = ruleR()
-		allocRule(trie, r, lhs)
-		// ------------------------------
+		constructors := []func() (*bidiRule, []byte){
+			ruleW4_1, ruleW4_2, ruleW4_3,
+			ruleW5_1, ruleW5_2,
+			ruleW6_1, ruleW6_2, ruleW6_3, ruleW6x, ruleW7,
+			ruleN1_1, ruleN1_2, ruleN1_3, ruleN1_4, ruleN1_5,
+			ruleN1_6, ruleN1_7, ruleN1_8, ruleN1_9, ruleN1_10,
+			ruleN2, ruleL, ruleR,
+		}
+		// Inserting another word can relocate earlier trie entries. Build the
+		// complete trie before associating rule actions with its final positions.
+		for _, construct := range constructors {
+			_, lhs := construct()
+			trie.AllocPositionForWord(lhs)
+		}
 		trie.Freeze()
+		for _, construct := range constructors {
+			rule, lhs := construct()
+			allocRule(trie, rule, lhs)
+		}
 		tracer().SetTraceLevel(tracelevel)
 		tracer().Debugf("--- freeze trie -------------")
 		trie.Stats()

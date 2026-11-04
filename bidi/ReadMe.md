@@ -69,17 +69,23 @@ The intended processing sequence is:
    boundaries. The default paragraph direction is `LeftToRight`; use
    `DefaultDirection(RightToLeft)` when the surrounding layout requires RTL.
    This setting is explicit, rather than automatic first-strong detection.
-2. Have the client's layout code choose line breaks. When a paragraph occupies
+2. Range over `levels.LogicalSegments()` to get source-order byte intervals and
+   their resolved directions, including text inside nested isolates. Intersect
+   these intervals with the client's font/style spans, then shape and measure
+   the resulting items. This does not change `levels`; do not call `Split` at
+   style boundaries.
+3. Have the client's layout code choose line breaks from the measured items.
+   When a paragraph occupies
    several lines, use `levels.Split(at, false)` to obtain the prefix and suffix
    at a byte boundary, then continue splitting the suffix. With `false`, offsets
    remain relative to the original paragraph. Choose valid text boundaries;
    `Split` does not find break opportunities or check grapheme boundaries.
-3. Call `Reorder()` on each line's resolved levels. If the paragraph is a single
+4. Call `Reorder()` on each line's resolved levels. If the paragraph is a single
    line, call it directly on the result of `ResolveParagraph`. The returned
    `*Ordering` exposes `Runs`, each with a `Dir` and a `Length` in bytes. A run
    can contain several noncontiguous source intervals, so use its segment
    iterator to retrieve text rather than deriving offsets from `Length`.
-4. For each run, range over `run.Segments(reverse)`. Each `Segment` contains
+5. For each run, range over `run.Segments(reverse)`. Each `Segment` contains
    `Dir`, `From`, and `To`. The iterator only orders intervals; it does not
    reverse the characters inside `text[segment.From:segment.To]`.
    For the left-to-right output convention illustrated below, the documented
@@ -157,8 +163,9 @@ for i, level := range levels.Range() {
 
 Despite the name `Level`, this API exposes bidi classes and intervals, not
 numeric embedding levels. It includes synthetic, zero-length outer LRI/RLI and
-PDI delimiters and does not descend into nested isolates. Use `Reorder()` and
-the run segment iterators when you need the nested text for output.
+PDI delimiters and does not descend into nested isolates. Use
+`LogicalSegments()` for nested directions before line breaking, and `Reorder()`
+with the run segment iterators for output after line breaking.
 `DirectionAt(pos)` likewise examines outer intervals only and falls back to
 `LeftToRight` when no interval matches; it is not a complete nested-direction
 query.
@@ -175,10 +182,12 @@ zero bytes, preserving offsets into the client's text.
 Treat resolution, splitting, and reordering as a consuming pipeline. `Split`
 and `Reorder` modify backing data. Copying their Go structs does not make
 independent snapshots. Resolve the text again when an independent resolution
-or reordering pass is needed, and inspect `Range()` before calling `Reorder()`.
+or reordering pass is needed. Inspect `Range()` and iterate `LogicalSegments()`
+on the original paragraph result before splitting or reordering it.
 
-`Run.Segments` does not modify the run, including when iterating in reverse.
-Its iterator can be reused, and a range loop can stop early with `break`.
+`ResolvedLevels.LogicalSegments` and `Run.Segments` do not modify their backing
+data, including when `Run.Segments` iterates in reverse. Their iterators can be
+reused, and a range loop can stop early with `break`.
 The older `SegmentIterator` / `Next` / `Segment` API remains available for
 compatibility, but `SegmentIterator(true)` reverses the run's backing segment
 slice in place. Prefer `Segments` for new code, and avoid modifying a run while
@@ -199,3 +208,82 @@ algorithm tests: it treats uppercase letters as RTL and `>`, `<`, `=` as isolate
 markers. Leave it off for normal text. `RecognizeLegacy` has no effect, and FSI
 is not yet supported by the reordering implementation.
 
+### Interaction with Text Shaping
+
+Line breaking needs text widths, and those widths depend on the selected font
+and shaping direction. First resolve bidi for the whole paragraph, then use
+`LogicalSegments()` to intersect direction boundaries with font/style boundaries.
+Do this before calling `Split` or `Reorder`. Unlike `Range()`, it descends into
+nested isolates and returns a `Direction` directly. Number runs of bidi class
+EN or AN are LTR even inside
+an RTL isolate. The iterator omits zero-length intervals and isolate controls;
+in-text controls leave gaps in the byte ranges, while external markup does not
+consume bytes. Isolate boundaries are preserved even when adjacent segments
+have the same direction. The result is not guaranteed to contain maximal runs
+of a single direction.
+
+This complete example prepares four shaping inputs by intersecting bidi
+segments with three font spans. Only "FOUR" uses the bold font. The font names
+stand for concrete fonts already selected by the client.
+`TestMode(true)` makes uppercase letters represent RTL text for this example;
+leave it off when processing real text.
+
+```go
+package main
+
+import (
+	"fmt"
+	"strings"
+
+	"github.com/npillmayer/uax/bidi"
+)
+
+func main() {
+	text := "one two THREE FOUR FIVE"
+	levels := bidi.ResolveParagraph(strings.NewReader(text), nil, bidi.TestMode(true))
+	styles := []struct {
+		from, to uint64
+		font     string
+	}{
+		{0, 14, "regular"},
+		{14, 18, "bold"},
+		{18, uint64(len(text)), "regular"},
+	}
+	for segment := range levels.LogicalSegments() {
+		for _, style := range styles {
+			from := max(segment.From, style.from)
+			to := min(segment.To, style.to)
+			if from < to {
+				// Shape text[from:to] using style.font and segment.Dir.
+				fmt.Printf("%s %s [%d:%d] %q\n",
+					segment.Dir, style.font, from, to, text[from:to])
+			}
+		}
+	}
+}
+```
+
+Output:
+
+```text
+L2R regular [0:8] "one two "
+R2L regular [8:14] "THREE "
+R2L bold [14:18] "FOUR"
+R2L regular [18:23] " FIVE"
+```
+
+Replace the print operation with the client's shaping call, passing the selected
+font, `segment.Dir`, and the original logical text `text[from:to]`. Do not reverse
+the RTL input before shaping. Retain source-byte mappings with the glyphs and
+advances so the line breaker and renderer can refer back to the original text.
+If the shaper also requires uniform script or language, subdivide these items
+at those boundaries as well.
+
+`LogicalSegments()` leaves the resolved paragraph intact. Style boundaries
+create shaping items; they do not require `levels.Split`. Once the line breaker
+has selected actual line boundaries, split the resolved paragraph and call
+`Reorder()` on each resulting line. `Run.Segments()` then identifies the source
+intervals to associate with the shaped output for that line.
+
+For larger inputs, the intersection can use a single forward scan of the two
+ordered interval lists instead of the nested loops shown here.

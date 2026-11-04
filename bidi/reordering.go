@@ -73,6 +73,60 @@ func (rl *ResolvedLevels) Range() iter.Seq2[int, Level] {
 	}
 }
 
+// LogicalSegments returns text segments with resolved directions in source
+// order, descending into nested isolates. Clients can intersect these byte
+// intervals with font and style spans before shaping and choosing line breaks.
+// European and Arabic number runs have direction LeftToRight.
+//
+// Isolate delimiters and zero-length intervals are omitted. In-text isolate
+// controls therefore leave gaps in the returned byte intervals; out-of-line
+// markup consumes no bytes. Adjacent segments with the same direction are not
+// necessarily merged, so isolate boundaries remain available to the client.
+//
+// Iterate over the original result of ResolveParagraph before calling Split
+// or Reorder, which modify its backing data. LogicalSegments does not modify
+// that data. Its iterator supports repeated and independent traversals and
+// early exit, provided the resolved levels are not otherwise modified.
+func (rl *ResolvedLevels) LogicalSegments() iter.Seq[Segment] {
+	return func(yield func(Segment) bool) {
+		walkLogicalSegments(rl.scraps, rl.embedding, yield)
+	}
+}
+
+// walkLogicalSegments substitutes each child isolate for the corresponding
+// part of its enclosing scrap, retaining the enclosing direction in the gaps.
+// The scraps and their children must still be in logical order.
+func walkLogicalSegments(scraps []scrap, embedding Direction, yield func(Segment) bool) bool {
+	embedding = findEmbeddingDir(scraps, embedding)
+	for _, s := range scraps {
+		if isisolate(s) || s.bidiclz == cNULL {
+			continue
+		}
+		dir := directionFromBidiClass(s, embedding)
+		from := s.l
+		for _, child := range s.children {
+			if len(child) == 0 {
+				continue
+			}
+			if from < child[0].l {
+				if !yield(Segment{Dir: dir, From: uint64(from), To: uint64(child[0].l)}) {
+					return false
+				}
+			}
+			if !walkLogicalSegments(child, embedding, yield) {
+				return false
+			}
+			from = child[len(child)-1].r
+		}
+		if from < s.r {
+			if !yield(Segment{Dir: dir, From: uint64(from), To: uint64(s.r)}) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 // Split cuts a resolved level run into 2 pieces at position at. The character
 // at position at will be the first character of the second (cut-off) piece.
 //

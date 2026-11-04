@@ -16,14 +16,13 @@ import (
 // substitute the LHS with an appropriate RHS.
 //
 // Invariants:
-// - The RHS must be of equal length to the LHS or shorter.
-// - No LHS must be prefix of another rule's LHS, except for |LHS|=1 .
-// - Every rule is required to either have RHS≠LHS or to return a jump offset ≠ 0,
-//   otherwise the parser will enter an infinite loop.
+//   - The RHS must be of equal length to the LHS or shorter.
+//   - No LHS must be prefix of another rule's LHS, except for |LHS|=1 .
+//   - Every rule is required to either have RHS≠LHS or to return a jump offset ≠ 0,
+//     otherwise the parser will enter an infinite loop.
 //
 // All rules are hand-checked to not create circular identities and therefore
 // are guaranteed to not send the parser into an infinite loop.
-//
 type bidiRule struct {
 	name   string     // name of the rule according to UAX#9
 	lhsLen int        // number of symbols in the left hand side (LHS)
@@ -33,7 +32,7 @@ type bidiRule struct {
 
 // ruleAction is an action on bidi class intervals. Input is a slice of (consecutive)
 // class intervals which have been matched. The action's task is to substitute all or some
-// of the input intervals by one or more output intervals (reduce action). The ``cursor''
+// of the input intervals by one or more output intervals (reduce action). The “cursor”
 // will be positioned after the substitution by the parser, according to the second result
 // of the action, an integer. This position hint will be negative most of the time, telling
 // the parser to backtrack and try to re-apply other BiDi rules.
@@ -187,9 +186,8 @@ func ruleN1_3() (*bidiRule, []byte) {
 		lhsLen: len(lhs),
 		pass:   2,
 		action: func(match []scrap) ([]scrap, int, bool) {
-			collapse(match[0], match[1], bidi.R)
-			match[1].bidiclz = bidi.AN
-			match[1].appendAllChildrenOf(match[2])
+			match[0] = collapse(match[0], match[1], bidi.R)
+			match[1] = match[2]
 			return match[:2], 1, false
 		},
 	}, lhs
@@ -202,9 +200,8 @@ func ruleN1_4() (*bidiRule, []byte) {
 		lhsLen: len(lhs),
 		pass:   2,
 		action: func(match []scrap) ([]scrap, int, bool) {
-			collapse(match[0], match[1], bidi.R)
-			match[1].bidiclz = bidi.EN
-			match[1].appendAllChildrenOf(match[2])
+			match[0] = collapse(match[0], match[1], bidi.R)
+			match[1] = match[2]
 			return match[:2], 1, false
 		},
 	}, lhs
@@ -217,7 +214,7 @@ func ruleN1_5() (*bidiRule, []byte) {
 		lhsLen: len(lhs),
 		pass:   2,
 		action: func(match []scrap) ([]scrap, int, bool) {
-			collapse(match[1], match[2], bidi.R)
+			match[1] = collapse(match[1], match[2], bidi.R)
 			return match[:2], 1, false
 		},
 	}, lhs
@@ -240,7 +237,7 @@ func ruleN1_8() (*bidiRule, []byte) {
 		lhsLen: len(lhs),
 		pass:   2,
 		action: func(match []scrap) ([]scrap, int, bool) {
-			collapse(match[1], match[2], bidi.R)
+			match[1] = collapse(match[1], match[2], bidi.R)
 			return match[:2], 1, false
 		},
 	}, lhs
