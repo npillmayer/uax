@@ -492,11 +492,48 @@ func (rl *ResolvedLevels) DirectionAt(pos uint64) Direction {
 	return LeftToRight
 }
 
+// Segment describes a text interval in the original, unshuffled input.
+// From and To are UTF-8 byte offsets; From is inclusive and To is exclusive.
+// Dir is the direction in which the segment should be rendered.
+type Segment struct {
+	Dir      Direction
+	From, To uint64
+}
+
+// Segments returns an iterator over the text segments contained in a run.
+// If reverse is true, segments are visited in reverse order. The characters
+// within each segment remain in their original logical order.
+//
+// For left-to-right output, a client can iterate with:
+//
+//	for segment := range run.Segments(run.IsOpposite(bidi.LeftToRight)) {
+//	    text := paragraph[segment.From:segment.To]
+//	    // Shape and draw text using segment.Dir.
+//	}
+//
+// Iteration does not modify the run. The returned iterator can be reused and
+// supports independent traversals, provided the run is not otherwise modified.
+func (r *Run) Segments(reverse bool) iter.Seq[Segment] {
+	return func(yield func(Segment) bool) {
+		for i := 0; i < len(r.scraps); i++ {
+			index := i
+			if reverse {
+				index = len(r.scraps) - 1 - i
+			}
+			s := r.scraps[index]
+			if !yield(Segment{Dir: r.Dir, From: uint64(s.l), To: uint64(s.r)}) {
+				return
+			}
+		}
+	}
+}
+
 // SegmentIterator iterates over the text segments contained in a run.
 // Runs are the product of a re-ordering of text, which may lead to segments of text
 // to be shuffled around. A segment starts and ends at text positions of the unshuffled
 // text. Clients will need this information to create the correct visual order
 // of text segments.
+// For range-based iteration without modifying the run, use [Run.Segments].
 type SegmentIterator struct {
 	//run      *Run
 	Dir      Direction
@@ -526,6 +563,9 @@ type SegmentIterator struct {
 // the run in reverse order. This will be the case in situations where the direction
 // of the run is opposite to the visual direction of an output device and the
 // application has to handle visual re-ordering.
+//
+// This method is retained for compatibility. Unlike [Run.Segments], passing
+// true reverses the run's backing segment slice in place.
 func (r *Run) SegmentIterator(reverse bool) *SegmentIterator {
 	it := &SegmentIterator{
 		//run:     r,

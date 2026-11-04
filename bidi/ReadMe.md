@@ -79,9 +79,9 @@ The intended processing sequence is:
    `*Ordering` exposes `Runs`, each with a `Dir` and a `Length` in bytes. A run
    can contain several noncontiguous source intervals, so use its segment
    iterator to retrieve text rather than deriving offsets from `Length`.
-4. For each run, call `SegmentIterator(reverse)`, advance with `Next()`, and
-   read `(direction, from, to)` with `Segment()`. The iterator only orders
-   intervals; it does not reverse the characters inside `text[from:to]`.
+4. For each run, range over `run.Segments(reverse)`. Each `Segment` contains
+   `Dir`, `From`, and `To`. The iterator only orders intervals; it does not
+   reverse the characters inside `text[segment.From:segment.To]`.
    For the left-to-right output convention illustrated below, the documented
    choice is `run.IsOpposite(bidi.LeftToRight)` for `reverse`.
 
@@ -120,12 +120,11 @@ func main() {
 	// This paragraph fits on one line, so no Split is needed.
 	order := levels.Reorder()
 	for _, run := range order.Runs {
-		segments := run.SegmentIterator(run.IsOpposite(bidi.LeftToRight))
-		for segments.Next() {
-			dir, from, to := segments.Segment()
-			segment := text[from:to]
-			fmt.Printf("%s [%d:%d] %+q\n", dir, from, to, segment)
-			// Shape and draw segment with direction dir here.
+		for segment := range run.Segments(run.IsOpposite(bidi.LeftToRight)) {
+			part := text[segment.From:segment.To]
+			fmt.Printf("%s [%d:%d] %+q\n",
+				segment.Dir, segment.From, segment.To, part)
+			// Shape and draw part with direction segment.Dir here.
 		}
 	}
 }
@@ -173,12 +172,17 @@ zero bytes, preserving offsets into the client's text.
 
 ### Current implementation limits relevant to clients
 
-Treat resolution, splitting, reordering, and segment iteration as a consuming
-pipeline. `Split` and `Reorder` modify backing data, and
-`SegmentIterator(true)` reverses the run's backing segment slice in place.
-Copying their Go structs does not make independent snapshots. Resolve the text
-again when an independent pass is needed, and inspect `Range()` before calling
-`Reorder()`.
+Treat resolution, splitting, and reordering as a consuming pipeline. `Split`
+and `Reorder` modify backing data. Copying their Go structs does not make
+independent snapshots. Resolve the text again when an independent resolution
+or reordering pass is needed, and inspect `Range()` before calling `Reorder()`.
+
+`Run.Segments` does not modify the run, including when iterating in reverse.
+Its iterator can be reused, and a range loop can stop early with `break`.
+The older `SegmentIterator` / `Next` / `Segment` API remains available for
+compatibility, but `SegmentIterator(true)` reverses the run's backing segment
+slice in place. Prefer `Segments` for new code, and avoid modifying a run while
+iterating over it.
 
 `Split(at, true)` is intended to rebase suffix positions to zero, for use with
 a separately sliced text buffer. Currently it shifts only outer intervals,
