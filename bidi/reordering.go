@@ -80,7 +80,8 @@ func (rl *ResolvedLevels) Range() iter.Seq2[int, Level] {
 //
 // Isolate delimiters and zero-length intervals are omitted. In-text isolate
 // controls therefore leave gaps in the returned byte intervals; out-of-line
-// markup consumes no bytes. Adjacent segments with the same direction are not
+// markup consumes no bytes. A paragraph containing only empty isolates yields
+// no segments. Adjacent segments with the same direction are not
 // necessarily merged, so isolate boundaries remain available to the client.
 //
 // Iterate over the original result of ResolveParagraph before calling Split
@@ -486,6 +487,11 @@ func cutScrapAt(s scrap, ch []scrap) (scrap, scrap) {
 func appendRuns(childRuns []Run, last Run, runs []Run) (Run, []Run) {
 	if len(childRuns) == 0 {
 		return last, runs
+	}
+	if len(runs) == 0 {
+		// An isolate can precede all outer text, including when its only
+		// contents are delimiters. There is no preceding run to concatenate.
+		return childRuns[len(childRuns)-1], childRuns
 	}
 	if childRuns[0].Dir == last.Dir {
 		//last.Length = childRuns[0].Length

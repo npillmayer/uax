@@ -16,6 +16,26 @@ func TestLogicalSegments(t *testing.T) {
 		want   []Segment
 	}{
 		{name: "empty"},
+		{name: "only empty LTR isolate", text: "\u2066\u2069"},
+		{name: "only empty RTL isolate", text: "\u2067\u2069"},
+		{name: "only nested empty isolates", text: "\u2067\u2066\u2069\u2069"},
+		{name: "only sibling empty isolates", text: "\u2066\u2069\u2067\u2069"},
+		{
+			name: "only empty isolate in RTL paragraph", text: "\u2066\u2069",
+			opts: []Option{DefaultDirection(RightToLeft)},
+		},
+		{
+			name: "only empty test-mode isolate", text: "<=",
+			opts: []Option{TestMode(true)},
+		},
+		{
+			name: "empty isolate before whitespace", text: "\u2067\u2069 ",
+			want: []Segment{{LeftToRight, 6, 7}},
+		},
+		{
+			name: "empty isolate after whitespace", text: " \u2067\u2069",
+			want: []Segment{{LeftToRight, 0, 1}},
+		},
 		{
 			name: "style example", text: "one two THREE FOUR FIVE",
 			opts: []Option{TestMode(true)},

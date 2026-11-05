@@ -170,17 +170,15 @@ func (p *parser) reduce(n int, rhs []scrap, startIRS int) {
 // pass1 will return false if it has not been terminated by a PDI but rather by
 // reading a (premature) EOF.
 func (p *parser) pass1(startIRS int) bool {
-	p.sp = startIRS              // start at beginning of isolating run sequence
-	la := 0                      // length of lookahead LA
-	if _, ok := p.read(3); !ok { // initially load 3 scraps
-		return false // no input to read
-	}
+	p.sp = startIRS // start at beginning of isolating run sequence
 	var rule, shortrule *bidiRule
 	walk := false // if true, accept walking over 1 scrap
 	pdi := false
 	for { // scan the input sequence until PDI or EOF
 		//T().Debugf("EOF=%v", p.eof)
-		la = len(p.stack) - p.sp
+		// EOF from the scanner does not exhaust buffered lookahead. In
+		// particular, a nested isolate may still have its PDI on the stack.
+		la := len(p.stack) - p.sp
 		k, _ := p.read(3 - la) // extend LA to |LA|=3, if possible
 		la += k
 		//T().Debugf("t=%v, sp=%d, la=%d, walk=%v", t, p.sp, la, walk) //, minMatchLen)
