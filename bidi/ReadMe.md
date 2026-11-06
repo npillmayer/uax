@@ -181,9 +181,9 @@ zero bytes, preserving offsets into the client's text.
 
 Treat resolution, splitting, and reordering as a consuming pipeline. `Split`
 and `Reorder` modify backing data. Copying their Go structs does not make
-independent snapshots. Resolve the text again when an independent resolution
-or reordering pass is needed. Inspect `Range()` and iterate `LogicalSegments()`
-on the original paragraph result before splitting or reordering it.
+independent snapshots. Use `ResolvedLevels.Clone()` to make an independent
+working copy before splitting or reordering. Inspect `Range()` and iterate
+`LogicalSegments()` on the original paragraph result.
 
 `ResolvedLevels.LogicalSegments` and `Run.Segments` do not modify their backing
 data, including when `Run.Segments` iterates in reverse. Their iterators can be
@@ -287,3 +287,26 @@ intervals to associate with the shaped output for that line.
 
 For larger inputs, the intersection can use a single forward scan of the two
 ordered interval lists instead of the nested loops shown here.
+
+To support repeated layout attempts, keep the original resolved paragraph and
+clone it once per attempt. For the text above, a line breaker might select byte
+offset 14 (before "FOUR") on its first attempt and 18 (after "FOUR") on another:
+
+```go
+for _, breakpoint := range []uint64{14, 18} {
+	working := levels.Clone()
+	firstLine, secondLine := working.Split(breakpoint, false)
+	firstOrder := firstLine.Reorder()
+	secondOrder := secondLine.Reorder()
+	// Use firstOrder and secondOrder to place the shaped text for this attempt.
+	_, _ = firstOrder, secondOrder
+}
+// levels.LogicalSegments() is still available for another shaping/layout pass.
+```
+
+`Clone()` copies the embedding direction and the entire nested isolate tree.
+Its time and memory cost is proportional to the stored scraps and child slices;
+it does not copy the client's text, fonts, or shaped glyphs. It copies the current
+state, so cloning after `Reorder()` does not recover the original logical order.
+Resolve again if the text or directional markup changes. Cloning preserves the
+original result but does not change the `Split` limitations described above.

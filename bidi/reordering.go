@@ -31,6 +31,38 @@ type ResolvedLevels struct {
 	scraps    []scrap
 }
 
+// Clone returns an independent deep copy of the resolved levels, including
+// their embedding direction and all nested isolates. Splitting or reordering
+// either copy does not affect the other.
+//
+// Keep the original paragraph result and clone it once per layout attempt,
+// before calling Split or Reorder. Clone copies the current state; it does not
+// restore logical order if the receiver has already been reordered.
+// It takes time and space proportional to the stored scraps and child slices.
+// The source text is owned by the client and is not copied.
+func (rl *ResolvedLevels) Clone() *ResolvedLevels {
+	cloned := *rl
+	cloned.scraps = cloneScraps(rl.scraps)
+	return &cloned
+}
+
+func cloneScraps(scraps []scrap) []scrap {
+	if scraps == nil {
+		return nil
+	}
+	cloned := make([]scrap, len(scraps))
+	copy(cloned, scraps)
+	for i, s := range scraps {
+		if s.children != nil {
+			cloned[i].children = make([][]scrap, len(s.children))
+			for j, child := range s.children {
+				cloned[i].children[j] = cloneScraps(child)
+			}
+		}
+	}
+	return cloned
+}
+
 func (rl *ResolvedLevels) String() string {
 	var b strings.Builder
 	for _, s := range rl.scraps {
