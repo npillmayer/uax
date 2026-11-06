@@ -193,12 +193,18 @@ compatibility, but `SegmentIterator(true)` reverses the run's backing segment
 slice in place. Prefer `Segments` for new code, and avoid modifying a run while
 iterating over it.
 
-`Split(at, true)` is intended to rebase suffix positions to zero, for use with
-a separately sliced text buffer. Currently it shifts only outer intervals,
-not nested isolate children. Also, `Split` does not copy the paragraph's
-embedding-direction field into its results. Splitting nested isolates or RTL
-paragraphs therefore needs particular care; the simple single-line example
-above avoids those unfinished paths.
+`Split` preserves the paragraph direction in both results and partitions nested
+isolates at the cut. An isolate continuing onto another line receives synthetic,
+zero-length boundary markers; these do not replay control bytes from an earlier
+line. `Split(at, true)` rebases the suffix and all of its nested isolates by
+subtracting `at`, for use with a separately sliced text buffer. Subsequent cuts
+on that suffix must use its rebased coordinates. With `false`, keep using
+original paragraph offsets.
+
+Splitting empty levels returns two empty results. A cut at or before the start
+returns an empty prefix; a cut at or after the end returns an empty suffix.
+Empty results can be split again or reordered. Clients must still choose valid
+text boundaries: `Split` does not validate UTF-8 or grapheme boundaries.
 
 By default, resolution stops at a paragraph separator. Supply a reader bounded
 to one paragraph rather than relying on its position afterward: the scanner
@@ -309,4 +315,4 @@ Its time and memory cost is proportional to the stored scraps and child slices;
 it does not copy the client's text, fonts, or shaped glyphs. It copies the current
 state, so cloning after `Reorder()` does not recover the original logical order.
 Resolve again if the text or directional markup changes. Cloning preserves the
-original result but does not change the `Split` limitations described above.
+original result; the client remains responsible for choosing valid line breaks.

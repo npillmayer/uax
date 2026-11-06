@@ -116,10 +116,11 @@ func (rl *ResolvedLevels) Range() iter.Seq2[int, Level] {
 // no segments. Adjacent segments with the same direction are not
 // necessarily merged, so isolate boundaries remain available to the client.
 //
-// Iterate over the original result of ResolveParagraph before calling Split
-// or Reorder, which modify its backing data. LogicalSegments does not modify
-// that data. Its iterator supports repeated and independent traversals and
-// early exit, provided the resolved levels are not otherwise modified.
+// Iterate before calling Reorder, which changes source order. After Split,
+// iterate over its returned parts, using rebased coordinates if requested.
+// LogicalSegments does not modify the backing data. Its iterator supports
+// repeated and independent traversals and early exit, provided the resolved
+// levels are not otherwise modified.
 func (rl *ResolvedLevels) LogicalSegments() iter.Seq[Segment] {
 	return func(yield func(Segment) bool) {
 		walkLogicalSegments(rl.scraps, rl.embedding, yield)
@@ -160,90 +161,99 @@ func walkLogicalSegments(scraps []scrap, embedding Direction, yield func(Segment
 	return true
 }
 
-// Split cuts a resolved level run into 2 pieces at position at. The character
-// at position at will be the first character of the second (cut-off) piece.
+// Split divides resolved levels at a UTF-8 byte position. Text at the cut
+// belongs to the suffix. Both results retain the paragraph's embedding
+// direction, and nested isolates are partitioned recursively. Continuation
+// delimiters are synthetic, zero-length markers at the new line boundaries.
 //
-// Clients typically use this for line-wrapping. Cut-off level runs (= lines) can then
-// be reordered one by one.
+// Empty input produces two empty results. A cut at or before the start produces
+// an empty prefix; a cut at or after the end produces an empty suffix. The
+// caller must choose a valid text boundary; Split does not validate UTF-8 or
+// grapheme boundaries or find line-break opportunities.
 //
-// If parameter shift0 is set, all indices within resolved levels will be lowered by `at`,
-// resulting in the first level to have a left boundary of zero. This is useful for
-// cases where the clients splits the underlying text congruently to Bidi levels
-// and characters are therefore “re-positioned”.
+// If shift0 is true, suffix positions (including nested isolates) are reduced
+// by at, for use with a separately sliced text buffer. Otherwise both results
+// retain their original paragraph offsets.
+//
+// Split consumes its receiver's backing data. Use Clone before splitting when
+// the original levels must remain available. Each returned part can be split
+// further or reordered independently.
 func (rl *ResolvedLevels) Split(at uint64, shift0 bool) (*ResolvedLevels, *ResolvedLevels) {
-	prefix, suffix := split(rl.scraps, charpos(at))
-	if shift0 {
-		//suffix = shiftzero(suffix, charpos(at))
-		shiftzero(&suffix, charpos(at))
-		tracer().Debugf("resolved levels: shifted suffix levels = %v", suffix)
+	var prefix, suffix []scrap
+	// Compare before narrowing to charpos so a large cut cannot wrap around.
+	if len(rl.scraps) > 0 && at >= uint64(rl.scraps[len(rl.scraps)-1].r) {
+		prefix = rl.scraps
+	} else {
+		prefix, suffix = split(rl.scraps, charpos(at))
 	}
-	return &ResolvedLevels{scraps: prefix}, &ResolvedLevels{scraps: suffix}
+	if shift0 && len(suffix) > 0 {
+		shiftzero(suffix, charpos(at))
+	}
+	return &ResolvedLevels{embedding: rl.embedding, scraps: prefix},
+		&ResolvedLevels{embedding: rl.embedding, scraps: suffix}
 }
 
 func split(scraps []scrap, at charpos) ([]scrap, []scrap) {
-	// resulting level runs end up unbalanced, i.e. the nested IRS are
-	// split, too. In fact, we need to introduce a LRI/RLI at the beginning of
-	// the right rest and can spare PDIs in left parts.
-	tracer().Debugf("split @%d, irs = %v", at, scraps)
-	if !irsContains(scraps, at) {
-		return scraps, []scrap{}
+	if len(scraps) == 0 {
+		return nil, nil
 	}
-	for i, s := range scraps {
-		if !s.contains(at) {
-			continue
-		}
-		var restch [][]scrap
-		if len(s.children) > 0 { // TODO omit this
-			tracer().Debugf("split in %v with |ch|=%d", s, len(s.children))
-			for j, ch := range s.children {
-				if irsContains(ch, at) {
-					prefix, suffix := split(ch, at)
-					restch = [][]scrap{suffix}
-					if j < len(s.children)-1 {
-						restch = append(restch, s.children[j+1:]...)
-					}
-					s.children = s.children[:j]
-					s.children = append(s.children, prefix)
-					break
+	if at <= scraps[0].l {
+		return nil, scraps
+	}
+	if at >= scraps[len(scraps)-1].r {
+		return scraps, nil
+	}
+
+	opening := scraps[0]
+	hasOpening := opening.bidiclz == bidi.LRI || opening.bidiclz == bidi.RLI || opening.bidiclz == bidi.FSI
+	prefix := scraps[:0] // reuse storage only after its source element is read
+	suffix := make([]scrap, 0, len(scraps)+1)
+	if hasOpening {
+		// Retain the isolate direction, but never replay its original control
+		// bytes on a later line. The original opening stays with the prefix.
+		opening.l, opening.r = at, at
+		opening.children = nil
+		suffix = append(suffix, opening)
+	}
+	for _, s := range scraps {
+		switch {
+		case s.r <= at:
+			prefix = append(prefix, s)
+		case s.l >= at:
+			suffix = append(suffix, s)
+		default:
+			left, right := s, s // preserve bidi class and directional context
+			left.r, right.l = at, at
+			left.children, right.children = nil, nil
+			for _, child := range s.children {
+				before, after := split(child, at)
+				if len(before) > 0 {
+					left.children = append(left.children, before)
+				}
+				if len(after) > 0 {
+					right.children = append(right.children, after)
 				}
 			}
+			prefix = append(prefix, left)
+			suffix = append(suffix, right)
 		}
-		// children are split at this point
-		// restch is set to right part of children split
-		rest := scrap{r: s.r, bidiclz: s.bidiclz}
-		s.r, rest.l = at, at
-		rest.children = restch
-		rseg := make([]scrap, len(scraps)-i+1)
-		if isisolate(scraps[0]) {
-			rseg[0] = scraps[0] // copy IRS start
-			copy(rseg[1:], scraps[i:])
-			scraps[i], rseg[1] = s, rest
-		} else {
-			copy(rseg, scraps[i:])
-			rseg = rseg[:len(rseg)-1]
-			scraps[i], rseg[0] = s, rest
-		}
-		prefix := scraps[:i+1]
-		tracer().Debugf("prefix=%v", prefix)
-		tracer().Debugf("suffix=%v", rseg)
-		return scraps[:i+1], rseg
 	}
-	panic("split iterated over all scraps, did not find cut line")
+	if hasOpening {
+		prefix = append(prefix, scrap{l: at, r: at, bidiclz: bidi.PDI})
+	}
+	return prefix, suffix
 }
 
-func irsContains(scraps []scrap, pos charpos) bool {
-	return scraps[0].l <= pos && scraps[len(scraps)-1].r > pos
-}
-
-func shiftzero(scraps *[]scrap, offset charpos) { //[]scrap {
-	for i, s := range *scraps {
+func shiftzero(scraps []scrap, offset charpos) {
+	for i := range scraps {
+		s := &scraps[i]
 		s.l = validcharpos(s.l, offset)
 		s.r = validcharpos(s.r, offset)
-		(*scraps)[i] = s
-		//T().Errorf("scrap = %v", s)
+		s.context.matchPos = validcharpos(s.context.matchPos, offset)
+		for _, child := range s.children {
+			shiftzero(child, offset)
+		}
 	}
-	//T().Errorf("shifted = %v", scraps)
-	//return scraps
 }
 
 // The Reordering Phase of the UAX#9 algorithm is basically building a tree

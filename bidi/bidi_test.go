@@ -241,8 +241,11 @@ func TestSplitSingle(t *testing.T) {
 		{l: 51, r: 51, bidiclz: bidi.PDI},
 	}
 	prefix, suffix := split(scraps[:], 38)
-	if len(prefix) != 3 || len(suffix) != 4 {
-		t.Errorf("expected split into 3|4, is %d|%d", len(prefix), len(suffix))
+	if len(prefix) != 4 || len(suffix) != 4 {
+		t.Errorf("expected split into 4|4, is %d|%d", len(prefix), len(suffix))
+	}
+	if end := prefix[len(prefix)-1]; end.bidiclz != bidi.PDI || end.l != 38 || end.r != 38 {
+		t.Errorf("expected synthetic PDI at cut, got %v", end)
 	}
 }
 
@@ -268,8 +271,11 @@ func TestSplit(t *testing.T) {
 	scraps[4].children = append(scraps[2].children, chRL[:])
 	t.Logf("scraps=%v", scraps)
 	prefix, suffix := split(scraps[:], 37)
-	if len(prefix) != 5 || len(suffix) != 3 {
-		t.Errorf("expected split into 5|3, is %d|%d", len(prefix), len(suffix))
+	if len(prefix) != 6 || len(suffix) != 3 {
+		t.Errorf("expected split into 6|3, is %d|%d", len(prefix), len(suffix))
+	}
+	if end := prefix[len(prefix)-1]; end.bidiclz != bidi.PDI || end.l != 37 || end.r != 37 {
+		t.Errorf("expected synthetic PDI at cut, got %v", end)
 	}
 }
 
