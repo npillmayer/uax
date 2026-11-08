@@ -24,8 +24,16 @@ import (
 // ResolvedLevels is a type for holding the result of phase 3.3
 // “Resolving Embedded Levels”.
 type ResolvedLevels struct {
-	embedding Direction // TODO set this from parser
+	embedding Direction // paragraph embedding direction
 	scraps    []scrap
+}
+
+// ParagraphDirection returns the paragraph embedding direction: LeftToRight
+// corresponds to level 0, and RightToLeft to level 1. It is independent of the
+// direction of individual text runs and is preserved by Clone, Split, ApplyL1,
+// and Reorder. The zero value of ResolvedLevels has direction LeftToRight.
+func (rl *ResolvedLevels) ParagraphDirection() Direction {
+	return rl.embedding
 }
 
 // Clone returns an independent deep copy of the resolved levels, including

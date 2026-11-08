@@ -176,6 +176,11 @@ with the run segment iterators for output after line breaking.
 `LeftToRight` when no interval matches; it is not a complete nested-direction
 query.
 
+Use `levels.ParagraphDirection()` to retrieve the paragraph embedding direction:
+`LeftToRight` corresponds to level 0 and `RightToLeft` to level 1. This direction
+is independent of individual text runs and remains unchanged through `Clone`,
+`Split`, `ApplyL1`, and `Reorder`. Both parts returned by `Split` retain it.
+
 For directional boundaries supplied by external markup, pass an
 `OutOfLineBidiMarkup` callback to `ResolveParagraph`. It receives a byte position
 and should return `0` for no boundary, or one of `MarkupLRI`, `MarkupRLI`,
