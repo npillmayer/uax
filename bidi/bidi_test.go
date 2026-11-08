@@ -565,8 +565,8 @@ func TestTest(t *testing.T) {
 func applyOrder(text []byte, order *Ordering) []byte {
 	var r []byte = make([]byte, 0, len(text))
 	for _, run := range order.Runs {
-		for _, s := range run.scraps {
-			b := text[s.l:s.r]
+		for s := range run.Segments(run.IsOpposite(LeftToRight)) {
+			b := text[s.From:s.To]
 			if run.Dir == RightToLeft {
 				b = reverseString(b)
 			}

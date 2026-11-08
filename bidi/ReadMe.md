@@ -80,19 +80,25 @@ The intended processing sequence is:
    at a byte boundary, then continue splitting the suffix. With `false`, offsets
    remain relative to the original paragraph. Choose valid text boundaries;
    `Split` does not find break opportunities or check grapheme boundaries.
-4. Call `Reorder()` on each line's resolved levels. If the paragraph is a single
-   line, call it directly on the result of `ResolveParagraph`. The returned
-   `*Ordering` exposes `Runs`, each with a `Dir` and a `Length` in bytes. A run
+4. Identify the intervals requiring rule L1 using the original bidi classes,
+   and call `line.ApplyL1(from, to)` for each interval. This includes trailing
+   whitespace and isolate controls, and separators with qualifying preceding
+   whitespace/controls. Include the final line, even without an explicit wrap.
+5. Call `Reorder()` on each line's resolved levels. If the paragraph is a single
+   line, apply L1 and reorder the result of `ResolveParagraph` directly. The returned
+   `*Ordering` exposes `Runs` in left-to-right visual order, each with a `Dir`
+   and a `Length` in bytes. A run
    can contain several noncontiguous source intervals, so use its segment
    iterator to retrieve text rather than deriving offsets from `Length`.
-5. For each run, range over `run.Segments(reverse)`. Each `Segment` contains
+6. For each run, range over `run.Segments(reverse)`. Each `Segment` contains
    `Dir`, `From`, and `To`. The iterator only orders intervals; it does not
    reverse the characters inside `text[segment.From:segment.To]`.
    For the left-to-right output convention illustrated below, the documented
    choice is `run.IsOpposite(bidi.LeftToRight)` for `reverse`.
 
 The client remains responsible for shaping, glyph placement, mirroring, and
-line-boundary whitespace handling (UAX#9 rule L1). Pass each segment's logical
+identifying the intervals requiring UAX#9 rule L1; `ApplyL1` performs the level
+reset. Pass each segment's logical
 text and direction to the appropriate shaping/rendering stage. A renderer that
 already performs paragraph bidi layout needs a different integration to avoid
 applying reordering twice. For a simple visual-text demonstration, reversing
@@ -179,8 +185,8 @@ zero bytes, preserving offsets into the client's text.
 
 ### Current implementation limits relevant to clients
 
-Treat resolution, splitting, and reordering as a consuming pipeline. `Split`
-and `Reorder` modify backing data. Copying their Go structs does not make
+Treat resolution, splitting, L1 resets, and reordering as a consuming pipeline.
+`Split`, `ApplyL1`, and `Reorder` modify backing data. Copying their Go structs does not make
 independent snapshots. Use `ResolvedLevels.Clone()` to make an independent
 working copy before splitting or reordering. Inspect `Range()` and iterate
 `LogicalSegments()` on the original paragraph result.
@@ -287,8 +293,9 @@ at those boundaries as well.
 
 `LogicalSegments()` leaves the resolved paragraph intact. Style boundaries
 create shaping items; they do not require `levels.Split`. Once the line breaker
-has selected actual line boundaries, split the resolved paragraph and call
-`Reorder()` on each resulting line. `Run.Segments()` then identifies the source
+has selected actual line boundaries, split the resolved paragraph, apply L1 to
+the client-identified intervals, and call `Reorder()` on each resulting line.
+`Run.Segments()` then identifies the source
 intervals to associate with the shaped output for that line.
 
 For larger inputs, the intersection can use a single forward scan of the two
@@ -302,6 +309,13 @@ offset 14 (before "FOUR") on its first attempt and 18 (after "FOUR") on another:
 for _, breakpoint := range []uint64{14, 18} {
 	working := levels.Clone()
 	firstLine, secondLine := working.Split(breakpoint, false)
+	if breakpoint == 14 {
+		// In this example, the space at byte 13 ends the first line.
+		if err := firstLine.ApplyL1(13, 14); err != nil {
+			panic(err)
+		}
+	}
+	// Neither the break at 18 nor the final line has trailing L1 characters.
 	firstOrder := firstLine.Reorder()
 	secondOrder := secondLine.Reorder()
 	// Use firstOrder and secondOrder to place the shaped text for this attempt.
@@ -316,3 +330,75 @@ it does not copy the client's text, fonts, or shaped glyphs. It copies the curre
 state, so cloning after `Reorder()` does not recover the original logical order.
 Resolve again if the text or directional markup changes. Cloning preserves the
 original result; the client remains responsible for choosing valid line breaks.
+
+### Applying L1 after Line Wrapping
+
+[Rule L1 of UAX#9](https://www.unicode.org/reports/tr9/#L1) resets selected
+characters to the **paragraph embedding level** before reordering each line.
+The client identifies the affected intervals using the original `Bidi_Class`
+values: segment and paragraph separators, sequences of whitespace (`WS`) and/or
+isolate controls (`LRI`, `RLI`, `FSI`, `PDI`) preceding those separators, and such
+sequences at the end of the line. The resolved directions alone cannot identify
+these characters. A line may need several calls, including for an internal tab
+(a segment separator). The final line needs the same treatment as wrapped lines.
+
+Call `line.ApplyL1(from, to)` after splitting and before `Reorder()`. The interval
+is half-open and uses UTF-8 **byte** positions, not a count of characters. With
+`Split(at, false)`, retain paragraph-relative positions. After `Split(at, true)`,
+use rebased positions on the suffix. The client chooses valid character
+boundaries; the package has no text with which to check them or L1 eligibility.
+
+In an RTL paragraph, reset intervals use the RTL paragraph level. This also
+works inside nested isolates: the reset interval is removed from the enclosing
+isolates' reordering, while unaffected text keeps its embedding context. Actual
+isolate controls remain excluded from `LogicalSegments()`.
+
+`ApplyL1` mutates the working levels. Repeated or overlapping calls have the
+same effect as resetting the union of their intervals. Reversed or out-of-range
+intervals return an error without changing the receiver; an empty interval
+within its bounds is a no-op. Empty levels with no stored positions accept
+`[0, 0)` only. Keep an original `Clone` source for subsequent layout attempts;
+neither cloning nor another reset undoes a previous reset or reordering.
+
+#### Example: resetting trailing spaces
+
+Suppose `"Go אבג  דה"` wraps immediately after the two spaces following
+`"אבג"`. Those spaces must be reset to the paragraph's LTR embedding level
+before reordering the first line. In a function returning an error:
+
+```go
+text := "Go אבג  דה"
+levels := bidi.ResolveParagraph(strings.NewReader(text), nil)
+
+lineEnd := uint64(len("Go אבג  ")) // byte 11
+resetFrom := uint64(len("Go אבג")) // byte 9
+
+first, rest := levels.Clone().Split(lineEnd, false)
+
+// Reset only the trailing spaces: [9, 11).
+if err := first.ApplyL1(resetFrom, lineEnd); err != nil {
+    return err
+}
+
+firstOrder := first.Reorder()
+
+// The final line contains only "דה", so no L1 reset is needed.
+restOrder := rest.Reorder()
+// Use firstOrder and restOrder to place the shaped text for each line.
+```
+
+The first line's resulting directions are:
+
+| Byte interval | Text | Direction |
+|---|---|---|
+| `[0, 3)` | `"Go "` | LTR |
+| `[3, 9)` | `"אבג"` | RTL |
+| `[9, 11)` | `"  "` | LTR |
+
+The trailing spaces therefore appear at the **right-hand visual end** of this
+LTR line.
+
+The client identifies the interval using the original character classes. All
+positions are **UTF-8 byte offsets**; `Split(..., false)` keeps them relative to
+the original paragraph. `Clone()` preserves the original levels for another
+layout attempt.

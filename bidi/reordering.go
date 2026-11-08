@@ -10,12 +10,9 @@ import (
 
 // --- ResolvedLevels --------------------------------------------------------
 
-// Resolving embedding levels consists of application of L1 to L4.
-//
-// We will disregard rule L1 for now and leave it to the client. It would be
-// possible to remember whitespace at IRS boundaries, but we'd rather avoid
-// remembering WS runs in the middle of the paragraph, as required by rule L1,
-// because any WS may end up next to a boundary after line wrap.
+// After resolution and line breaking, ApplyL1 resets client-identified intervals
+// to the paragraph level. Original character classes are not retained, so the
+// client identifies eligible whitespace, separators and isolate controls.
 //
 // We support reversing scraps and splitting up sequences of scraps, where
 // splits may occur mid-scrap. This is better done by cords, but we'll have
@@ -319,8 +316,14 @@ func (r *Run) concat(other Run) {
 	}
 	lscr := r.scraps[len(r.scraps)-1]
 	ofst := other.scraps[0]
-	if lscr.r == ofst.l {
+	// During flattening intervals arrive in visual order. Merge only when
+	// rendering the combined interval preserves that order in this direction.
+	if r.Dir == LeftToRight && lscr.r == ofst.l {
 		lscr.r = ofst.r
+		r.scraps[len(r.scraps)-1] = lscr
+		r.scraps = append(r.scraps, other.scraps[1:]...)
+	} else if r.Dir == RightToLeft && lscr.l == ofst.r {
+		lscr.l = ofst.l
 		r.scraps[len(r.scraps)-1] = lscr
 		r.scraps = append(r.scraps, other.scraps[1:]...)
 	} else {
@@ -351,7 +354,9 @@ func reorder(scraps []scrap, i, j int, embedded Direction) []scrap {
 			}
 			reorder(ch, 0, len(ch), dir)
 			tracer().Debugf("reordered child = %v", ch)
-			if dir != embedded {
+			if dir == RightToLeft {
+				// Each child is laid out internally in left-to-right visual order;
+				// its parent's reversals move the child as a single unit.
 				tracer().Debugf("reversing total child %v", ch)
 				reverseWithoutIsolates(ch, 0, len(ch))
 				tracer().Debugf("                child = %v", ch)
@@ -538,6 +543,7 @@ func appendRuns(childRuns []Run, last Run, runs []Run) (Run, []Run) {
 	if childRuns[0].Dir == last.Dir {
 		//last.Length = childRuns[0].Length
 		last.concat(childRuns[0])
+		runs[len(runs)-1] = last
 		runs = append(runs, childRuns[1:]...)
 	} else {
 		runs = append(runs, childRuns...)
@@ -554,6 +560,9 @@ func runappend(runs []Run, r Run) []Run {
 }
 
 func directionFromBidiClass(s scrap, embedding Direction) Direction {
+	if s.l1Reset {
+		return embedding
+	}
 	switch s.bidiclz {
 	case bidi.L, bidi.LRI:
 		return LeftToRight
@@ -572,23 +581,83 @@ type Ordering struct {
 	Runs []Run
 }
 
-// Reorder reorders runs of resolved levels and returns an ordering reflecting runs
-// of characters with either L2R or R2L direction.
+// Reorder consumes the resolved levels and returns runs in left-to-right visual
+// order. ApplyL1 must precede Reorder when the line has intervals requiring an
+// L1 reset. Use Run.Segments with run.IsOpposite(LeftToRight) to visit the source
+// intervals of each run in left-to-right visual order.
 func (rl *ResolvedLevels) Reorder() *Ordering {
 	if len(rl.scraps) == 0 {
 		return &Ordering{}
 	}
+	// Children must occupy separate scraps so reversals can move them relative
+	// to the surrounding text, even when neutral resolution merged both into
+	// one parent scrap. Work from logical order before any reversals occur.
+	rl.scraps = partitionAtChildren(rl.scraps)
 	rscr := reorder(rl.scraps, 0, len(rl.scraps), rl.embedding)
+	if rl.embedding == RightToLeft {
+		// Recursive reordering is relative to the enclosing direction. The root
+		// also needs the level-1 reversal for left-to-right visual output.
+		reverseWithoutIsolates(rscr, 0, len(rscr))
+	}
 	tracer().Debugf("=====reorder done, flatten ========")
 	r := flatten(rscr, rl.embedding)
+	for i := range r {
+		if r[i].Dir == RightToLeft {
+			// flatten appends intervals in visual order. Store them in the run's
+			// own direction to honor Segments(reverse)'s public contract.
+			reverse(r[i].scraps, 0, len(r[i].scraps))
+		}
+	}
 	return &Ordering{Runs: r}
+}
+
+func partitionAtChildren(scraps []scrap) []scrap {
+	hasChildren := false
+	for _, s := range scraps {
+		if len(s.children) > 0 {
+			hasChildren = true
+			break
+		}
+	}
+	if !hasChildren {
+		return scraps
+	}
+	parts := make([]scrap, 0, len(scraps))
+	for _, s := range scraps {
+		if len(s.children) == 0 {
+			parts = append(parts, s)
+			continue
+		}
+		from := s.l
+		for _, child := range s.children {
+			if len(child) == 0 {
+				continue
+			}
+			lo, hi := child[0].l, child[len(child)-1].r
+			if from < lo {
+				gap := s
+				gap.l, gap.r, gap.children = from, lo, nil
+				parts = append(parts, gap)
+			}
+			isolated := s
+			isolated.l, isolated.r = lo, hi
+			isolated.children = [][]scrap{partitionAtChildren(child)}
+			parts = append(parts, isolated)
+			from = hi
+		}
+		if from < s.r {
+			s.l, s.children = from, nil
+			parts = append(parts, s)
+		}
+	}
+	return parts
 }
 
 // DirectionAt returns the text direction at byte position pos.
 func (rl *ResolvedLevels) DirectionAt(pos uint64) Direction {
 	for _, s := range rl.scraps {
 		if uint64(s.l) <= pos && pos < uint64(s.r) {
-			return directionFromBidiClass(s, LeftToRight)
+			return directionFromBidiClass(s, rl.embedding)
 		}
 	}
 	return LeftToRight

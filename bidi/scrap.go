@@ -35,6 +35,7 @@ type scrap struct {
 	l, r     charpos    // left and right bounds, r not included
 	context  dirContext // directional context
 	children [][]scrap  // may build up a tree of isolating run sequences
+	l1Reset  bool       // an L1-reset control retains its class but uses the paragraph direction
 }
 
 func (s scrap) String() string {
@@ -56,6 +57,7 @@ func (s *scrap) clear() {
 	s.bidiclz = cNULL
 	s.context = dirContext{}
 	s.children = nil
+	s.l1Reset = false
 }
 
 func (s *scrap) appendChild(ch []scrap) {
