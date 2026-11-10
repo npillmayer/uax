@@ -21,9 +21,9 @@ func OpenTestFile(filename string, t *testing.T) *ucdTestFile {
 	f, err := os.Open(filename)
 	if err != nil {
 		if t != nil {
-			t.Errorf("ERROR loading " + filename)
+			t.Error("ERROR loading " + filename)
 		} else {
-			fmt.Fprintf(os.Stderr, "ERROR loading "+filename)
+			fmt.Fprint(os.Stderr, "ERROR loading "+filename)
 		}
 		return nil
 	}

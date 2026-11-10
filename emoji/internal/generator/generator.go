@@ -68,7 +68,7 @@ func loadUnicodeEmojiBreakFile() (map[string][]rune, error) {
 	gopath := os.Getenv("GOPATH")
 	f, err := os.Open(gopath + "/etc/emoji-data.txt")
 	if err != nil {
-		fmt.Printf("ERROR loading " + gopath + "/etc/emoji-data.txt\n")
+		fmt.Print("ERROR loading " + gopath + "/etc/emoji-data.txt\n")
 		return nil, err
 	}
 	defer f.Close()

@@ -64,7 +64,7 @@ func loadUnicodeLineBreakFile() (map[string][]rune, error) {
 	gopath := os.Getenv("GOPATH")
 	f, err := os.Open(gopath + "/etc/LineBreak.txt")
 	if err != nil {
-		fmt.Printf("ERROR loading " + gopath + "/etc/LineBreak.txt\n")
+		fmt.Print("ERROR loading " + gopath + "/etc/LineBreak.txt\n")
 		return nil, err
 	}
 	defer f.Close()

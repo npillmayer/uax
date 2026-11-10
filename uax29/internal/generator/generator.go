@@ -70,7 +70,7 @@ func loadUnicodeLineBreakFile() (map[string][]rune, error) {
 	gopath := os.Getenv("GOPATH")
 	f, err := os.Open(gopath + "/etc/WordBreakProperty.txt")
 	if err != nil {
-		fmt.Printf("ERROR loading " + gopath + "/etc/WordBreakProperty.txt\n")
+		fmt.Print("ERROR loading " + gopath + "/etc/WordBreakProperty.txt\n")
 		return nil, err
 	}
 	defer f.Close()

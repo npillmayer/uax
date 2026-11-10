@@ -76,7 +76,7 @@ func loadUnicodeGraphemeBreakFile() (map[string][]rune, error) {
 	gopath := os.Getenv("GOPATH")
 	f, err := os.Open(gopath + "/etc/GraphemeBreakProperty.txt")
 	if err != nil {
-		fmt.Printf("ERROR loading " + gopath + "/etc/GraphemeBreakProperty.txt\n")
+		fmt.Print("ERROR loading " + gopath + "/etc/GraphemeBreakProperty.txt\n")
 		return nil, err
 	}
 	defer f.Close()

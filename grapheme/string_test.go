@@ -17,9 +17,9 @@ func TestRuneReader(t *testing.T) {
 		r, sz, err := reader.ReadRune()
 		if err != nil {
 			if err != io.EOF {
-				t.Errorf(err.Error())
+				t.Error(err)
 			} else {
-				t.Logf(err.Error())
+				t.Log(err)
 			}
 			break
 		}

@@ -71,7 +71,7 @@ func TestScannerMarkup(t *testing.T) {
 			t.Errorf("expected scrap #4 to be LRI, is %v", s)
 		}
 	}
-	t.Logf(scraps)
+	t.Log(scraps)
 }
 
 func TestScannerScraps(t *testing.T) {
@@ -105,7 +105,7 @@ func TestScannerScraps(t *testing.T) {
 		}
 		if n-1 != inp.cnt {
 			t.Logf("scanner test for [%d] \"%s\"", i, inp.str)
-			t.Logf(scraps)
+			t.Log(scraps)
 			t.Errorf("ERROR: expected scanner to produce %d scraps, have %d", inp.cnt, n-1)
 		}
 	}
