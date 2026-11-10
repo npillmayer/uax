@@ -142,7 +142,6 @@ func makeScrap(r rune, clz bidi.Class, pos charpos, length int) scrap {
 // As opposed to the generic scanner interface, which will handle character positions
 // as uint64, the bidi scanner has certain internal limits which have to fit into
 // uint32.
-//
 func (sc *bidiScanner) Scan(pipe chan<- scrap) {
 	var lookahead scrap
 	current := sc.initialOuterScrap(false)
@@ -150,12 +149,29 @@ func (sc *bidiScanner) Scan(pipe chan<- scrap) {
 	for {
 		r, length, bidiclz, ok := sc.nextRune(current.r) // read the next input rune
 		if !ok {                                         // if EOF, drain lookahead and quit
+			// A BN-only paragraph still owns its original byte interval.
+			if current.bidiclz == cNULL && current.r > current.l {
+				current.bidiclz = bidi.L
+				if sc.hasMode(optionOuterR2L) {
+					current.bidiclz = bidi.R
+				}
+			}
 			if isisolate(current) { // if last character is PDI
 				sc.handleIsolatingRunSwitch(current)
 			}
 			sc.post(current, pipe) // use lookahead as current scrap and put it onto pipe
 			sc.stop(pipe)          // then send quit signal to parser
 			break
+		}
+
+		// X9: BN characters (including soft hyphens) do not participate in
+		// resolution. Keep their bytes on the preceding scrap, without changing
+		// its class or weak/strong context. This must happen before W1–W3:
+		// treating BN as a neutral would split an LTR word in an RTL paragraph.
+		// At an isolate boundary these bytes remain with the omitted delimiter.
+		if bidiclz == bidi.BN {
+			current.r += charpos(length)
+			continue
 		}
 
 		// a rune has successfully been read ⇒ make it the new lookahead
@@ -170,6 +186,11 @@ func (sc *bidiScanner) Scan(pipe chan<- scrap) {
 		bidiclz = applyRulesW1to3(r, bidiclz, current) // UAX#9 W1–3 handled by scanner
 		//lookahead = makeScrap(r, bidiclz, lapos, length)
 		lookahead = makeScrap(r, bidiclz, current.r, length)
+		if current.bidiclz == cNULL {
+			// Leading BN bytes belong to the first real scrap. The scanner's
+			// next input position remains the original UTF-8 offset.
+			lookahead.l = current.l
+		}
 		tracer().Debugf("bidi scanner lookahead = %v", lookahead) // finally a new lookahead
 
 		// the current scrap is finished if the lookahead cannot extend it
@@ -233,7 +254,6 @@ func (sc *bidiScanner) initialOuterScrap(setIRS bool) scrap {
 
 // applyRulesW1to3 returns the Bidi_Class for a rune. It will apply certain UAX#9
 // rules immediately to relief the parser.
-//
 func applyRulesW1to3(r rune, clz bidi.Class, current scrap) bidi.Class {
 	currclz := current.bidiclz
 	switch clz { // do some pre-processing
@@ -484,12 +504,11 @@ func DefaultDirection(dir Direction) Option {
 // represented with the symbols '>', '<', and '=', respectively.” Thus it is
 // possible to replay the examples of section 3.4 of UAX#9:
 //
-//     <car MEANS CAR.=
+//	<car MEANS CAR.=
 //
 // or
 //
-//     DID YOU SAY ’>he said “<car MEANS CAR=”=‘?
-//
+//	DID YOU SAY ’>he said “<car MEANS CAR=”=‘?
 func TestMode(b bool) Option {
 	return func(sc *bidiScanner) {
 		if !sc.hasMode(optionTesting) && b ||
